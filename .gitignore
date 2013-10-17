@@ -1,0 +1,5 @@
+*.bin
+*.img
+*.flp
+qemu-1.60/
+kern/toolchain/

@@ -1,0 +1,241 @@
+     1                                  	BITS	16
+     2                                  
+     3                                  ; Size of second stage loader, in sectors
+     4                                  stage2_len:		EQU $2F
+     5                                  ; Start of second stage loader on disk, in sectors
+     6                                  stage2_start:	EQU $02
+     7                                  ; Segment to load second stage to (Physical address $00500)
+     8                                  stage2_seg:		EQU $0000
+     9                                  stage2_off:		EQU $0500
+    10                                  
+    11                                  loader_start:
+    12 00000000 B8C007                  	mov		ax, $07C0											; Set up 4K stack space after this bootloader
+    13 00000003 052001                  	add 	ax, 288												; (4096 + 512) / 16 bytes per frame
+    14 00000006 8ED0                    	mov 	ss, ax
+    15 00000008 BC0010                  	mov 	sp, 4096											; Set up SP
+    16                                  
+    17 0000000B B8C007                  	mov 	ax, $07C0											; Set data segment to where we're loaded
+    18 0000000E 8ED8                    	mov 	ds, ax
+    19                                  
+    20 00000010 8816[4601]              	mov		BYTE [BootDevice], dl								; Save boot device number
+    21                                  
+    22 00000014 30E4                    	xor		ah, ah												; Change video mode (AH = $00)
+    23 00000016 B003                    	mov		al, $03												; 40x25 text mode
+    24 00000018 CD10                    	int		$10													; Call video BIOS
+    25                                  
+    26 0000001A 31FF                    	xor		di, di												; Clear colour value
+    27 0000001C 31D2                    	xor		dx, dx												; Row 0, col 0
+    28 0000001E BE[1501]                	mov 	si, str_loadstage2									; Put string position into SI
+    29 00000021 E84700                  	call 	print_string										; Call string printing routine
+    30                                  
+    31                                  	; Enable the A20 gate so we can use the full address range
+    32                                  ;	call	check_a20											; Determine if A20 gate is set
+    33                                  ;	cmp		ax, $0												; Is A20 line disabled?
+    34                                  ;	jne		.A20GateEnabled										; If not, branch.
+    35                                  
+    36 00000024 B80124                  	mov		ax, $2401											; Try to enable A20 using the BIOS
+    37 00000027 CD15                    	int		$15
+    38 00000029 80FC00                  	cmp		ah, $0												; Was there an error?
+    39 0000002C 740C                    	je		.A20GateEnabled										; If not, branch
+    40                                  
+    41 0000002E E492                    	in		al, $92												; Use "Fast A20 Gate" method
+    42 00000030 A802                    	test	al, 2
+    43 00000032 7506                    	jnz		.A20GateEnabled
+    44 00000034 0C02                    	or		al, 2
+    45 00000036 24FE                    	and		al, $0FE
+    46 00000038 E692                    	out		$92, al
+    47                                  
+    48                                  .A20GateEnabled:
+    49 0000003A 30E4                    	xor		ah, ah												; Reset drive controller
+    50 0000003C 8A16[4601]              	mov		dl, BYTE [BootDevice]								; Device number
+    51 00000040 CD13                    	int		$13													; Reset drive
+    52                                  
+    53                                  .readStage2:
+    54 00000042 BE[4A01]                	mov 	si, ExtendedRead_Table								; address of "disk address packet"
+    55 00000045 B442                    	mov 	ah, $42												; Extended Read
+    56 00000047 8A16[4601]              	mov		dl, BYTE [BootDevice]								; Device number
+    57 0000004B CD13                    	int 	$13
+    58 0000004D 7209                    	jc 		SHORT .readErr
+    59                                  
+    60 0000004F 8A16[4601]              	mov		dl, BYTE [BootDevice]								; Fetch boot device
+    61 00000053 EA00050000              	jmp		stage2_seg:stage2_off								; Jump to second stage
+    62                                  
+    63                                  .readErr:
+    64 00000058 8B16[4701]              	mov		dx, WORD [LastCursorPosition]						; Read last cursor position
+    65 0000005C BF4F00                  	mov		di, $04F											; White text on red background
+    66 0000005F BE[2601]                	mov 	si, str_floppyError									; Put string position into SI
+    67 00000062 E80600                  	call 	print_string										; Call string printing routine
+    68                                  
+    69 00000065 31C0                    	xor		ax, ax												; Clear AX
+    70 00000067 CD16                    	int		$16													; Wait for keypress
+    71                                  
+    72 00000069 EBD7                    	jmp		.readStage2
+    73                                  
+    74                                  ;========================================================================================
+    75                                  ; Outputs the string in SI to the VGA adapter in text mode using INT10h.
+    76                                  ; Note that the start position of the string on-screen (row, col) is in EDX.
+    77                                  ;========================================================================================
+    78                                  print_string:
+    79 0000006B 52                      	push	dx													; Push column
+    80                                  
+    81 0000006C 85FF                    	test	di, di												; Check if DI is set
+    82 0000006E 7406                    	jz		.useDefaultColour									; If so, branch
+    83                                  
+    84 00000070 89F8                    	mov		ax, di												; Set colour
+    85 00000072 88C3                    	mov		bl, al												; Get low byte only
+    86 00000074 EB02                    	jmp		SHORT .setCursor
+    87                                  
+    88                                  .useDefaultColour:
+    89 00000076 B30F                    	mov		bl, $00F											; White text on black background
+    90                                  
+    91                                  .setCursor:
+    92 00000078 B402                    	mov 	ah, $02												; Set cursor position
+    93 0000007A 30FF                    	xor		bh, bh												; Video page 0 (BH = 0)
+    94 0000007C CD10                    	int		$10													; Set cursor
+    95                                  
+    96                                  .repeat:
+    97 0000007E AC                      	lodsb														; Get character from string
+    98 0000007F 3C00                    	cmp 	al, 0
+    99 00000081 7417                    	je		.done												; If char is zero, end of string
+   100                                  	
+   101 00000083 3C0A                    	cmp 	al, $0A												; Process newline
+   102 00000085 741B                    	je		.newline
+   103                                  
+   104 00000087 B90100                  	mov		cx, $01												; Write one ASCII character
+   105 0000008A 30FF                    	xor		bh, bh												; Video page 0 (BH = 0)
+   106 0000008C B409                    	mov 	ah, $09												; Write character
+   107 0000008E CD10                    	int		$10													; Print character
+   108                                  
+   109 00000090 B402                    	mov 	ah, $02												; Set cursor position
+   110 00000092 30FF                    	xor		bh, bh												; Video page 0 (BH = 0)
+   111 00000094 FEC2                    	inc		dl													; Increment column
+   112 00000096 CD10                    	int		$10													; Set cursor
+   113                                  
+   114 00000098 EBE4                    	jmp		.repeat
+   115                                  
+   116                                  .done:
+   117 0000009A 8916[4701]              	mov		WORD [LastCursorPosition], dx						; Write last cursor position
+   118 0000009E 5A                      	pop		dx													; Pop position
+   119 0000009F 31FF                    	xor		di, di												; Clear colour
+   120 000000A1 C3                      	ret
+   121                                  
+   122                                  .newline:
+   123 000000A2 5A                      	pop		dx													; Get original column
+   124 000000A3 FEC6                    	inc		dh													; Increment row
+   125 000000A5 52                      	push	dx													; Push it back to stack
+   126 000000A6 EBD6                    	jmp		.repeat
+   127                                  
+   128                                  
+   129                                  ;========================================================================================
+   130                                  ; Disk timestamp
+   131                                  ;========================================================================================
+   132 000000A8 00<rept>                	times	0xDA-($-$$) db 0									; Align at 0xDA
+   133                                  
+   134 000000DA 0000                    	dw		0
+   135 000000DC 80                      	db		$80													; Original physical drive
+   136 000000DD 00                      	db		$00													; Secs
+   137 000000DE 00                      	db		$00													; Mins
+   138 000000DF 00                      	db		$00													; Hours
+   139                                  
+   140                                  	times	0xE0-($-$$) db 0									; Align at 0xE0
+   141                                  
+   142                                  ;========================================================================================
+   143                                  ; Checks if the A20 gate is enabled.
+   144                                  ;
+   145                                  ; Returns:  0 in ax if the a20 line is disabled (memory wraps around)
+   146                                  ;			1 in ax if the a20 line is enabled (memory does not wrap around)
+   147                                  ;========================================================================================
+   148                                  check_a20:
+   149 000000E0 9C                      	pushf
+   150 000000E1 FA                      	cli
+   151                                   
+   152 000000E2 31C0                    	xor		ax, ax ; ax = 0
+   153 000000E4 8EC0                    	mov		es, ax
+   154                                   
+   155 000000E6 F7D0                    	not		ax ; ax = 0xFFFF
+   156 000000E8 8ED8                    	mov		ds, ax
+   157                                   
+   158 000000EA BF0005                  	mov		di, 0x0500
+   159 000000ED BE1005                  	mov		si, 0x0510
+   160                                   
+   161 000000F0 268A05                  	mov		al, BYTE [es:di]
+   162 000000F3 50                      	push	ax
+   163                                   
+   164 000000F4 3E8A04                  	mov		al, BYTE [ds:si]
+   165 000000F7 50                      	push	ax
+   166                                   
+   167 000000F8 26C60500                	mov		BYTE [es:di], 0x00
+   168 000000FC 3EC604FF                	mov		BYTE [ds:si], 0xFF
+   169                                   
+   170 00000100 26803DFF                	cmp		BYTE [es:di], 0xFF
+   171                                   
+   172 00000104 58                      	pop		ax
+   173 00000105 3E8804                  	mov		BYTE [ds:si], al
+   174                                   
+   175 00000108 58                      	pop		ax
+   176 00000109 268805                  	mov		BYTE [es:di], al
+   177                                   
+   178 0000010C 31C0                    	xor		ax, ax
+   179 0000010E 7403                    	je		.done
+   180                                   
+   181 00000110 B80100                  	mov		ax, 1
+   182                                   
+   183                                  .done:
+   184 00000113 9D                      	popf
+   185 00000114 C3                      	ret
+   186                                  
+   187                                  ;========================================================================================
+   188                                  ; DATA SECTION
+   189                                  ;========================================================================================
+   190                                  str_loadstage2:
+   191 00000115 4C6F6164696E672053-     	db 		"Loading Stage 2", $0A, 0
+   192 0000011E 7461676520320A00   
+   193                                  
+   194                                  str_floppyError:
+   195 00000126 52656164206572726F-     	db 		"Read error, press key to retry", $0A, 0
+   196 0000012F 722C20707265737320-
+   197 00000138 6B657920746F207265-
+   198 00000141 7472790A00         
+   199                                  
+   200                                  BootDevice:
+   201 00000146 80                      	db		$80
+   202                                  
+   203                                  LastCursorPosition:
+   204 00000147 0000                    	dw		0
+   205                                  
+   206 00000149 90                      	align 2
+   207                                  ExtendedRead_Table:
+   208 0000014A 10                      	db	$10
+   209 0000014B 00                      	db	0
+   210 0000014C 2F00                    	dw	stage2_len											; Num blocks
+   211 0000014E 0005                    	dw	stage2_off											; Dest
+   212 00000150 0000                    	dw	stage2_seg											; Memory page
+   213 00000152 01000000                	dd	stage2_start-1										; Starting LBA
+   214 00000156 00000000                	dd	0													; more storage bytes only for big lba's ( > 4 bytes )
+   215                                  
+   216                                  ;========================================================================================
+   217                                  ; MBR part 2
+   218                                  ;========================================================================================
+   219 0000015A 00<rept>                	times	0x1B8-($-$$) db 0									; Align at 0x1B8
+   220                                  
+   221 000001B8 00000000                	dd		0													; Disk signature
+   222 000001BC 0000                    	dw		0													; Reserved
+   223                                  
+   224                                  	; FAT partition 0
+   225 000001BE 80                      	db		$80													; Bootable
+   226 000001BF FEFFFF                  	db		$0FE, $0FF, $0FF									; CHS start (1023, 254, 63)
+   227 000001C2 0C                      	db		$0C													; FAT32 with LBA addressing
+   228 000001C3 FEFFFF                  	db		$0FE, $0FF, $0FF									; CHS end (1023, 254, 63)
+   229 000001C6 40000000                	dd		$40													; FAT partition table starts at sector $40 (32K of padding for bootloader)
+   230 000001CA 24FB0200                	dd		$2FB24												; 100 MB
+   231                                  	; End FAT partition 0
+   232                                  
+   233 000001CE 000000000000000000-     	dd		0, 0, 0, 0											; Partition entry 2
+   234 000001D7 00000000000000     
+   235 000001DE 000000000000000000-     	dd		0, 0, 0, 0											; Partition entry 3
+   236 000001E7 00000000000000     
+   237 000001EE 000000000000000000-     	dd		0, 0, 0, 0											; Partition entry 4
+   238 000001F7 00000000000000     
+   239                                  
+   240                                  	times	510-($-$$) db 0										; Pad remainder of boot sector with 0s
+   241 000001FE 55AA                    	dw 		0xAA55												; Standard PC boot signature

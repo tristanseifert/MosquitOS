@@ -1,0 +1,1167 @@
+     1                                  	BITS	16
+     2                                  	org		$0500
+     3                                  
+     4                                  ; Kernel will be loaded to segment $0300, or $003000 physical
+     5                                  kern_loc:				EQU $0300
+     6                                  kern_loc_phys:			EQU kern_loc<<4
+     7                                  kern_start:				EQU 6
+     8                                  kern_len:				EQU 32									; Length in sectors
+     9                                  
+    10                                  ; Location to store various BIOS info at
+    11                                  Kern_Info_Struct:		EQU $0160								; $001600 phys (len = $400 max)
+    12                                  VESA_SupportedModes:	EQU	$01A0								; $001A00 phys (len = $200)
+    13                                  BIOS_MemMapSeg:			EQU	$0200								; $002000 phys (len = $800 max)
+    14                                  
+    15                                  struc KernInfoStruct
+    16                                  	.munchieValue	resd	0									; Munchie value
+    17                                  	.supportBits	resw	0									; Support Bitfield
+    18                                  	.high16Mem		resw	0									; 64K blocks above 16M
+    19                                  	.low16Mem		resw	0									; 1K blocks below 16M
+    20                                  	.memMap			resd	0									; Physical pointer to memory map
+    21                                  	.vesaSupport	resb	0									; VESA support byte
+    22                                  	.bootDrive		resb	0									; Boot drive
+    23                                  	.vesaMap		resd	0									; Physical pointer to VESA mode map
+    24                                  endstruc
+    25                                  
+    26                                  %define KINFO(x)  gs:di + KernInfoStruct. %+ x
+    27                                  
+    28                                  stage2_start:
+    29 00000000 8CC8                    	mov 	ax, cs												; Set segment to where we're loaded
+    30 00000002 8ED8                    	mov 	ds, ax
+    31                                  
+    32 00000004 8816[A806]              	mov		BYTE [BootDevice], dl								; Save boot device number
+    33                                  
+    34                                  	; Set up GS to point to a place in memory that houses the kernel info structure
+    35 00000008 B86001                  	mov		ax, Kern_Info_Struct								; Place that houses the struct
+    36 0000000B 8EE8                    	mov		gs, ax												; Set up register
+    37                                  
+    38 0000000D 31FF                    	xor		di, di												; Clear DI
+    39 0000000F 6566C7054B45524E        	mov		[KINFO(munchieValue)], DWORD "KERN"					; Set magic value for kern struct
+    40                                  
+    41 00000017 A0[A806]                	mov		al, [BootDevice]									; Set boot drive
+    42 0000001A 658805                  	mov		[KINFO(bootDrive)], al								; ""
+    43                                  
+    44                                  	; Set up video
+    45 0000001D B400                    	mov		ah, $00												; Change video mode
+    46 0000001F B003                    	mov		al, $03												; 80x25 text mode
+    47 00000021 CD10                    	int		$10													; Call video BIOS
+    48                                  
+    49 00000023 BE[E304]                	mov 	si, str_stage2loaded								; Put string position into SI
+    50 00000026 BA0000                  	mov		dx, $0000											; Cursor position
+    51 00000029 BF2F00                  	mov		di, $2F												; Set colour
+    52 0000002C E80E03                  	call 	print_string										; Call string printing routine
+    53                                  
+    54                                  	; Call VESA BIOS routines to get supported video modes
+    55 0000002F B8A001                  	mov		ax, VESA_SupportedModes								; Memory location of supported mode struct
+    56 00000032 8EC0                    	mov		es, ax												; ""
+    57 00000034 31FF                    	xor		di, di												; Offset 0 in segment
+    58                                  
+    59 00000036 2666C70556424532        	mov		[es:di], DWORD "VBE2"								; Tell BIOS we want 512 bytes of data
+    60                                  
+    61 0000003E B8004F                  	mov		ax, $4F00											; VESA BIOS routines — get supported modes
+    62 00000041 CD10                    	int		$10													; Perform lookup
+    63                                  
+    64 00000043 84E4                    	test	ah, ah												; Is AH not zero (i.e. error)
+    65 00000045 7400                    	je		.vesaDone											; If so, VESA is unsupported
+    66                                  
+    67                                  .vesaDone:
+    68                                  	; Call BIOS to get memory information
+    69 00000047 31C9                    	xor 	cx, cx
+    70 00000049 31D2                    	xor 	dx, dx
+    71 0000004B B801E8                  	mov 	ax, $0E801
+    72 0000004E CD15                    	int 	$15													; Request upper memory size
+    73 00000050 7278                    	jc 		error_memoryDetect
+    74 00000052 80FC86                  	cmp 	ah, $86												; Unsupported function
+    75 00000055 7473                    	je		error_memoryDetect
+    76 00000057 80FC80                  	cmp		ah, $80												; Invalid command
+    77 0000005A 746E                    	je		error_memoryDetect
+    78 0000005C E304                    	jcxz 	.useax												; Was the CX result invalid?
+    79                                   
+    80 0000005E 89C8                    	mov		ax, cx												; Number of continuous 1K blocks (1M-16M)
+    81 00000060 89D3                    	mov		bx, dx												; Number of continuous 64K block above 16M
+    82                                  
+    83                                  .useax:
+    84 00000062 31FF                    	xor		di, di												; Clear DI
+    85 00000064 891E[AB06]              	mov		WORD [MemBlocksAbove16M], bx						; Store amount of memory available
+    86 00000068 65891D                  	mov		[KINFO(high16Mem)], bx								; ""
+    87 0000006B A3[AD06]                	mov		WORD [MemBlocksBelow16M], ax						; ""
+    88 0000006E 658905                  	mov		[KINFO(low16Mem)], ax								; ""
+    89                                  
+    90 00000071 E8A402                  	call	display_memsize										; Display the memory size
+    91                                  
+    92                                  	; Fetch memory map
+    93 00000074 B80002                  	mov 	ax, BIOS_MemMapSeg									; Write mem map to $01800 in physical space
+    94 00000077 8EC0                    	mov 	es, ax
+    95 00000079 BF0000                  	mov		di, $0000											; Start of segment
+    96                                  
+    97 0000007C E86703                  	call	fetch_mem_map										; Fetch a memory map
+    98 0000007F 7249                    	jc 		SHORT error_memoryDetect							; Branch if error
+    99 00000081 892E[AF06]              	mov		WORD [MemMap_NumEntries], bp						; Store number of memory map entries
+   100                                  
+   101                                  	; Initialise FAT library
+   102 00000085 E8B806                  	call	FAT_Init
+   103                                  
+   104                                  	; Check which partitions are bootable from MBR partition map
+   105 00000088 E88101                  	call	find_bootable_partitions
+   106                                  
+   107                                  	; Set up the partition chooser UI
+   108 0000008B E84400                  	call	render_partition_chooser
+   109                                  
+   110                                  	; Process keypresses
+   111 0000008E E83701                  	call	chooser_loop
+   112                                  
+   113                                  	; Load kernel
+   114 00000091 E82802                  	call	load_kernel											; Load the kernel
+   115                                  
+   116                                  	; Hide cursor
+   117 00000094 31D2                    	xor		dx, dx												; Clear dx
+   118 00000096 F7D2                    	not		dx													; dx = $FFFF
+   119 00000098 B402                    	mov 	ah, $02												; Set cursor position
+   120 0000009A 30FF                    	xor		bh, bh												; Video page 0 (BH = 0)
+   121 0000009C CD10                    	int		$10													; Set cursor
+   122                                  
+   123                                  	; Set up GDT
+   124 0000009E FA                      	cli															; Disable ints
+   125 0000009F 0F0116[3807]            	lgdt	[gdt_table]											; Set up GDTR
+   126                                  
+   127 000000A4 8B360000                	mov		si, [KernInfoStruct]								; Load address to kernel info struct in SI
+   128                                  
+   129 000000A8 EBFE                    	jmp		$
+   130                                  
+   131                                  	; Jump into protected mode, woot!
+   132 000000AA 0F20C0                  	mov		eax, cr0											; Get control reg
+   133 000000AD 0C01                    	or		al, 00000001b										; Set PE bit
+   134 000000AF 0F22C0                  	mov		cr0, eax											; Write control reg
+   135                                  
+   136                                  	; Set up selectors
+   137 000000B2 B80800                  	mov		ax, $08												; CODE32_DESCRIPTOR
+   138 000000B5 8ED8                    	mov		ds, ax												; Set data selector
+   139                                  
+   140 000000B7 B81000                  	mov		ax, $10												; DATA32_DESCRIPTOR
+   141 000000BA 8EC0                    	mov		es, ax												; Update other selectors to point to data segment
+   142 000000BC 8EE0                    	mov		fs, ax
+   143 000000BE 8EE8                    	mov		gs, ax
+   144 000000C0 8ED0                    	mov		ss, ax
+   145                                  
+   146                                  	; The kernel is loaded to $00003000 phys (segmented address 0300h:0000h)
+   147 000000C2 66                      	db		$66													; 32-bit prefix
+   148 000000C3 EA                      	db		$0EA												; Far jump opcode
+   149 000000C4 00300000                	dd		kern_loc_phys										; Physical kernel lcoation
+   150 000000C8 0800                    	dw		$08													; Selector for CODE32_DESCRIPTOR
+   151                                  
+   152                                  ;========================================================================================
+   153                                  ; Memory detection error handler
+   154                                  ;========================================================================================
+   155                                  error_memoryDetect:
+   156 000000CA BE[FE04]                	mov 	si, str_errorDetectMem								; Put string position into SI
+   157 000000CD E86702                  	call 	print_error											; Call string printing routine
+   158 000000D0 EBFE                    	jmp		$
+   159                                  
+   160                                  ;========================================================================================
+   161                                  ; Renders the partition chooser
+   162                                  ;========================================================================================
+   163                                  render_partition_chooser:
+   164 000000D2 BE[AC05]                	mov 	si, str_select_partition							; Put string position into SI
+   165 000000D5 BA0105                  	mov		dx, $0501											; Cursor position
+   166 000000D8 BF0700                  	mov		di, $07												; Set colour
+   167 000000DB E85F02                  	call 	print_string										; Call string printing routine
+   168                                  
+   169 000000DE C706[A906]0407          	mov		WORD [LastCursorPosition], 0x0704					; Read last cursor position
+   170                                  
+   171 000000E4 66BA[B1060000]          	mov		edx, HDD_BootablePartitions							; EDX contains bootable partition ptr
+   172 000000EA B90400                  	mov		cx, $04												; Loop 4x
+   173                                  
+   174                                  .disp_loop:
+   175 000000ED 678A02                  	mov		al, BYTE [edx]										; Read bootability
+   176 000000F0 2480                    	and		al, $80												; Get high bit only
+   177 000000F2 3C80                    	cmp		al, $80												; Is it $80?
+   178 000000F4 7505                    	jne		.not_bootable										; If not, it's not a bootable drive
+   179                                  
+   180 000000F6 E81300                  	call	.render_boot										; Render bootable drive label
+   181                                  
+   182 000000F9 EB03                    	jmp		SHORT .next											; Skip over non-bootable code
+   183                                  
+   184                                  .not_bootable:
+   185 000000FB E87600                  	call	.render_noboot										; Render non-bootable drive label
+   186                                  
+   187                                  .next:
+   188 000000FE 6642                    	inc		edx													; Go to next item
+   189 00000100 E2EB                    	loop	.disp_loop											; Loop over all 4 partitions
+   190                                  
+   191 00000102 BA010C                  	mov		dx, $0C01
+   192 00000105 BE[0B06]                	mov		si, str_err_clear_err								; Clear error
+   193 00000108 E83202                  	call	print_string										; Display
+   194                                  
+   195 0000010B C3                      	ret
+   196                                  
+   197                                  ;========================================================================================
+   198                                  ; Renders an entry for a bootable drive
+   199                                  ;========================================================================================
+   200                                  .render_boot:
+   201 0000010C B004                    	mov		al, $04												; Max drive num to al
+   202 0000010E 28C8                    	sub		al, cl												; Subtract loop counter
+   203 00000110 A2[7301]                	mov		BYTE [.index], al									; Write index
+   204 00000113 0430                    	add		al, $30												; ASCII numbers
+   205                                  
+   206 00000115 66C706[EA06]686430-     	mov		DWORD [Temp_StrBuf], "hd0,"							; "hd0," text
+   207 0000011D 2C                 
+   208 0000011E A2[EE06]                	mov		BYTE [Temp_StrBuf+4], al							; Drive number converted to ascii
+   209 00000121 C706[EF06]3A20          	mov		WORD [Temp_StrBuf+5], ": "							; Colon, space
+   210                                  
+   211 00000127 60                      	pusha														; Push registers
+   212 00000128 66BA[F1060000]          	mov		edx, Temp_StrBuf+7									; String buffer write place
+   213 0000012E 66BB[BA060000]          	mov		ebx, HDD_PartitionNames								; Partition names
+   214 00000134 B90C00                  	mov		cx, $0C												; $0C characters
+   215                                  
+   216                                  .copyNameLoop:
+   217 00000137 678A03                  	mov		al, BYTE [ebx]										; Copy a character
+   218 0000013A 678802                  	mov		BYTE [edx], al										; Write to temp buffer
+   219 0000013D 6643                    	inc		ebx													; Increment read pointer
+   220 0000013F 6642                    	inc		edx													; Increment write pointer
+   221 00000141 E2F4                    	loop	.copyNameLoop
+   222                                  
+   223 00000143 67C742FF0A00            	mov		WORD [edx-1], 0x000A								; Insert newline
+   224                                  
+   225 00000149 6631C0                  	xor		eax, eax											; Clear EAX
+   226 0000014C 66BA[B5060000]          	mov		edx, HDD_BootablePartitionsFATType					; FAT type matrix
+   227 00000152 0216[7301]              	add		dl, BYTE [.index]
+   228 00000156 678A02                  	mov		al, BYTE [edx]										; Read FAT type to AL
+   229                                  ;	call	hex_to_ascii
+   230                                  
+   231 00000159 8A1E[B906]              	mov		bl, BYTE [HDD_Selected]								; Read index of selected HDD
+   232 0000015D 80E303                  	and		bl, $3												; Get low 2 bits only
+   233 00000160 38D9                    	cmp		cl, bl												; Is current drive equal to selection?
+   234 00000162 7503                    	jne		.no_highlight										; If not, branch.
+   235                                  
+   236 00000164 BF7000                  	mov		di, $070											; Black text on white background
+   237                                  
+   238                                  .no_highlight:
+   239 00000167 8B16[A906]              	mov		dx, WORD [LastCursorPosition]						; Read last cursor position
+   240 0000016B BE[EA06]                	mov		si, Temp_StrBuf										; Temporary string buffer
+   241 0000016E E8CC01                  	call 	print_string										; Call string printing routine
+   242 00000171 61                      	popa														; Pop registers
+   243                                  
+   244 00000172 C3                      	ret
+   245                                  
+   246                                  .index:
+   247 00000173 00                      	db	0
+   248                                  
+   249                                  ;========================================================================================
+   250                                  ; Renders an entry for a non-bootable drive.
+   251                                  ;========================================================================================
+   252                                  	align 4
+   253                                  
+   254                                  .render_noboot:
+   255 00000174 B004                    	mov		al, $04												; Max drive num to al
+   256 00000176 28C8                    	sub		al, cl												; Subtract loop counter
+   257 00000178 0430                    	add		al, $30												; ASCII numbers
+   258                                  
+   259 0000017A 66C706[EA06]686430-     	mov		DWORD [Temp_StrBuf], "hd0,"							; "hd0," text
+   260 00000182 2C                 
+   261 00000183 A2[EE06]                	mov		BYTE [Temp_StrBuf+4], al							; Drive number converted to ascii
+   262 00000186 66C706[EF06]3A204E-     	mov		DWORD [Temp_StrBuf+5], ": No"						; "Not Bootable"
+   263 0000018E 6F                 
+   264 0000018F 66C706[F306]742042-     	mov		DWORD [Temp_StrBuf+9], "t Bo"
+   265 00000197 6F                 
+   266 00000198 66C706[F706]6F7461-     	mov		DWORD [Temp_StrBuf+13], "otab"
+   267 000001A0 62                 
+   268 000001A1 C706[FB06]6C65          	mov		WORD [Temp_StrBuf+17], "le"
+   269 000001A7 C706[FD06]0A00          	mov		WORD [Temp_StrBuf+19], 0x000A						; Newline, terminator
+   270                                  
+   271 000001AD 60                      	pusha														; Push registers
+   272                                  
+   273 000001AE 8A1E[B906]              	mov		bl, BYTE [HDD_Selected]								; Read index of selected HDD
+   274 000001B2 80E303                  	and		bl, $3												; Get low 2 bits only
+   275 000001B5 38D9                    	cmp		cl, bl												; Is current drive equal to selection?
+   276 000001B7 7503                    	jne		.no_highlight2										; If not, branch.
+   277                                  
+   278 000001B9 BF7000                  	mov		di, $070											; Black text on white background
+   279                                  
+   280                                  .no_highlight2:
+   281 000001BC 8B16[A906]              	mov		dx, WORD [LastCursorPosition]						; Read last cursor position
+   282 000001C0 BE[EA06]                	mov		si, Temp_StrBuf										; Temporary string buffer
+   283 000001C3 E87701                  	call 	print_string										; Call string printing routine
+   284 000001C6 61                      	popa														; Pop registers
+   285                                  
+   286 000001C7 C3                      	ret
+   287                                  
+   288                                  ;========================================================================================
+   289                                  ; Handle keypresses for chooser
+   290                                  ;========================================================================================
+   291                                  chooser_loop:
+   292 000001C8 30E4                    	xor		ah, ah												; Wait for keystroke
+   293 000001CA CD16                    	int		$16													; Call into BIOS
+   294                                  
+   295 000001CC 80FC50                  	cmp		ah, $50												; Down pressed?
+   296 000001CF 7429                    	je		partition_chooser_dn
+   297                                  
+   298 000001D1 80FC48                  	cmp		ah, $48												; Up pressed?
+   299 000001D4 742D                    	je		partition_chooser_up
+   300                                  
+   301 000001D6 80FC1C                  	cmp		ah, $1C												; Enter pressed?
+   302 000001D9 7402                    	je		partition_chooser_enter
+   303                                  
+   304 000001DB EBEB                    	jmp		chooser_loop
+   305                                  
+   306                                  partition_chooser_enter:
+   307 000001DD B304                    	mov		bl, $04												; $04 = drive 0
+   308 000001DF A0[B906]                	mov		al, BYTE [HDD_Selected]								; Get selection
+   309 000001E2 28C3                    	sub		bl, al												; Subtract
+   310                                  
+   311 000001E4 8A87[B106]              	mov		al, BYTE [HDD_BootablePartitions+bx]				; Check bootability status
+   312 000001E8 2480                    	and		al, $80												; Get high bit only
+   313 000001EA 3C80                    	cmp		al, $80
+   314 000001EC 7501                    	jne		.noBootErr											; If not bootable, branch
+   315                                  
+   316 000001EE C3                      	ret
+   317                                  
+   318                                  .noBootErr:
+   319 000001EF BA010C                  	mov		dx, $0C01
+   320 000001F2 BE[E105]                	mov		si, str_err_not_bootable							; Not bootable error
+   321 000001F5 E83F01                  	call	print_error											; Display
+   322 000001F8 EBCE                    	jmp		chooser_loop
+   323                                  
+   324                                  partition_chooser_dn:
+   325 000001FA FE0E[B906]              	dec		BYTE [HDD_Selected]									; Increment HDD selection
+   326 000001FE E8D1FE                  	call	render_partition_chooser							; Update display
+   327 00000201 EBC5                    	jmp		chooser_loop
+   328                                  
+   329                                  partition_chooser_up:
+   330 00000203 FE06[B906]              	inc		BYTE [HDD_Selected]									; Decrement HDD selection	
+   331 00000207 E8C8FE                  	call	render_partition_chooser							; Update display
+   332 0000020A EBBC                    	jmp		chooser_loop
+   333                                  
+   334                                  ;========================================================================================
+   335                                  ; Finds all partitions that are bootable.
+   336                                  ;========================================================================================
+   337                                  find_bootable_partitions:
+   338 0000020C B90400                  	mov		cx, $4												; MBR contains 4 partition maps
+   339                                  
+   340 0000020F B8C007                  	mov		ax, $07C0											; Bootloader at 0x7C00
+   341 00000212 8EC0                    	mov		es, ax												; Set ES to the bootloader's place in memory
+   342 00000214 BFBE01                  	mov		di, $1BE											; Start of partition map
+   343                                  
+   344 00000217 8CD8                    	mov		ax, ds												; Fetch data segment
+   345 00000219 8EE8                    	mov		gs, ax												; Set GS to data segment
+   346                                  
+   347 0000021B 66BE[B1060000]          	mov		esi, HDD_BootablePartitions							; ESI contains bootable partition ptr
+   348 00000221 66BA[BA060000]          	mov		edx, HDD_PartitionNames								; Partition name ptr
+   349                                  
+   350                                  .loop:
+   351 00000227 268A05                  	mov		al, BYTE [es:di]									; Read bootable flag
+   352 0000022A 2480                    	and		al, $80												; Get high bit only
+   353 0000022C 3C80                    	cmp		al, $80												; Is it $80?
+   354 0000022E 7547                    	jne		.not_bootable										; If not, it's not a bootable drive
+   355                                  
+   356 00000230 678806                  	mov		BYTE [esi], al										; Write bootability flag
+   357                                  
+   358 00000233 880E[B906]              	mov		BYTE [HDD_Selected], cl								; Write index
+   359                                  
+   360                                  	; Try to read the LBA of the partition
+   361 00000237 26668B4508              	mov		eax, DWORD [es:di+8]								; Read partition LBA
+   362 0000023C 663D00000000            	cmp		eax, $00											; Is it zero?
+   363 00000242 7433                    	je		.no_valid_lba										; If so, fuck off
+   364                                  
+   365 00000244 66A3[1207]              	mov		DWORD [ExtendedRead_Table+0x08], eax				; Write LBA
+   366 00000248 C706[0C07]0100          	mov		WORD [ExtendedRead_Table+0x02], 0x01				; Read one sector
+   367 0000024E C706[0E07][4C08]        	mov		WORD [ExtendedRead_Table+0x04], SectorBuf			; Temporary sector buffer offset (seg 0)
+   368                                  
+   369 00000254 60                      	pusha														; Push registers (BIOS may clobber them)
+   370 00000255 BE[0A07]                	mov 	si, ExtendedRead_Table								; address of "disk address packet"
+   371 00000258 B442                    	mov 	ah, $42												; Extended Read
+   372 0000025A 8A16[A806]              	mov		dl, BYTE [BootDevice]								; Device number
+   373 0000025E CD13                    	int 	$13
+   374 00000260 61                      	popa														; Pop registers
+   375 00000261 7214                    	jc 		SHORT .no_valid_lba									; If error, fuck off
+   376                                  
+   377 00000263 E82100                  	call	.typeDetermine										; Determine type and label loc
+   378                                  
+   379 00000266 51                      	push	cx													; Back up original loop counter
+   380                                  
+   381 00000267 B90B00                  	mov		cx, $0B												; Copy 0xB bytes
+   382                                  .copy_str_loop:
+   383 0000026A 678A18                  	mov		bl, BYTE [eax]										; Copy from source
+   384 0000026D 67881A                  	mov		BYTE [edx], bl										; Write to target buffer
+   385 00000270 6640                    	inc		eax													; Increment read pointer
+   386 00000272 6642                    	inc		edx													; Increment write pointer
+   387 00000274 E2F4                    	loop	.copy_str_loop										; Copy all bytes.
+   388                                  
+   389 00000276 59                      	pop		cx													; Restore original loop counter.
+   390                                  
+   391                                  .no_valid_lba:
+   392                                  
+   393                                  .not_bootable:
+   394 00000277 81C71000                	add		di, $10												; Go to next entry in bootsector
+   395 0000027B 6646                    	inc		esi													; Write next bootability flag
+   396 0000027D 6681C20C000000          	add		edx, $0C											; Each entry of partition names is 0x0C in length
+   397 00000284 E2A1                    	loop	.loop												; Loop through all partitions
+   398                                  
+   399                                  .done:
+   400 00000286 C3                      	ret
+   401                                  
+   402                                  ; Determines FAT type and stores pointer to read volume label in eax
+   403                                  .typeDetermine:
+   404 00000287 6656                    	push	esi													; Push old ESI
+   405 00000289 BE[4C08]                	mov		si, SectorBuf										; Sector buffer
+   406 0000028C E8CB04                  	call	FAT_DetermineType									; Determine type of FS
+   407 0000028F 665E                    	pop		esi													; Pop ESI
+   408                                  
+   409 00000291 6652                    	push	edx													; Back up EDX
+   410 00000293 B304                    	mov		bl, $04												; Max drive num to al
+   411 00000295 28CB                    	sub		bl, cl												; Subtract loop counter
+   412                                  
+   413 00000297 66BA[B5060000]          	mov		edx, HDD_BootablePartitionsFATType					; FAT type ptr
+   414 0000029D 28DA                    	sub		dl, bl												; Subtract index
+   415 0000029F 678802                  	mov		BYTE [edx], al										; Write FAT size
+   416 000002A2 665A                    	pop		edx													; Restore EDX
+   417                                  
+   418 000002A4 3C20                    	cmp		al, $20												; Is it a FAT32 volume?
+   419 000002A6 7509                    	jne		.fat16_label										; If so, branch
+   420                                  
+   421 000002A8 66B8[93080000]          	mov		eax, SectorBuf+$47									; FAT32 has volume label at 0x47
+   422                                  
+   423 000002AE E90600                  	jmp		.copy												; Copy label
+   424                                  
+   425                                  	; Extract volume label from sector buffer
+   426                                  .fat16_label:
+   427 000002B1 66B8[77080000]          	mov		eax, SectorBuf+$2B									; FAT16 has volume label at 0x2B
+   428                                  
+   429                                  .copy:
+   430 000002B7 C3                      	ret
+   431                                  
+   432                                  .index:
+   433 000002B8 00                      	db		0
+   434                                  
+   435                                  ;========================================================================================
+   436                                  ; Loads the kernel from the floppy.
+   437                                  ;========================================================================================
+   438 000002B9 90<rept>                	align 4
+   439                                  
+   440                                  load_kernel:
+   441 000002BC BE[4C06]                	mov 	si, str_kernel_loading								; Put string position into SI
+   442 000002BF BA000C                  	mov		dx, $0C00											; Cursor position
+   443 000002C2 BF0200                  	mov		di, $02												; Set colour
+   444 000002C5 E87500                  	call 	print_string										; Call string printing routine
+   445                                  
+   446 000002C8 B80600                  	mov		ax, kern_start										; Read start sector
+   447 000002CB E8DA00                  	call	hex_to_ascii										; Display start sector
+   448 000002CE 8B16[A906]              	mov		dx, WORD [LastCursorPosition]						; Read last cursor position
+   449 000002D2 FEC2                    	inc		dl													; Move to right one
+   450 000002D4 8916[A906]              	mov		WORD [LastCursorPosition], dx						; Write last cursor position
+   451 000002D8 B82000                  	mov		ax, kern_len										; Read length sector
+   452 000002DB E8CA00                  	call	hex_to_ascii										; Display length sector
+   453                                  
+   454                                  	; Now, load the kernel from the floppy
+   455 000002DE 30E4                    	xor 	ah, ah												; Function 0x0
+   456 000002E0 8A16[A806]              	mov		dl, BYTE [BootDevice]								; Fetch device to reset
+   457 000002E4 CD13                    	int 	$13													; int BIOS
+   458                                  
+   459                                  .readKernel:
+   460                                  	; Load the second stage of the bootloader to es = 0x0800, bx = 0x0000 (0800h:0000h, $8000 phys)
+   461 000002E6 BB0003                  	mov		bx, kern_loc										; Segment to load to
+   462 000002E9 8EC3                    	mov		es, bx												; Write to ES
+   463 000002EB 31DB                    	xor		bx, bx												; Offset to read into (start of segment)
+   464                                  
+   465 000002ED B402                    	mov		ah, $02												; Function 0x02
+   466 000002EF B020                    	mov		al, kern_len										; Read correct number of sectors
+   467 000002F1 30ED                    	xor		ch, ch												; Track 0
+   468 000002F3 B106                    	mov		cl, kern_start										; Load start of kernel
+   469 000002F5 30F6                    	xor		dh, dh												; Head 0
+   470 000002F7 8A16[A806]              	mov		dl, BYTE [BootDevice]								; Fetch boot device
+   471 000002FB CD13                    	int 	$13													; int BIOS
+   472                                  
+   473 000002FD 720D                    	jc		.floppyErr											; Repeat until success
+   474                                  
+   475 000002FF BE[5D06]                	mov 	si, str_kernel_loaded_ok							; Put string position into SI
+   476 00000302 BA000D                  	mov		dx, $0D00											; Cursor position
+   477 00000305 BF0200                  	mov		di, $02												; Set colour
+   478 00000308 E83200                  	call 	print_string										; Call string printing routine
+   479                                  
+   480 0000030B C3                      	ret
+   481                                  
+   482                                  .floppyErr:
+   483 0000030C BE[3005]                	mov 	si, str_floppyError									; Put string position into SI
+   484 0000030F E82500                  	call 	print_error											; Call string printing routine
+   485                                  
+   486 00000312 31C0                    	xor		ax, ax												; Clear AX
+   487 00000314 CD16                    	int		$16													; Wait for keypress
+   488                                  
+   489 00000316 EBCE                    	jmp		.readKernel
+   490                                  
+   491                                  ;========================================================================================
+   492                                  ; Displays the memory size on the screen 
+   493                                  ;========================================================================================
+   494                                  display_memsize:
+   495 00000318 BE[5605]                	mov 	si, str_available_lomem								; Put string position into SI
+   496 0000031B BA0002                  	mov		dx, $0200
+   497 0000031E E81C00                  	call 	print_string										; Call string printing routine
+   498 00000321 A1[AD06]                	mov		ax, WORD [MemBlocksBelow16M]						; Get total of memory blocks to EDX
+   499 00000324 E88100                  	call	hex_to_ascii
+   500                                  
+   501 00000327 BE[8105]                	mov 	si, str_available_himem								; Put string position into SI
+   502 0000032A BA0003                  	mov		dx, $0300
+   503 0000032D E80D00                  	call 	print_string										; Call string printing routine
+   504 00000330 A1[AB06]                	mov		ax, WORD [MemBlocksAbove16M]						; Get total of memory blocks to EDX
+   505 00000333 E87200                  	call	hex_to_ascii
+   506                                  
+   507 00000336 C3                      	ret
+   508                                  
+   509                                  ;========================================================================================
+   510                                  ; Outputs the string in SI to the VGA adapter in text mode using INT10h with the styling
+   511                                  ; required for an error string.
+   512                                  ; Note that the start position of the string on-screen (row, col) is in EDX.
+   513                                  ;========================================================================================
+   514                                  print_error:
+   515 00000337 BF4F00                  	mov		di, $04F											; White text on red background
+   516 0000033A E90000                  	jmp 	print_string										; Call string printing routine
+   517                                  
+   518                                  ;========================================================================================
+   519                                  ; Outputs the string in SI to the VGA adapter in text mode using INT10h.
+   520                                  ; Note that the start position of the string on-screen (row, col) is in EDX.
+   521                                  ;========================================================================================
+   522                                  print_string:
+   523 0000033D 52                      	push	dx													; Push column
+   524                                  
+   525 0000033E 85FF                    	test	di, di												; Check if DI is set
+   526 00000340 7406                    	jz		.useDefaultColour									; If so, branch
+   527                                  
+   528 00000342 89F8                    	mov		ax, di												; Set colour
+   529 00000344 88C3                    	mov		bl, al												; Get low byte only
+   530 00000346 EB02                    	jmp		SHORT .setCursor
+   531                                  
+   532                                  .useDefaultColour:
+   533 00000348 B307                    	mov		bl, $007											; Light gray text on black background
+   534                                  
+   535                                  .setCursor:
+   536 0000034A B402                    	mov 	ah, $02												; Set cursor position
+   537 0000034C 30FF                    	xor		bh, bh												; Video page 0 (BH = 0)
+   538 0000034E CD10                    	int		$10													; Set cursor
+   539                                  
+   540                                  .repeat:
+   541 00000350 AC                      	lodsb														; Get character from string
+   542 00000351 3C00                    	cmp 	al, 0
+   543 00000353 7417                    	je		.done												; If char is zero, end of string
+   544                                  	
+   545 00000355 3C0A                    	cmp 	al, $0A												; Process newline
+   546 00000357 741B                    	je		.newline
+   547                                  
+   548 00000359 B90100                  	mov		cx, $01												; Write one ASCII character
+   549 0000035C 30FF                    	xor		bh, bh												; Video page 0 (BH = 0)
+   550 0000035E B409                    	mov 	ah, $09												; Write character
+   551 00000360 CD10                    	int		$10													; Print character
+   552                                  
+   553 00000362 B402                    	mov 	ah, $02												; Set cursor position
+   554 00000364 30FF                    	xor		bh, bh												; Video page 0 (BH = 0)
+   555 00000366 FEC2                    	inc		dl													; Increment column
+   556 00000368 CD10                    	int		$10													; Set cursor
+   557                                  
+   558 0000036A EBE4                    	jmp		.repeat
+   559                                  
+   560                                  .done:
+   561 0000036C 8916[A906]              	mov		WORD [LastCursorPosition], dx						; Write last cursor position
+   562 00000370 5A                      	pop		dx													; Pop position
+   563 00000371 31FF                    	xor		di, di												; Clear colour
+   564 00000373 C3                      	ret
+   565                                  
+   566                                  .newline:
+   567 00000374 5A                      	pop		dx													; Get original column
+   568 00000375 FEC6                    	inc		dh													; Increment row
+   569 00000377 52                      	push	dx													; Push it back to stack
+   570 00000378 EBD6                    	jmp		.repeat
+   571                                  
+   572                                  ;========================================================================================
+   573                                  ; Prints the character in al to the screen at the current cursor position, using the
+   574                                  ; colour in di.
+   575                                  ;========================================================================================
+   576                                  putc:
+   577 0000037A 85FF                    	test	di, di												; Check if DI is set
+   578 0000037C 7406                    	jz		.useDefaultColour									; If so, branch
+   579                                  
+   580 0000037E 89F8                    	mov		ax, di												; Set colour
+   581 00000380 88C3                    	mov		bl, al												; Get low byte only
+   582 00000382 EB02                    	jmp		SHORT .setCursor
+   583                                  
+   584                                  .useDefaultColour:
+   585 00000384 B307                    	mov		bl, $007											; Light gray text on black background
+   586                                  
+   587                                  .setCursor:
+   588 00000386 8B16[A906]              	mov		dx, WORD [LastCursorPosition]						; Read last cursor position
+   589 0000038A B402                    	mov 	ah, $02												; Set cursor position
+   590 0000038C B700                    	mov		bh, $0												; Video page 0
+   591 0000038E CD10                    	int		$10													; Set cursor
+   592                                  
+   593 00000390 B90100                  	mov		cx, $01												; Write one ASCII character
+   594 00000393 B700                    	mov		bh, $0												; Video page 0
+   595 00000395 B409                    	mov 	ah, $09												; Write character
+   596 00000397 CD10                    	int		$10													; Print character
+   597                                  
+   598 00000399 FEC2                    	inc		dl													; Increment column
+   599                                  
+   600 0000039B B402                    	mov 	ah, $02												; Set cursor position
+   601 0000039D B700                    	mov		bh, $0												; Video page 0
+   602 0000039F CD10                    	int		$10													; Set cursor
+   603                                  
+   604 000003A1 8916[A906]              	mov		WORD [LastCursorPosition], dx						; Write last cursor position
+   605 000003A5 31FF                    	xor		di, di												; Clear colour
+   606 000003A7 C3                      	ret
+   607                                  
+   608                                  ;========================================================================================
+   609                                  ; Prints the value in eax to the screen.
+   610                                  ;========================================================================================
+   611                                  hex_to_ascii:
+   612 000003A8 31C9                    	xor 	cx, cx
+   613                                  
+   614 000003AA 88E1                    	mov 	cl, ah												; Move high byte of ax to cl
+   615 000003AC E81000                  	call 	.nibble_high										; Print low nibble to ASCII
+   616 000003AF 88E1                    	mov 	cl, ah
+   617 000003B1 E81100                  	call 	.nibble_low
+   618 000003B4 88C1                    	mov 	cl, al
+   619 000003B6 E80600                  	call 	.nibble_high
+   620 000003B9 88C1                    	mov 	cl, al
+   621 000003BB E80700                  	call 	.nibble_low
+   622 000003BE C3                      	ret
+   623                                  
+   624                                  .nibble_high:
+   625 000003BF C0E904                  	shr 	cl, $04
+   626 000003C2 E90600                  	jmp 	.convert_check
+   627                                  
+   628                                  .nibble_low:
+   629 000003C5 80E10F                  	and 	cl, $0F
+   630 000003C8 E90000                  	jmp 	.convert_check
+   631                                  
+   632                                  .convert_check:
+   633 000003CB 80F90A                  	cmp 	cl, $0A
+   634 000003CE 7D0B                    	jge 	.letter
+   635 000003D0 80C130                  	add 	cl, $30
+   636 000003D3 50                      	push 	ax
+   637 000003D4 88C8                    	mov 	al, cl
+   638 000003D6 E8A1FF                  	call 	putc
+   639 000003D9 58                      	pop 	ax
+   640 000003DA C3                      	ret
+   641                                  
+   642                                  .letter:
+   643 000003DB 80C137                  	add 	cl, $37
+   644 000003DE 50                      	push	ax
+   645 000003DF 88C8                    	mov 	al, cl
+   646 000003E1 E896FF                  	call	putc
+   647 000003E4 58                      	pop 	ax
+   648 000003E5 C3                      	ret
+   649                                  
+   650                                  ;========================================================================================
+   651                                  ; Uses BIOS INT $15, EAX $E820 function to get the memory map of the system
+   652                                  ; input: 	es:di = destination buffer for 24 byte entries
+   653                                  ; output: 	bp = entry count, trashes all registers except esi
+   654                                  ;========================================================================================
+   655                                  fetch_mem_map:
+   656 000003E6 6631DB                  	xor		ebx, ebx											; Clear EBX
+   657 000003E9 31ED                    	xor		bp, bp												; Use BP as an entry count
+   658 000003EB 66BA50414D53            	mov		edx, $0534D4150										; Place "SMAP" into edx (magic value)
+   659 000003F1 66B820E80000            	mov		eax, $0E820											; Function call
+   660                                  
+   661 000003F7 2666C7451401000000      	mov		[es:di+20], dword 1									; Write to the array so we have a valid ACPI 3.x entry
+   662 00000400 66B918000000            	mov		ecx, 24												; Ask BIOS for 24 bytes of data
+   663 00000406 CD15                    	int		$15
+   664                                  
+   665 00000408 7257                    	jc		SHORT .error										; If carry set, the function is unsupported
+   666                                  
+   667 0000040A 66BA50414D53            	mov		edx, $0534D4150										; Restore EDX in case trashed by BIOS
+   668 00000410 6639D0                  	cmp		eax, edx											; On success, EAX = "SMAP"
+   669 00000413 754C                    	jne		SHORT .error
+   670                                  
+   671 00000415 6685DB                  	test	ebx, ebx											; ebx = 0 implies list is only 1 entry long (worthless)
+   672 00000418 7447                    	je		SHORT .error
+   673                                  
+   674 0000041A EB1F                    	jmp		SHORT .startLoop									; Jump into the loop
+   675                                  
+   676                                  .getEntryLoop:
+   677 0000041C 66B820E80000            	mov		eax, $0E820											; Reset command (EAX, ECX are trashed)
+   678 00000422 2666C7451401000000      	mov		[es:di+20], dword 1									; Write to the array so we have a valid ACPI 3.x entry
+   679 0000042B 66B918000000            	mov		ecx, 24												; Ask BIOS for 24 bytes of data
+   680 00000431 CD15                    	int		$15
+   681                                  
+   682 00000433 722A                    	jc		SHORT .done											; If carry set, we are done
+   683 00000435 66BA50414D53            	mov		edx, $0534D4150										; Restore EDX in case trashed by BIOS
+   684                                  
+   685                                  .startLoop:
+   686 0000043B E31D                    	jcxz	.skipEntry											; Skip any 0 length entries
+   687                                  
+   688 0000043D 80F914                  	cmp		cl, 20												; Did we get 24-byte ACPI 3.x data?
+   689 00000440 7607                    	jbe		SHORT .notext
+   690                                  
+   691 00000442 26F6451401              	test	BYTE [es:di+20], 1									; If so, is the "ignore this data" bit clear?
+   692 00000447 7411                    	je		SHORT .skipEntry
+   693                                  
+   694                                  .notext:
+   695 00000449 26668B4D08              	mov		ecx, [es:di+8]										; get lower dword of memory region length
+   696 0000044E 26660B4D0C              	or		ecx, [es:di+12]										; Check if zero (OR with upper dword)
+   697 00000453 7405                    	jz		.skipEntry											; If length qword is 0, skip entry
+   698                                  
+   699 00000455 45                      	inc		bp													; We got a good entry, increment count, go to next entry
+   700                                  
+   701 00000456 81C71800                	add		di, 24
+   702                                  
+   703                                  .skipEntry:
+   704 0000045A 6685DB                  	test	ebx, ebx											; If EBX = 0, then the BIOS has given us all entries
+   705 0000045D 75BD                    	jne		SHORT .getEntryLoop
+   706                                  
+   707                                  .done:
+   708 0000045F F8                      	clc															; There is "jc" on end of list to this point, so the carry must be cleared
+   709 00000460 C3                      	ret
+   710                                  
+   711                                  .error:
+   712 00000461 F9                      	stc															; Set carry if this BIOS sucks ass and doesn't support this
+   713 00000462 C3                      	ret
+   714                                  
+   715                                  ;========================================================================================
+   716                                  ; Writes a register dump to the VGA hardware
+   717                                  ;========================================================================================
+   718                                  VGA_MISC_WRITE		EQU	$3C2
+   719                                  VGA_SEQ_INDEX		EQU	$3C4
+   720                                  VGA_SEQ_DATA		EQU	$3C5
+   721                                  VGA_CRTC_INDEX		EQU	$3D4
+   722                                  VGA_CRTC_DATA		EQU	$3D5
+   723                                  VGA_INSTAT_READ		EQU	$3DA
+   724                                  
+   725                                  NUM_SEQ_REGS		EQU	5
+   726                                  NUM_CRTC_REGS		EQU	25
+   727                                  
+   728                                  write_regs:
+   729 00000463 56                      	push 	si
+   730 00000464 52                      	push 	dx
+   731 00000465 51                      	push 	cx
+   732 00000466 50                      	push 	ax
+   733 00000467 FC                      	cld
+   734                                  
+   735                                  ; write MISC register
+   736 00000468 BAC203                  	mov 	dx, VGA_MISC_WRITE
+   737 0000046B AC                      	lodsb
+   738 0000046C EE                      	out 	dx, al
+   739                                  
+   740                                  ; write SEQuencer registers
+   741 0000046D B90500                  	mov 	cx, NUM_SEQ_REGS
+   742 00000470 30E4                    	xor 	ah, ah
+   743                                  
+   744                                  write_seq:
+   745 00000472 BAC403                  	mov 	dx, VGA_SEQ_INDEX
+   746 00000475 88E0                    	mov 	al, ah
+   747 00000477 EE                      	out 	dx, al
+   748                                  
+   749 00000478 BAC503                  	mov 	dx, VGA_SEQ_DATA
+   750 0000047B AC                      	lodsb
+   751 0000047C EE                      	out 	dx, al
+   752                                  
+   753 0000047D FEC4                    	inc 	ah
+   754 0000047F E2F1                    	loop 	write_seq
+   755                                  
+   756                                  ; write CRTC registers
+   757                                  ; Unlock CRTC registers: enable writes to CRTC regs 0-7
+   758 00000481 BAD403                  	mov 	dx, VGA_CRTC_INDEX
+   759 00000484 B011                    	mov 	al, 17
+   760 00000486 EE                      	out 	dx, al
+   761                                  
+   762 00000487 BAD503                  	mov 	dx, VGA_CRTC_DATA
+   763 0000048A EC                      	in		al, dx
+   764 0000048B 247F                    	and 	al, $7F
+   765 0000048D EE                      	out 	dx, al
+   766                                  
+   767                                  ; Unlock CRTC registers: enable access to vertical retrace regs
+   768 0000048E BAD403                  	mov 	dx, VGA_CRTC_INDEX
+   769 00000491 B003                    	mov 	al, 3
+   770 00000493 EE                      	out 	dx, al
+   771                                  
+   772 00000494 BAD503                  	mov 	dx ,VGA_CRTC_DATA
+   773 00000497 EC                      	in		al, dx
+   774 00000498 0C80                    	or		al, $80
+   775 0000049A EE                      	out		dx, al
+   776                                  
+   777                                  ; make sure CRTC registers remain unlocked
+   778 0000049B 8A4411                  	mov		al,[si + 17]
+   779 0000049E 247F                    	and 	al, $7F
+   780 000004A0 884411                  	mov 	[si + 17],al
+   781                                  
+   782 000004A3 8A4403                  	mov 	al,[si + 3]
+   783 000004A6 0C80                    	or		al, $80
+   784 000004A8 884403                  	mov 	[si + 3], al
+   785                                  
+   786                                  ; now, finally, write them
+   787 000004AB B91900                  	mov 	cx, NUM_CRTC_REGS
+   788 000004AE B400                    	mov 	ah, 0
+   789                                  
+   790                                  write_crtc:
+   791 000004B0 BAD403                  	mov 	dx, VGA_CRTC_INDEX
+   792 000004B3 88E0                    	mov 	al, ah
+   793 000004B5 EE                      	out 	dx, al
+   794                                  
+   795 000004B6 BAD503                  	mov 	dx, VGA_CRTC_DATA
+   796 000004B9 AC                      	lodsb
+   797 000004BA EE                      	out 	dx, al
+   798                                  
+   799 000004BB FEC4                    	inc 	ah
+   800 000004BD E2F1                    	loop write_crtc
+   801                                  
+   802 000004BF 58                      	pop 	ax
+   803 000004C0 59                      	pop 	cx
+   804 000004C1 5A                      	pop 	dx
+   805 000004C2 5E                      	pop 	si
+   806 000004C3 C3                      	ret
+   807                                  
+   808                                  ;========================================================================================
+   809                                  ; DATA SECTION
+   810                                  ;========================================================================================
+   811                                  regs_90x60:
+   812                                  ; MISC
+   813 000004C4 E7                      	db	0E7h
+   814                                  ; SEQuencer
+   815 000004C5 0301030002              	db	03h, 01h, 03h, 00h, 02h
+   816                                  ; CRTC
+   817 000004CA 6B595A82608D0B3E        	db	6Bh, 59h,  5Ah, 82h, 60h,  8Dh, 0Bh,  3Eh,
+   818 000004D2 0047060700000000        	db	00h, 47h,  06h, 07h, 00h,  00h, 00h,  00h,
+   819 000004DA EA0CDF2D08E805A3        	db	0EAh, 0Ch, 0DFh, 2Dh, 08h, 0E8h, 05h, 0A3h,
+   820 000004E2 FF                      	db 	0FFh
+   821                                  ; GC (no)
+   822                                  ; AC (no)
+   823                                  
+   824                                  str_stage2loaded:
+   825 000004E3 537461676520322042-     	db 	'Stage 2 Bootloader (boot2)', 0
+   826 000004EC 6F6F746C6F61646572-
+   827 000004F5 2028626F6F74322900 
+   828                                  
+   829                                  str_errorDetectMem:
+   830 000004FE 4572726F7220646574-     	db 	"Error detecting available memory, cannot continue", 0
+   831 00000507 656374696E67206176-
+   832 00000510 61696C61626C65206D-
+   833 00000519 656D6F72792C206361-
+   834 00000522 6E6E6F7420636F6E74-
+   835 0000052B 696E756500         
+   836                                  
+   837                                  str_floppyError:
+   838 00000530 466C6F707079204572-     	db 	"Floppy Error, press any key to retry", $0A, 0
+   839 00000539 726F722C2070726573-
+   840 00000542 7320616E79206B6579-
+   841 0000054B 20746F207265747279-
+   842 00000554 0A00               
+   843                                  
+   844                                  str_available_lomem:
+   845 00000556 436F6E74696E756F75-     	db 	"Continuous 01K blocks below 0x01000000: 0x", 0
+   846 0000055F 732030314B20626C6F-
+   847 00000568 636B732062656C6F77-
+   848 00000571 203078303130303030-
+   849 0000057A 30303A20307800     
+   850                                  
+   851                                  str_available_himem:
+   852 00000581 436F6E74696E756F75-     	db 	"Continuous 64K blocks above 0x01000000: 0x", 0
+   853 0000058A 732036344B20626C6F-
+   854 00000593 636B732061626F7665-
+   855 0000059C 203078303130303030-
+   856 000005A5 30303A20307800     
+   857                                  
+   858                                  str_select_partition:
+   859 000005AC 557365207468652063-     	db 	"Use the cursor to select the partition to boot from.", 0
+   860 000005B5 7572736F7220746F20-
+   861 000005BE 73656C656374207468-
+   862 000005C7 652070617274697469-
+   863 000005D0 6F6E20746F20626F6F-
+   864 000005D9 742066726F6D2E00   
+   865                                  
+   866                                  str_err_not_bootable:
+   867 000005E1 546869732070617274-     	db 	"This partition is not marked as bootable!", 0
+   868 000005EA 6974696F6E20697320-
+   869 000005F3 6E6F74206D61726B65-
+   870 000005FC 6420617320626F6F74-
+   871 00000605 61626C652100       
+   872                                  
+   873                                  str_err_clear_err:
+   874 0000060B 20<rept>                	times	0x40 db 0x20
+   875 0000064B 00                      	db	0
+   876                                  
+   877                                  
+   878                                  str_kernel_loading:
+   879 0000064C 4C6F6164696E67206B-     	db 	"Loading kernel: ", 0
+   880 00000655 65726E656C3A2000   
+   881                                  
+   882                                  str_kernel_loaded_ok:
+   883 0000065D 4B65726E656C206C6F-     	db 	"Kernel loaded. Transferring control now...", 0
+   884 00000666 616465642E20547261-
+   885 0000066F 6E7366657272696E67-
+   886 00000678 20636F6E74726F6C20-
+   887 00000681 6E6F772E2E2E00     
+   888                                  
+   889                                  str_err_loadkernel:
+   890 00000688 436F756C64206E6F74-     	db 	"Could not load kernel: Fuck you", 0
+   891 00000691 206C6F6164206B6572-
+   892 0000069A 6E656C3A204675636B-
+   893 000006A3 20796F7500         
+   894                                  
+   895                                  BootDevice:
+   896 000006A8 00                      	db	0
+   897                                  
+   898                                  LastCursorPosition:
+   899 000006A9 0000                    	dw	0
+   900                                  
+   901                                  MemBlocksAbove16M:
+   902 000006AB 0000                    	dw	0
+   903                                  
+   904                                  MemBlocksBelow16M:
+   905 000006AD 0000                    	dw	0
+   906                                  
+   907                                  MemMap_NumEntries:
+   908 000006AF 0000                    	dw	0
+   909                                  
+   910                                  HDD_BootablePartitions:
+   911 000006B1 00000000                	dd	0
+   912                                  
+   913                                  HDD_BootablePartitionsFATType:
+   914 000006B5 00000000                	dd	0
+   915                                  
+   916                                  HDD_Selected:
+   917 000006B9 00                      	db	0
+   918                                  
+   919                                  HDD_PartitionNames:
+   920 000006BA 00<rept>                	times	(0xB+1)*4 db 0
+   921                                  
+   922                                  Temp_StrBuf:
+   923 000006EA 00<rept>                	times	0x20 db 0
+   924                                  
+   925                                  	align 2
+   926                                  ExtendedRead_Table:
+   927 0000070A 10                      	db	$10
+   928 0000070B 00                      	db	0
+   929 0000070C 0000                    	dw	0														; Num blocks
+   930 0000070E 0000                    	dw	0														; Dest
+   931 00000710 0000                    	dw	0														; Memory page
+   932 00000712 00000000                	dd	0														; Starting LBA
+   933 00000716 00000000                	dd	0	
+   934                                  
+   935                                  ;========================================================================================
+   936                                  ; Global Descriptor Table
+   937                                  ;========================================================================================
+   938 0000071A 90<rept>                	align	$10
+   939                                  
+   940                                  gdt_start:
+   941 00000720 0000000000000000        	dd	$00, $00												; Null Descriptor
+   942                                  
+   943                                  	; Code segment
+   944 00000728 FFFF                    	dw	$0FFFF													; Limit 0:15 = $0FFFF
+   945 0000072A 0000                    	dw	$0000													; Base 0:15 = $0000
+   946 0000072C 00                      	db	$00														; Base 16:23 = $00
+   947 0000072D 9A                      	db	$9A														; Access byte: Present, ring 0, Exec, grow up, R/W
+   948 0000072E CF                      	db	$0CF													; 4K pages, 32-bit, limit 16:19 = $F
+   949 0000072F 00                      	db	$00														; Base 24:31 = $00
+   950                                  
+   951                                  	; Data segment
+   952 00000730 FFFF                    	dw	$0FFFF													; Limit 0:15 = $0FFFF
+   953 00000732 0000                    	dw	$0000													; Base 0:15 = $0000
+   954 00000734 00                      	db	$00														; Base 16:23 = $00
+   955 00000735 92                      	db	$92														; Access byte: Present, ring 0, Exec, grow up, R/W
+   956 00000736 CF                      	db	$0CF													; 4K pages, 32-bit, limit 16:19 = $F
+   957 00000737 00                      	db	$00														; Base 24:31 = $00	
+   958                                  
+   959                                  gdt_table:
+   960 00000738 1700                    	dw	(gdt_table-gdt_start)-1									; Length
+   961 0000073A [20070000]              	dd	gdt_start												; Physical address to GDT	
+   962                                  
+   963 0000073E 90<rept>                	align 4														; DWORD align
+   964                                  	%include	"./fat.asm"
+   965                              <1> ;========================================================================================
+   966                              <1> ; FAT Filesystem Library v 0.1
+   967                              <1> ; By Tristan Seifert
+   968                              <1> ;========================================================================================
+   969                              <1> ; Equates
+   970                              <1> ;========================================================================================
+   971                              <1> 
+   972                              <1> ;========================================================================================
+   973                              <1> ; Initialises the FAT filesystem library
+   974                              <1> ;========================================================================================
+   975                              <1> FAT_Init:
+   976 00000740 B90001              <1> 	mov		cx, (1024/4)										; Clear 2 sectors worth
+   977 00000743 66BA[4B080000]      <1> 	mov		edx, FAT_ReadBuffer									; Pointer to buffer
+   978 00000749 6631C0              <1> 	xor		eax, eax											; Clear value ($00000000)
+   979                              <1> 
+   980                              <1> .clearLoop:
+   981 0000074C 66678902            <1> 	mov		DWORD [edx], eax									; Clear a DWORD
+   982 00000750 6681C204000000      <1> 	add		edx, $04											; Increment pointer
+   983 00000757 E2F3                <1> 	loop	.clearLoop											; Loop
+   984                              <1> 
+   985                              <1> .done
+   986 00000759 C3                  <1> 	ret
+   987                              <1> 
+   988                              <1> ;========================================================================================
+   989                              <1> ; Determines the type of FAT, give that the first logical sector of the partition is
+   990                              <1> ; pointed to by SI, and returns the FAT bit size in AL.
+   991                              <1> ;
+   992                              <1> ; This is how Microsoft recommends we determine FAT type:
+   993                              <1> ;
+   994                              <1> ; RootDirSectors = ((BPB_RootEntCnt * 32) + (BPB_BytesPerSec - 1)) / BPB_BytesPerSec
+   995                              <1> ; DataSectors = Total Sectors - (BPB_ReservedSectors + (BPB_NumFATs * FATSz) + RootDirSectors)
+   996                              <1> ; Count of clusters = DataSectors/BPB_SectorsPerCluster 
+   997                              <1> ;
+   998                              <1> ; FAT12: Total clusters < 4085
+   999                              <1> ; FAT16: Total clusters > 4085 && < 65525
+  1000                              <1> ; FAT32: Total clusters > 65525
+  1001                              <1> ;========================================================================================
+  1002                              <1> FAT_DetermineType:
+  1003 0000075A 60                  <1> 	pusha														; Push registers
+  1004                              <1> 
+  1005 0000075B E88800              <1> 	call	FAT_ReadBPB											; 
+  1006                              <1> 
+  1007                              <1> 	; Calculate RootDirSectors
+  1008 0000075E 6631C0              <1> 	xor		eax, eax											; Clear EAX
+  1009 00000761 6631DB              <1> 	xor		ebx, ebx											; Clear EBX
+  1010 00000764 8B1E[3608]          <1> 	mov		bx,	WORD [FAT_BPB_RootEntCnt]						; Read root entries 
+  1011 00000768 66C1E305            <1> 	shl		ebx, 5												; Each root entry is 32 bytes
+  1012                              <1> 
+  1013 0000076C A1[3008]            <1> 	mov		ax, WORD [FAT_BPB_BytesPerSec]						; Read sector length
+  1014 0000076F 48                  <1> 	dec		ax													; Subtract one
+  1015 00000770 6601D8              <1> 	add		eax, ebx											; Add root entry length to sector length
+  1016                              <1> 
+  1017 00000773 6631D2              <1> 	xor		edx, edx											; Clear EDX
+  1018 00000776 8B0E[3008]          <1> 	mov		cx, WORD [FAT_BPB_BytesPerSec]						; Read bytes per sector
+  1019 0000077A F7F1                <1> 	div		cx													; Divide by sector length (result = ax)
+  1020 0000077C A3[4008]            <1> 	mov		WORD [FAT_RootDirSectors], ax						; Store result in memory
+  1021                              <1> 
+  1022                              <1> 	; Calculate DataSectors
+  1023 0000077F 6631C0              <1> 	xor		eax, eax											; Clear EAX
+  1024 00000782 A0[3508]            <1> 	mov		al, BYTE [FAT_BPB_NumFATs]							; Read number of FATs 
+  1025                              <1> 
+  1026 00000785 668B16[3808]        <1> 	mov		edx, DWORD [FAT_BPB_FATSz]							; Read FAT size
+  1027 0000078A 66F7E2              <1> 	mul		edx													; Multiply by number of FATs in eax
+  1028                              <1> 
+  1029 0000078D 6631C9              <1> 	xor		ecx, ecx											; Clear ECX
+  1030 00000790 8B0E[3308]          <1> 	mov		cx, WORD [FAT_BPB_ReservedSectors]					; Read number of reserved sectors
+  1031                              <1> 
+  1032 00000794 6601C8              <1> 	add		eax, ecx											; Add count of reserved sectors to FAT size
+  1033 00000797 668B0E[4008]        <1> 	mov		ecx, DWORD [FAT_RootDirSectors]						; Read RootDirSectors
+  1034 0000079C 6601C8              <1> 	add		eax, ecx											; Add root directory sectors
+  1035                              <1> 
+  1036 0000079F 6691                <1> 	xchg	eax, ecx											; Subtract all of the above from total sectors
+  1037                              <1> 	
+  1038 000007A1 66A1[3C08]          <1> 	mov		eax, DWORD [FAT_BPB_TotSec]							; Read total sector count
+  1039 000007A5 6629C8              <1> 	sub		eax, ecx											; Subtract from total sector count
+  1040                              <1> 
+  1041 000007A8 66A3[4208]          <1> 	mov		DWORD [FAT_DataSectors], eax						; Store to memory
+  1042                              <1> 
+  1043                              <1> 	; Calculate cluster count
+  1044 000007AC 6631DB              <1> 	xor		ebx, ebx											; Clear EBX
+  1045 000007AF 8A1E[3208]          <1> 	mov		bl, BYTE [FAT_BPB_SectorsPerCluster]				; Read sectors/cluster
+  1046 000007B3 66A1[4208]          <1> 	mov		eax, DWORD [FAT_DataSectors]						; Read number of data sectors
+  1047 000007B7 66F7F3              <1> 	div		ebx													; Divide by sectors/cluster value 
+  1048                              <1> 
+  1049 000007BA 66A3[4608]          <1> 	mov		DWORD [FAT_TotalClusters], eax						; Store result in EAX
+  1050                              <1> 
+  1051                              <1> 	; Now, do some comparisons!
+  1052 000007BE 663DF50F0000        <1> 	cmp		eax, 4085											; Is the FS FAT12?
+  1053 000007C4 7F07                <1> 	jg		.notFAT12											; If not, branch
+  1054                              <1> 
+  1055 000007C6 C606[4A08]0C        <1> 	mov		BYTE [FAT_Type], 12									; FAT12
+  1056 000007CB EB14                <1> 	jmp		SHORT .done											; Return
+  1057                              <1> 
+  1058                              <1> .notFAT12:
+  1059 000007CD 663DF5FF0000        <1> 	cmp		eax, 65525											; Is the FS FAT16?
+  1060 000007D3 7F07                <1> 	jg		.notFAT16											; If not, branch
+  1061                              <1> 
+  1062 000007D5 C606[4A08]10        <1> 	mov		BYTE [FAT_Type], 16									; FAT16
+  1063 000007DA EB05                <1> 	jmp		SHORT .done											; Return
+  1064                              <1> 
+  1065                              <1> .notFAT16:
+  1066                              <1> 	; Okay, if we get down here, it HAS to be FAT32 or a corrupt FS
+  1067 000007DC C606[4A08]20        <1> 	mov		BYTE [FAT_Type], 32									; FAT32
+  1068                              <1> 
+  1069                              <1> .done:
+  1070 000007E1 61                  <1> 	popa														; Restore registers
+  1071                              <1> 
+  1072 000007E2 A0[4A08]            <1> 	mov		al, BYTE [FAT_Type]									; Store FAT type in AL
+  1073                              <1> 
+  1074 000007E5 C3                  <1> 	ret
+  1075                              <1> 
+  1076                              <1> ;========================================================================================
+  1077                              <1> ; Reads the BPB from the FAT 1st sector in SI.
+  1078                              <1> ;========================================================================================
+  1079                              <1> FAT_ReadBPB:
+  1080 000007E6 8B440B              <1> 	mov		ax, WORD [si+11]									; Read Bytes/sector
+  1081 000007E9 A3[3008]            <1> 	mov		WORD [FAT_BPB_BytesPerSec], ax						; ""
+  1082                              <1> 
+  1083 000007EC 8A440D              <1> 	mov		al, BYTE [si+13]									; Read sectors/cluster
+  1084 000007EF A2[3208]            <1> 	mov		BYTE [FAT_BPB_SectorsPerCluster], al				; ""
+  1085                              <1> 
+  1086 000007F2 8B440E              <1> 	mov		ax, WORD [si+14]									; Read reserved sectors
+  1087 000007F5 A3[3308]            <1> 	mov		WORD [FAT_BPB_ReservedSectors], ax					; ""
+  1088                              <1> 
+  1089 000007F8 8A4410              <1> 	mov		al, BYTE [si+16]									; Read number of FATs
+  1090 000007FB A2[3508]            <1> 	mov		BYTE [FAT_BPB_NumFATs], al							; ""
+  1091                              <1> 
+  1092 000007FE 8B4411              <1> 	mov		ax, WORD [si+17]									; Read num root entries
+  1093 00000801 A3[3608]            <1> 	mov		WORD [FAT_BPB_RootEntCnt], ax						; ""
+  1094                              <1> 
+  1095 00000804 6631C0              <1> 	xor		eax, eax											; Clear EAX
+  1096                              <1> 
+  1097 00000807 668B4420            <1> 	mov		eax, DWORD [si+32]									; Read BPB_TotSec32 first
+  1098 0000080B 663D00000000        <1> 	cmp		eax, 0												; Is EAX zero?
+  1099 00000811 7503                <1> 	jne		.writeTotSec										; If not, branch
+  1100                              <1> 
+  1101 00000813 8B4413              <1> 	mov		ax, WORD [si+19]									; Read BPB_TotSec16 first
+  1102                              <1> 
+  1103                              <1> .writeTotSec:
+  1104 00000816 66A3[3C08]          <1> 	mov		DWORD [FAT_BPB_TotSec], eax							; ""
+  1105                              <1> 
+  1106 0000081A 6631C0              <1> 	xor		eax, eax											; Clear EAX
+  1107                              <1> 
+  1108 0000081D 8B4416              <1> 	mov		ax, WORD [si+22]									; Read BPB_FATSz16
+  1109 00000820 3D0000              <1> 	cmp		ax, 0												; Is it zero?
+  1110 00000823 7504                <1> 	jne		.writeFATSz											; If not, branch.
+  1111                              <1> 
+  1112 00000825 668B4424            <1> 	mov		eax, DWORD [si+36]									; Read BPB_FATSz32
+  1113                              <1> 
+  1114                              <1> .writeFATSz:
+  1115 00000829 66A3[3808]          <1> 	mov		DWORD [FAT_BPB_FATSz], eax							; Write FAT size
+  1116                              <1> 
+  1117 0000082D C3                  <1> 	ret
+  1118                              <1> 
+  1119                              <1> ;========================================================================================
+  1120                              <1> ; Data section
+  1121                              <1> ;========================================================================================
+  1122 0000082E 90<rept>            <1> 	align	4
+  1123                              <1> FAT_BPB_BytesPerSec: ; file offset 11
+  1124 00000830 0000                <1> 	dw		0
+  1125                              <1> 
+  1126                              <1> FAT_BPB_SectorsPerCluster: ; file offset 13
+  1127 00000832 00                  <1> 	db		0
+  1128                              <1> 
+  1129                              <1> FAT_BPB_ReservedSectors: ; file offset 14
+  1130 00000833 0000                <1> 	dw		0
+  1131                              <1> 
+  1132                              <1> FAT_BPB_NumFATs: ; file offset 16
+  1133 00000835 00                  <1> 	db		0
+  1134                              <1> 
+  1135                              <1> FAT_BPB_RootEntCnt:	; file offset 17
+  1136 00000836 0000                <1> 	dw		0
+  1137                              <1> 
+  1138                              <1> ; !!!
+  1139                              <1> FAT_BPB_FATSz: ; file offset 22 if FAT16, 36 if FAT32 and word at 22 is 0
+  1140 00000838 00000000            <1> 	dd		0
+  1141                              <1> 
+  1142                              <1> ; Works with FAT32
+  1143                              <1> ; For the total sector count, try to read BPB_FATSz16 first (19), then the 32-bit at off 32
+  1144                              <1> FAT_BPB_TotSec: ; file offset 32 if 19 = 0
+  1145 0000083C 00000000            <1> 	dd		0
+  1146                              <1> 
+  1147                              <1> ; Calculated when identifying FS
+  1148                              <1> FAT_RootDirSectors:
+  1149 00000840 0000                <1> 	dw		0
+  1150                              <1> 
+  1151                              <1> ; Calculated when identifying FS
+  1152                              <1> FAT_DataSectors:
+  1153 00000842 00000000            <1> 	dd		0
+  1154                              <1> 
+  1155                              <1> ; Calculated when identifying FS
+  1156                              <1> FAT_TotalClusters:
+  1157 00000846 00000000            <1> 	dd		0
+  1158                              <1> 
+  1159                              <1> FAT_Type:
+  1160 0000084A 00                  <1> 	db		0
+  1161                              <1> 
+  1162                              <1> FAT_ReadBuffer:
+  1163                                  
+  1164 0000084B 90                      	align 4
+  1165                                  
+  1166                                  SectorBuf:
+  1167 0000084C 00<rept>                	times	512 db 0
