@@ -9,35 +9,37 @@
  * those as well.
  */
 
-#define SYS_IDT_MEMLOC 0x00100000
-#define SYS_GDT_MEMLOC SYS_IDT_MEMLOC+(0x08*0x200)
-#define SYS_TSS_MEMLOC SYS_GDT_MEMLOC+(0x18+(SYS_NUM_TSS * 0x08))
+#define SYS_IDT_MEMLOC 0x00400000
+#define SYS_GDT_MEMLOC 0x00410000
+#define SYS_TSS_MEMLOC 0x00420000
 
-#define SYS_NUM_TSS 256
+#define SYS_NUM_TSS 8
 #define SYS_TSS_LEN	0x80
 
-typedef struct __attribute__((__packed__)) sys_idt_descriptor {
+typedef struct sys_idt_descriptor {
    uint16_t offset_1;	// offset bits 0..15
    uint16_t selector;	// a code segment selector in GDT or LDT
    uint8_t zero;		// unused, set to 0
-   uint8_t type_attr;	// type and attributes, see below
+   uint8_t flags;		// type and attributes
    uint16_t offset_2;	// offset bits 16..31
-} sys_idt_descriptor;
+} __attribute__((packed)) idt_entry_t;
 
 typedef struct sys_gdt_descriptor {
-	uint32_t limit;
-	uint32_t base;
-	uint8_t type;
-} sys_gdt_descriptor;
+	uint16_t limit_low;
+	uint16_t base_low;
+	uint8_t base_middle;
+	uint8_t access;
+	uint8_t granularity;
+	uint8_t base_high;
+} __attribute__((packed)) gdt_entry_t;
 
 void system_init();
 
-void sys_build_idt();
-void sys_install_idt(void* location);
+void sys_set_idt_gate(uint8_t entry, uint32_t function, uint8_t segment, uint8_t flags);
 
-void sys_build_gdt();
-void sys_gdt_convert(uint8_t *target, sys_gdt_descriptor source);
-void sys_install_gdt(void* location);
+void sys_setup_ints();
+
+void sys_set_gdt_gate(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, uint8_t gran);
 
 uint64_t sys_get_ticks();
 
@@ -45,6 +47,6 @@ bool sys_irq_enabled();
 
 void sys_cpuid(uint32_t code, uint32_t* a, uint32_t* d);
 void sys_rdtsc(uint32_t* upper, uint32_t* lower);
-void sys_flush_tlb(void* m);
+void sys_flush_tlb(uint32_t m);
 void sys_write_MSR(uint32_t msr, uint32_t lo, uint32_t hi);
 void sys_read_MSR(uint32_t msr, uint32_t *lo, uint32_t *hi);

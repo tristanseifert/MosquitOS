@@ -86,7 +86,7 @@ print_string:
 	jmp		SHORT .setCursor
 
 .useDefaultColour:
-	mov		bl, $00F											; White text on black background
+	mov		bl, $007											; Light gray text on black background
 
 .setCursor:
 	mov 	ah, $02												; Set cursor position

@@ -14,7 +14,7 @@ void terminal_initialize(bool clearMem) {
 	terminal_column = 0;
 	terminal_colour = vga_make_colour(VGA_COLOUR_LIGHT_GREY, VGA_COLOUR_BLACK);
 
-	terminal_buffer = (uint16_t *) VGA_TEXTMEM-0x80;
+	terminal_buffer = (uint16_t *) VGA_TEXTMEM;
 
 	if(clearMem) {
 		for (int y = 0; y < VGA_TEXT_ROWS; y++) {
@@ -61,6 +61,36 @@ void terminal_write_string(char *string) {
 	}
 
 	terminal_startCol = terminal_column;
+}
+
+void terminal_write_byte(uint8_t byte) {
+	uint8_t nybble = (byte & 0xF0) >> 0x04;
+	if(nybble > 0x09) { // ASCII characters - A
+		nybble += 0x37;
+	} else { // ASCII numbers
+		nybble += 0x30;		
+	}
+
+	terminal_putchar((unsigned char) nybble);
+
+	nybble = (byte & 0x0F);
+	if(nybble > 0x09) { // ASCII characters - A
+		nybble += 0x37;
+	} else { // ASCII numbers
+		nybble += 0x30;		
+	}
+
+	terminal_putchar((unsigned char) nybble);
+}
+
+void terminal_write_word(uint16_t byte) {
+	terminal_write_byte((byte & 0xFF00) >> 0x8);
+	terminal_write_byte(byte & 0x00FF);
+}
+
+void terminal_write_dword(uint32_t byte) {
+	terminal_write_word((byte & 0xFFFF0000) >> 0x10);
+	terminal_write_word(byte & 0x0000FFFF);
 }
 
 void terminal_clear() {

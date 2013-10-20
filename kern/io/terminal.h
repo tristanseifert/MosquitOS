@@ -5,3 +5,7 @@ void terminal_write_string(char *string);
 void terminal_putchar(char c);
 void terminal_setPos(uint8_t col, uint8_t row);
 void terminal_clear();
+
+void terminal_write_byte(uint8_t byte);
+void terminal_write_word(uint16_t byte);
+void terminal_write_dword(uint32_t byte);

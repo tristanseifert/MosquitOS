@@ -1,5 +1,6 @@
 #include "types.h"
 #include "sys/system.h"
+#include "sys/paging.h"
 #include "io/terminal.h"
 #include "runtime/error_handler.h"
  
@@ -9,19 +10,32 @@ extern "C" /* Use C linkage for kernel_main. */
 void kernel_main() {
 	system_init();
 
+	paging_init();
+
 	terminal_initialize(true);
 	terminal_write_string("Hello, kernel world!\n");
 
-	error_init();
+	uint8_t *mosquiten = (uint8_t *) 0x02000;
+	terminal_setPos(4, 2);
+	terminal_write_dword(*(mosquiten));
+
+	uint32_t *ptr = (uint32_t *) 0xDEADBEEF;
+	uint32_t do_page_fault = *ptr;
+
+	uint32_t timer = 0;
+	while(1) {
+		timer = sys_get_ticks() & 0xFFFFFFFF;
+		terminal_setPos(4, 4);
+		terminal_write_dword(timer);
+	}
 }
 
 /*
  * Set up BSS and some other stuff needed to make the kernel not implode.
+ * Called BEFORE kernel_main, so kernel structures may NOT be accessed!
  */
 void kernel_init() {
-	extern char _DATA__bss__begin, _DATA__bss__end;
-	extern char _DATA__common__begin, _DATA__common__end;
+	extern char __bss, __end;
 
-	memset(&_DATA__bss__begin, 0x00, (&_DATA__bss__end - &_DATA__bss__begin));
-	memset(&_DATA__common__begin, 0x00, (&_DATA__common__end - &_DATA__common__begin));
+	memset(&__bss, 0x00, (&__end - &__bss));
 }

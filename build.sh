@@ -20,9 +20,10 @@ dd conv=notrunc if=loader/stage2.bin of=disk_image.img bs=512 seek=1 count=30
 hdiutil attach disk_image.img
 
 # Copy kernel, etc
+rm -f /Volumes/MOSQUITOS/KERNEL.BIN
 cp kern/kernel.bin /Volumes/MOSQUITOS/KERNEL.BIN
 
 # Unmount disk image
-umount /Volumes/MOSQUITOS/
+diskutil unmount /Volumes/MOSQUITOS/
 
 qemu-1.60/qemu-system-i386 -hda /Users/tristanseifert/SquelchenOS/disk_image.img -boot c -m 32M -soundhw adlib -vga std -s

@@ -13,23 +13,29 @@ VESA_SupportedModes:	EQU	$01A0								; $001A00 phys (len = $200)
 BIOS_MemMapSeg:			EQU	$0200								; $002000 phys (len = $800 max)
 
 struc KernInfoStruct
-	.munchieValue	resd	0									; Munchie value
+	.munchieValue	resd	0									; X Munchie value
 	.supportBits	resw	0									; Support Bitfield
-	.high16Mem		resw	0									; 64K blocks above 16M
-	.low16Mem		resw	0									; 1K blocks below 16M
-	.memMap			resd	0									; Physical pointer to memory map
+	.high16Mem		resw	0									; X 64K blocks above 16M
+	.low16Mem		resw	0									; X 1K blocks below 16M
+	.memMap			resd	0									; X Physical pointer to memory map
+	.numMemMapEnt	resw	0									; X Number of entries in memory map
 	.vesaSupport	resb	0									; VESA support byte
-	.bootDrive		resb	0									; Boot drive
+	.bootDrive		resb	0									; X Boot drive
 	.vesaMap		resd	0									; Physical pointer to VESA mode map
 endstruc
 
-%define KINFO(x)  gs:di + KernInfoStruct. %+ x
+%define KINFO(x)  (Kern_Info_Struct<<4) + KernInfoStruct. %+ x
 
 stage2_start:
-	mov 	ax, cs												; Set segment to where we're loaded
+	mov		ax, $8000											; AX = stack segment value (Stack to go at $80000)
+	mov 	ss, ax
+	mov 	sp, 4096											; Set up SP
+
+	mov 	ax, cs												; Set data segment to where we're loaded
 	mov 	ds, ax
 
 	mov		BYTE [BootDevice], dl								; Save boot device number
+	mov		BYTE [FAT_Drive], dl								; Set FAT read drive
 
 	; Set up GS to point to a place in memory that houses the kernel info structure
 	mov		ax, Kern_Info_Struct								; Place that houses the struct
@@ -47,7 +53,7 @@ stage2_start:
 	int		$10													; Call video BIOS
 
 	mov 	si, str_stage2loaded								; Put string position into SI
-	mov		dx, $0000											; Cursor position
+	xor		dx, dx												; Cursor position
 	mov		di, $2F												; Set colour
 	call 	print_string										; Call string printing routine
 
@@ -83,6 +89,10 @@ stage2_start:
 .useax:
 	xor		di, di												; Clear DI
 	mov		WORD [MemBlocksAbove16M], bx						; Store amount of memory available
+
+	mov		ax, Kern_Info_Struct								; Place that houses the struct
+	mov		gs, ax												; Set up register
+
 	mov		[KINFO(high16Mem)], bx								; ""
 	mov		WORD [MemBlocksBelow16M], ax						; ""
 	mov		[KINFO(low16Mem)], ax								; ""
@@ -92,27 +102,43 @@ stage2_start:
 	; Fetch memory map
 	mov 	ax, BIOS_MemMapSeg									; Write mem map to $01800 in physical space
 	mov 	es, ax
-	mov		di, $0000											; Start of segment
+	xor		di, di												; Start of segment
 
 	call	fetch_mem_map										; Fetch a memory map
 	jc 		SHORT error_memoryDetect							; Branch if error
-	mov		WORD [MemMap_NumEntries], bp						; Store number of memory map entries
+
+	mov		ax, Kern_Info_Struct								; Place that houses the struct
+	mov		gs, ax												; Set up register
+
+	mov		WORD [KINFO(numMemMapEnt)], bp						; ""
+	mov		WORD [KINFO(memMap)], (BIOS_MemMapSeg<<4)			; Physical location of table
 
 	; Initialise FAT library
 	call	FAT_Init
 
 	; Check which partitions are bootable from MBR partition map
 	call	find_bootable_partitions
+	mov		BYTE [HDD_Selected], 0								; Clear HDD selection
 
 	; Set up the partition chooser UI
 	call	render_partition_chooser
 
-	; Process keypresses
+	; Process keypresses, and loads kernel from FS if ENTER is pressed
 	call	chooser_loop
+	jmp		boot
 
-	; Load kernel
-	call	load_kernel											; Load the kernel
+;========================================================================================
+; Memory detection error handler
+;========================================================================================
+error_memoryDetect:
+	mov 	si, str_errorDetectMem								; Put string position into SI
+	call 	print_error											; Call string printing routine
+	jmp		$
 
+;========================================================================================
+; Code to boot the kernel
+;========================================================================================
+boot:
 	; Hide cursor
 	xor		dx, dx												; Clear dx
 	not		dx													; dx = $FFFF
@@ -126,15 +152,13 @@ stage2_start:
 
 	mov		si, [KernInfoStruct]								; Load address to kernel info struct in SI
 
-	jmp		$
-
 	; Jump into protected mode, woot!
 	mov		eax, cr0											; Get control reg
 	or		al, 00000001b										; Set PE bit
 	mov		cr0, eax											; Write control reg
 
 	; Set up selectors
-	mov		ax, $08												; CODE32_DESCRIPTOR
+	mov		ax, $10												; DATA32_DESCRIPTOR
 	mov		ds, ax												; Set data selector
 
 	mov		ax, $10												; DATA32_DESCRIPTOR
@@ -148,14 +172,6 @@ stage2_start:
 	db		$0EA												; Far jump opcode
 	dd		kern_loc_phys										; Physical kernel lcoation
 	dw		$08													; Selector for CODE32_DESCRIPTOR
-
-;========================================================================================
-; Memory detection error handler
-;========================================================================================
-error_memoryDetect:
-	mov 	si, str_errorDetectMem								; Put string position into SI
-	call 	print_error											; Call string printing routine
-	jmp		$
 
 ;========================================================================================
 ; Renders the partition chooser
@@ -225,7 +241,6 @@ render_partition_chooser:
 	mov		edx, HDD_BootablePartitionsFATType					; FAT type matrix
 	add		dl, BYTE [.index]
 	mov		al, BYTE [edx]										; Read FAT type to AL
-;	call	hex_to_ascii
 
 	mov		bl, BYTE [HDD_Selected]								; Read index of selected HDD
 	and		bl, $3												; Get low 2 bits only
@@ -284,6 +299,8 @@ render_partition_chooser:
 ; Handle keypresses for chooser
 ;========================================================================================
 chooser_loop:
+	jmp		partition_chooser_enter
+
 	xor		ah, ah												; Wait for keystroke
 	int		$16													; Call into BIOS
 
@@ -299,14 +316,31 @@ chooser_loop:
 	jmp		chooser_loop
 
 partition_chooser_enter:
-	mov		bl, $04												; $04 = drive 0
-	mov		al, BYTE [HDD_Selected]								; Get selection
-	sub		bl, al												; Subtract
+	xor		bx, bx												; Clear BX
+	mov		bl, BYTE [HDD_Selected]								; Get selection
 
 	mov		al, BYTE [HDD_BootablePartitions+bx]				; Check bootability status
 	and		al, $80												; Get high bit only
 	cmp		al, $80
 	jne		.noBootErr											; If not bootable, branch
+
+	mov		si, kernel_filename									; Filename to find
+	call	FAT_FindFileAtRoot									; Find file
+	jc		.fileNotFound										; Carry set = KERNEL.BIN not found
+
+	mov		DWORD [kernel_cluster], eax							; Store cluster
+
+	xor		ax, ax												; Segment 0
+	mov		es, ax												; Write segment											
+	mov		di, kern_loc_phys									; Offset into segment
+
+	mov		eax, DWORD [kernel_cluster]							; Kernel's cluster location
+	call	FAT_ReadFile										; Read file
+
+	mov 	si, str_kernel_loaded_ok							; Put string position into SI
+	mov		dx, $0C01											; Cursor position
+	mov		di, $02												; Set colour
+	call 	print_string										; Call string printing routine
 
 	ret
 
@@ -316,13 +350,27 @@ partition_chooser_enter:
 	call	print_error											; Display
 	jmp		chooser_loop
 
+.fileNotFound:
+	mov		dx, $0C01
+	mov		si, str_err_kern_not_found							; Not found error
+	call	print_error											; Display
+	jmp		chooser_loop
+
 partition_chooser_dn:
-	dec		BYTE [HDD_Selected]									; Increment HDD selection
+	mov		al, BYTE [HDD_Selected]								; Read selection
+	dec		al													; Move cursor up
+	and		al, $03												; Get low 2 bits only
+	mov		BYTE [HDD_Selected], al								; Restore
+
 	call	render_partition_chooser							; Update display
 	jmp		chooser_loop
 
 partition_chooser_up:
-	inc		BYTE [HDD_Selected]									; Decrement HDD selection	
+	mov		al, BYTE [HDD_Selected]								; Read selection
+	inc		al													; Move cursor down
+	and		al, $03												; Get low 2 bits only
+	mov		BYTE [HDD_Selected], al								; Restore
+
 	call	render_partition_chooser							; Update display
 	jmp		chooser_loop
 
@@ -360,6 +408,8 @@ find_bootable_partitions:
 	mov		DWORD [ExtendedRead_Table+0x08], eax				; Write LBA
 	mov		WORD [ExtendedRead_Table+0x02], 0x01				; Read one sector
 	mov		WORD [ExtendedRead_Table+0x04], SectorBuf			; Temporary sector buffer offset (seg 0)
+
+	mov		DWORD [FAT_PartitionOffset], eax					; Write offset into FAT
 
 	pusha														; Push registers (BIOS may clobber them)
 	mov 	si, ExtendedRead_Table								; address of "disk address packet"
@@ -426,62 +476,6 @@ find_bootable_partitions:
 
 .index:
 	db		0
-
-;========================================================================================
-; Loads the kernel from the floppy.
-;========================================================================================
-	align 4
-
-load_kernel:
-	mov 	si, str_kernel_loading								; Put string position into SI
-	mov		dx, $0C00											; Cursor position
-	mov		di, $02												; Set colour
-	call 	print_string										; Call string printing routine
-
-	mov		ax, kern_start										; Read start sector
-	call	hex_to_ascii										; Display start sector
-	mov		dx, WORD [LastCursorPosition]						; Read last cursor position
-	inc		dl													; Move to right one
-	mov		WORD [LastCursorPosition], dx						; Write last cursor position
-	mov		ax, kern_len										; Read length sector
-	call	hex_to_ascii										; Display length sector
-
-	; Now, load the kernel from the floppy
-	xor 	ah, ah												; Function 0x0
-	mov		dl, BYTE [BootDevice]								; Fetch device to reset
-	int 	$13													; int BIOS
-
-.readKernel:
-	; Load the second stage of the bootloader to es = 0x0800, bx = 0x0000 (0800h:0000h, $8000 phys)
-	mov		bx, kern_loc										; Segment to load to
-	mov		es, bx												; Write to ES
-	xor		bx, bx												; Offset to read into (start of segment)
-
-	mov		ah, $02												; Function 0x02
-	mov		al, kern_len										; Read correct number of sectors
-	xor		ch, ch												; Track 0
-	mov		cl, kern_start										; Load start of kernel
-	xor		dh, dh												; Head 0
-	mov		dl, BYTE [BootDevice]								; Fetch boot device
-	int 	$13													; int BIOS
-
-	jc		.floppyErr											; Repeat until success
-
-	mov 	si, str_kernel_loaded_ok							; Put string position into SI
-	mov		dx, $0D00											; Cursor position
-	mov		di, $02												; Set colour
-	call 	print_string										; Call string printing routine
-
-	ret
-
-.floppyErr:
-	mov 	si, str_floppyError									; Put string position into SI
-	call 	print_error											; Call string printing routine
-
-	xor		ax, ax												; Clear AX
-	int		$16													; Wait for keypress
-
-	jmp		.readKernel
 
 ;========================================================================================
 ; Displays the memory size on the screen 
@@ -837,6 +831,9 @@ str_select_partition:
 str_err_not_bootable:
 	db 	"This partition is not marked as bootable!", 0
 
+str_err_kern_not_found:
+	db	"Could not find KERNEL.BIN at the root of the drive!", 0
+
 str_err_clear_err:
 	times	0x40 db 0x20
 	db	0
@@ -891,6 +888,12 @@ ExtendedRead_Table:
 	dd	0														; Starting LBA
 	dd	0	
 
+kernel_cluster:
+	dd	0
+
+kernel_filename:
+	db	"KERNEL  BIN", 0
+
 ;========================================================================================
 ; Global Descriptor Table
 ;========================================================================================
@@ -911,7 +914,7 @@ gdt_start:
 	dw	$0FFFF													; Limit 0:15 = $0FFFF
 	dw	$0000													; Base 0:15 = $0000
 	db	$00														; Base 16:23 = $00
-	db	$92														; Access byte: Present, ring 0, Exec, grow up, R/W
+	db	$92														; Access byte: Present, ring 0, Not exec, grow up, R/W
 	db	$0CF													; 4K pages, 32-bit, limit 16:19 = $F
 	db	$00														; Base 24:31 = $00	
 

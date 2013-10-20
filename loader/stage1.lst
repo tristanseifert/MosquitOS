@@ -86,7 +86,7 @@
     86 00000074 EB02                    	jmp		SHORT .setCursor
     87                                  
     88                                  .useDefaultColour:
-    89 00000076 B30F                    	mov		bl, $00F											; White text on black background
+    89 00000076 B307                    	mov		bl, $007											; Light gray text on black background
     90                                  
     91                                  .setCursor:
     92 00000078 B402                    	mov 	ah, $02												; Set cursor position

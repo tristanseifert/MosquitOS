@@ -6,44 +6,95 @@
 
 #define	IRQ_0			0x20	// IRQ0 = PIT timer tick
 
-static inline void sys_set_lidt(void* base, uint16_t size);
-static uint64_t sys_timer_ticks;
+static void sys_set_lidt(void* base, uint16_t size);
+uint64_t sys_timer_ticks;
+
+// Builds IDT to system defaults
+void sys_build_idt();
+// Builds GDT to system defaults
+void sys_build_gdt();
+// Sets location of GDT
+void sys_install_gdt(void* location);
 
 // Define the assembly IRQ handlers
-void sys_dummy_irq(void);
-void sys_timer_tick_irq(void);
+extern void sys_dummy_irq(void);
+extern void sys_timer_tick_irq(void);
+extern void sys_page_fault_irq(void);
+
+extern void isr0(void);
+extern void isr1(void);
+extern void isr2(void);
+extern void isr3(void);
+extern void isr4(void);
+extern void isr5(void);
+extern void isr6(void);
+extern void isr7(void);
+extern void isr8(void);
+extern void isr9(void);
+extern void isr10(void);
+extern void isr11(void);
+extern void isr12(void);
+extern void isr13(void);
+extern void isr14(void);
+extern void isr15(void);
+extern void isr16(void);
+extern void isr17(void);
+extern void isr18(void);
 
 /*
  * Initialises the system into a known state.
  */ 
 void system_init() {
+	// TODO: Fix GDT!
 	sys_build_gdt();
 	sys_build_idt();
+	sys_setup_ints();
 }
 
 /*
  * Builds the Interrupt Descriptor Table at a fixed location in memory.
  */
 void sys_build_idt() {
-	sys_idt_descriptor* idt = (sys_idt_descriptor *) SYS_IDT_MEMLOC;
+	idt_entry_t* idt = (idt_entry_t *) SYS_IDT_MEMLOC;
 
-	// Fill the IDT with dummy 32-bit interrupt handlers
-	for(uint16_t i = 0; i < 256; i++) {
-		idt[i].zero = 0x00;
-		idt[i].selector = 0x08; // Kernel code selector
-		idt[i].offset_1 = (((uint32_t) sys_dummy_irq) & 0xFFFF); // ISR logical location
-		idt[i].offset_2 = (((uint32_t) sys_dummy_irq) & 0xFFFF0000) >> 0x10; // ISR logical location
-		idt[i].type_attr = 0x8E; // Present, 32-bit interrupt
+	// Clear IDT
+	memset(idt, 0, sizeof(idt_entry_t)*256);
 
+	for(int i = 0; i < 256; i++) {
+		sys_set_idt_gate(i, (uint32_t) sys_dummy_irq, 0x08, 0x8E);
 	}
 
-	// 0x000830f0 0x00008e00
-	// Set up IRQ0
-	idt[IRQ_0].offset_1 = (((uint32_t) sys_timer_tick_irq) & 0xFFFF); // ISR logical location
-	idt[IRQ_0].offset_2 = (((uint32_t) sys_timer_tick_irq) & 0xFFFF0000) >> 0x10; // ISR logical location
+	// Set IDT gate for IRQ0
+	sys_set_idt_gate(IRQ_0, (uint32_t) sys_timer_tick_irq, 0x08, 0x8E);
 
-	sys_install_idt((void *) idt);
+	// Install exception handlers
+	sys_set_idt_gate(0, (uint32_t) isr0, 0x08, 0x8E);
+	sys_set_idt_gate(1, (uint32_t) isr1, 0x08, 0x8E);
+	sys_set_idt_gate(2, (uint32_t) isr2, 0x08, 0x8E);
+	sys_set_idt_gate(3, (uint32_t) isr3, 0x08, 0x8E);
+	sys_set_idt_gate(4, (uint32_t) isr4, 0x08, 0x8E);
+	sys_set_idt_gate(5, (uint32_t) isr5, 0x08, 0x8E);
+	sys_set_idt_gate(6, (uint32_t) isr6, 0x08, 0x8E);
+	sys_set_idt_gate(7, (uint32_t) isr7, 0x08, 0x8E);
+	sys_set_idt_gate(8, (uint32_t) isr8, 0x08, 0x8E);
+	sys_set_idt_gate(9, (uint32_t) isr9, 0x08, 0x8E);
+	sys_set_idt_gate(10, (uint32_t) isr10, 0x08, 0x8E);
+	sys_set_idt_gate(11, (uint32_t) isr11, 0x08, 0x8E);
+	sys_set_idt_gate(12, (uint32_t) isr12, 0x08, 0x8E);
+	sys_set_idt_gate(13, (uint32_t) isr13, 0x08, 0x8E);
+	sys_set_idt_gate(15, (uint32_t) isr15, 0x08, 0x8E);
+	sys_set_idt_gate(16, (uint32_t) isr16, 0x08, 0x8E);
+	sys_set_idt_gate(17, (uint32_t) isr17, 0x08, 0x8E);
+	sys_set_idt_gate(18, (uint32_t) isr18, 0x08, 0x8E);
 
+	// Page fault handler
+	sys_set_idt_gate(14, (uint32_t) isr14, 0x08, 0x8E);
+
+	// Install IDT (LIDT instruction)
+	sys_set_lidt((void *) idt, sizeof(idt_entry_t)*256);
+}
+
+void sys_setup_ints() {
 	// Remap PICs
 	sys_pic_irq_remap(0x20, 0x28);
 
@@ -53,19 +104,24 @@ void sys_build_idt() {
 	// Initialise PIT ch0 to hardware int
 	sys_pit_init(0, 0);
 	//  time in ms = reload_value / (3579545 / 3) * 1000
-	// Reload counter of 0x4AA, giving an int every 1.00068584136 ms
-	sys_pit_set_reload(0, 0x4AA);
+	// Reload counter of 0x078, giving an int every 0.10057144134 ms
+	sys_pit_set_reload(0, 0x078);
+
+	sys_timer_ticks = 0;
 
 	// Re-enable interrupts now
-	//__asm__("sti");
-	__asm__("int $20");
+	__asm__("sti");
+	//__asm__("int $0x20");
 }
 
-/*
- * Installs the Interrupt Descriptor Table.
- */
-void sys_install_idt(void* location) {
-	sys_set_lidt(location, 0x800);
+void sys_set_idt_gate(uint8_t entry, uint32_t function, uint8_t segment, uint8_t flags) {
+	idt_entry_t *ptr = (idt_entry_t *) SYS_IDT_MEMLOC;
+
+	ptr[entry].offset_1 = function & 0xFFFF;
+	ptr[entry].offset_2 = (function >> 0x10) & 0xFFFF;
+	ptr[entry].selector = segment;
+	ptr[entry].flags = flags; // OR with 0x60 for user level
+	ptr[entry].zero = 0x00;
 }
 
 /*
@@ -73,59 +129,37 @@ void sys_install_idt(void* location) {
  * space for some task state segment descriptors.
  */
 void sys_build_gdt() {
-	uint8_t *gdt = (uint8_t *) SYS_GDT_MEMLOC;
+	gdt_entry_t *gdt = (gdt_entry_t *) SYS_GDT_MEMLOC;
 
 	// Set up null entry
-	memset(gdt, 0x00, 0x08);
+	memset(gdt, 0x00, sizeof(gdt_entry_t));
 
-	uint8_t *gdt_write_ptr = gdt+8;
-
-	// Code segment
-	sys_gdt_convert(gdt_write_ptr, (sys_gdt_descriptor) {0xFFFFFFFF, 0x00000000, 0x9A});
-	gdt_write_ptr += 0x08;
-
-	// Data segment
-	sys_gdt_convert(gdt_write_ptr, (sys_gdt_descriptor) {0xFFFFFFFF, 0x00000000, 0x92});
+	// Kernel code segment and data segments
+	sys_set_gdt_gate(1, 0x00000000, 0xFFFFFFFF, 0x9A, 0xCF);
+	sys_set_gdt_gate(2, 0x00000000, 0xFFFFFFFF, 0x92, 0xCF);
+	sys_set_gdt_gate(3, 0x00000000, 0xFFFFFFFF, 0xFA, 0xCF);
+	sys_set_gdt_gate(4, 0x00000000, 0xFFFFFFFF, 0xF2, 0xCF);
 
 	// Create the correct number of TSS descriptors
 	for(int i = 0; i < SYS_NUM_TSS; i++) {
-		sys_gdt_convert(gdt_write_ptr, (sys_gdt_descriptor) 
-			{SYS_TSS_LEN, SYS_TSS_MEMLOC+(i*SYS_TSS_LEN), 0x89});		
+		sys_set_gdt_gate(i+5, SYS_TSS_MEMLOC+(i*SYS_TSS_LEN), SYS_TSS_LEN, 0x89, 0x4F);
 	}
 
 	sys_install_gdt(gdt);
 }
 
-/*
- * Turns a sys_gdt_descriptor struct into an actual GDT descriptor.
- */
-void sys_gdt_convert(uint8_t *target, sys_gdt_descriptor source) {
-    // Check the limit to make sure that it can be encoded
-    if ((source.limit > 65536) && (source.limit & 0xFFF) != 0xFFF) {
-        // error out here
-    }
+void sys_set_gdt_gate(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, uint8_t gran) {
+	gdt_entry_t *gdt = (gdt_entry_t *) SYS_GDT_MEMLOC;	
+	
+	gdt[num].base_low = (base & 0xFFFF);
+	gdt[num].base_middle = (base >> 16) & 0xFF;
+	gdt[num].base_high = (base >> 24) & 0xFF;
 
-    if (source.limit > 65536) {
-        // Adjust granularity if required
-        source.limit = source.limit >> 12;
-        target[6] = 0xC0;
-    } else {
-        target[6] = 0x40;
-    }
- 
-    // Encode the limit
-    target[0] = source.limit & 0xFF;
-    target[1] = (source.limit >> 8) & 0xFF;
-    target[6] |= (source.limit >> 16) & 0xF;
- 
-    // Encode the base 
-    target[2] = source.base & 0xFF;
-    target[3] = (source.base >> 8) & 0xFF;
-    target[4] = (source.base >> 16) & 0xFF;
-    target[7] = (source.base >> 24) & 0xFF;
- 
-    // And... Type
-    target[5] = source.type;
+	gdt[num].limit_low = (limit & 0xFFFF);
+	gdt[num].granularity = (limit >> 16) & 0x0F;
+
+	gdt[num].granularity |= gran & 0xF0;
+	gdt[num].access = flags;
 }
 
 /*
@@ -139,13 +173,13 @@ void sys_install_gdt(void* location) {
  
 	IDTR.length = (0x18 + (SYS_NUM_TSS * 0x08))-1;
 	IDTR.base = (uint32_t) location;
-	__asm__("lgdt (%0)" : : "p"(&IDTR));
+	__asm__ volatile("lgdt (%0)" : : "p"(&IDTR));
 }
 
 /*
  * Loads the IDTR register.
  */
-static inline void sys_set_lidt(void* base, uint16_t size) {
+static void sys_set_lidt(void* base, uint16_t size) {
 	struct {
 		uint16_t length;
 		uint32_t base;
@@ -153,57 +187,57 @@ static inline void sys_set_lidt(void* base, uint16_t size) {
  
 	IDTR.length = size;
 	IDTR.base = (uint32_t) base;
-	__asm__("lidt (%0)" : : "p"(&IDTR));
+	__asm__ volatile("lidt (%0)" : : "p"(&IDTR));
 }
 
 /*
  * Returns the number of system timer ticks since the kernel was started.
  */
-inline uint64_t sys_get_ticks() {
+uint64_t sys_get_ticks() {
 	return sys_timer_ticks;
 }
 
 /*
  * Checks if interrupts are enabled.
  */
-inline bool sys_irq_enabled() {
+bool sys_irq_enabled() {
 	int f;
-	__asm__ volatile ("pushf\n\t" "popl %0" : "=g"(f));
+	__asm__ volatile("pushf\n\t" "popl %0" : "=g"(f));
 	return f & (1 << 9);
 }
 
 /*
  * Reads CPUID register
  */
-inline void sys_cpuid(uint32_t code, uint32_t* a, uint32_t* d) {
+void sys_cpuid(uint32_t code, uint32_t* a, uint32_t* d) {
 	__asm__ volatile("cpuid" : "=a"(*a), "=d"(*d) : "0"(code) : "ebx", "ecx");
 }
 
 /*
  * Reads TSC (CPU timestamp counter)
  */
-inline void sys_rdtsc(uint32_t* upper, uint32_t* lower) {
+void sys_rdtsc(uint32_t* upper, uint32_t* lower) {
 	__asm__ volatile("rdtsc" : "=a"(*lower), "=d"(*upper) );
 }
 
 /*
  * Flushes the MMU TLB for a given logical address.
  */
-inline void sys_flush_tlb(void* m) {
-	__asm__ volatile("invlpg %0" : : "m"(*m) : "memory");
+void sys_flush_tlb(uint32_t m) {
+	__asm__ volatile("invlpg %0" : : "m"(m) : "memory");
 }
 
 /*
  * Reads an MSR register.
  */
-inline void sys_read_MSR(uint32_t msr, uint32_t *lo, uint32_t *hi) {
+void sys_read_MSR(uint32_t msr, uint32_t *lo, uint32_t *hi) {
 	__asm__ volatile("rdmsr" : "=a"(*lo), "=d"(*hi) : "c"(msr));
 }
 
 /*
  * Writes an MSR register.
  */ 
-inline void sys_write_MSR(uint32_t msr, uint32_t lo, uint32_t hi) {
+void sys_write_MSR(uint32_t msr, uint32_t lo, uint32_t hi) {
 	__asm__ volatile("wrmsr" : : "a"(lo), "d"(hi), "c"(msr));
 }
 
@@ -211,7 +245,13 @@ inline void sys_write_MSR(uint32_t msr, uint32_t lo, uint32_t hi) {
  * IRQ handler for the system tick.
  */
 void sys_timer_tick_handler(void) {
-	sys_pic_irq_eoi(0x00); // sent int ack
-
+	sys_pic_irq_eoi(0x00); // send int ack
 	sys_timer_ticks++;
+}
+
+/*
+ * Page fault handler
+ */
+void sys_page_fault_handler(uint32_t address) {
+
 }

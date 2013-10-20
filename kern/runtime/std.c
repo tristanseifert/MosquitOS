@@ -16,11 +16,11 @@ size_t strlen(const char* str) {
 /*
  * Finds the first occurrence of value in the first num bytes of ptr.
  */
-const void* memchr(const void * ptr, int value, size_t num) {
+const void* memchr(const void * ptr, uint8_t value, size_t num) {
 	uint8_t *read = (uint8_t *) ptr;
 
 	for(int i = 0; i < num; i++) {
-		if(read[i] == (uint8_t) value) return &read[i];
+		if(read[i] == value) return &read[i];
 	}
 
 	return NULL;
@@ -32,7 +32,7 @@ const void* memchr(const void * ptr, int value, size_t num) {
  * greater than the first byte in ptr2; and a value less than zero if the
  * opposite. Note that these comparisons are performed on uint8_t types.
  */
-int memcmp (const void* ptr1, const void* ptr2, size_t num) {
+int memcmp(const void* ptr1, const void* ptr2, size_t num) {
 	uint8_t *read1 = (uint8_t *) ptr1;
 	uint8_t *read2 = (uint8_t *) ptr2;
 
@@ -63,11 +63,11 @@ void* memcpy(void* destination, const void* source, size_t num) {
 /*
  * Fills a given segment of memory with a specified value.
  */
-void* memset(void* ptr, int value, size_t num) {
+void* memset(void* ptr, uint8_t value, size_t num) {
 	uint8_t *write = (uint8_t *) ptr;
 
 	for(int i = 0; i < num; i++) {
-		write[i] = (uint8_t) value;
+		write[i] = value;
 	}
 
 	return ptr;
