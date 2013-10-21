@@ -1,7 +1,6 @@
 #ifndef TYPES_H
 #define TYPES_H
 
-
 #if !defined(__cplusplus)
 #include <stdbool.h>
 #endif
@@ -10,13 +9,11 @@
 
 // This gives us all the runtime functions
 #include <runtime/std.h>
+#include <sys/kheap.h>
+// Include panic functions
+#include <runtime/panic.h>
 
-#define PANIC(x) terminal_initialize(true);\
-				terminal_setPos(4, 0);terminal_write_string("Kernel Panic");\
-				terminal_setPos(4, 2);terminal_write_string(x);\
-				terminal_setPos(4, 4);terminal_write_string(__FILE__);\
-				terminal_setPos(4, 5);terminal_write_dword(__LINE__);\
-				__asm__("cli");\
-				while(1);
+#define PANIC(msg) panic(msg, __FILE__, __LINE__);
+#define ASSERT(b) ((b) ? (void)0 : panic_assert(__FILE__, __LINE__, #b))
 
 #endif

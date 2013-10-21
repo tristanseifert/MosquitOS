@@ -8,6 +8,8 @@
 
 void error_dump_regs(err_registers_t regs);
 
+uint32_t error_cr0, error_cr1, error_cr2, error_cr3;
+
 /*
  * Initialises the VGA hardware for displaying an error screen.
  */
@@ -58,7 +60,7 @@ void error_dump_regs(err_registers_t regs) {
 	terminal_write_byte(regs.err_code);
 
 	// Dump the registers now.
-	static char reg_names[14][8] = {
+	static char reg_names[18][8] = {
 		" DS: 0x",
 		"EDI: 0x",
 		"ESI: 0x",
@@ -72,15 +74,20 @@ void error_dump_regs(err_registers_t regs) {
 		" CS: 0x",
 		"EFG: 0x",
 		"USP: 0x",
-		" SS: 0x"
+		" SS: 0x",
+		"CR0: 0x",
+		"CR1: 0x",
+		"CR2: 0x",
+		"CR3: 0x",
 	};
 
-	uint32_t registers[14] = {
+	uint32_t registers[18] = {
 		regs.ds, regs.edi, regs.esi, regs.ebp, regs.esp, regs.ebx, regs.edx, regs.ecx,
-		regs.eax, regs.eip, regs.cs, regs.eflags, regs.useresp, regs.ss
+		regs.eax, regs.eip, regs.cs, regs.eflags, regs.useresp, regs.ss, error_cr0, error_cr1,
+		error_cr2, error_cr3
 	};
 
-	for(uint8_t i = 0; i < 14; i+=2) {
+	for(uint8_t i = 0; i < 18; i+=2) {
 		terminal_setPos(4, (i/2)+10);
 
 		terminal_write_string((char *) &reg_names[i]);
@@ -97,12 +104,20 @@ void error_dump_regs(err_registers_t regs) {
  * Called by ISRs when an error occurrs.
  */
 void error_handler(err_registers_t regs) {
-	if(regs.int_no == 14) {
-		paging_page_fault_handler();
-	} else {
+	//if(regs.int_no == 14) {
+	//	paging_page_fault_handler();
+	//} else {
+		uint32_t obama;
+		__asm__ volatile("mov %%cr2, %0" : "=r" (obama));
+		error_cr2 = obama;
+		__asm__ volatile("mov %%cr0, %0" : "=r" (obama));
+		error_cr0 = obama;
+		__asm__ volatile("mov %%cr3, %0" : "=r" (obama));
+		error_cr3 = obama;
+
 		error_init();
 		error_dump_regs(regs);
 
 		while(1);
-	}
+	//}
 }

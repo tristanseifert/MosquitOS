@@ -170,8 +170,29 @@ boot:
 	; The kernel is loaded to $00003000 phys (segmented address 0300h:0000h)
 	db		$66													; 32-bit prefix
 	db		$0EA												; Far jump opcode
-	dd		kern_loc_phys										; Physical kernel lcoation
+	dd		copy_kernel											; Jump to kernel copying routine
 	dw		$08													; Selector for CODE32_DESCRIPTOR
+
+	BITS	32
+copy_kernel:
+	mov		esp, $400000										; Stackzors at $400000
+
+	mov		eax, kern_loc_phys									; Physical kernel location
+	mov		ebx, $00100000										; Destination memory address
+	mov		ecx, $4000											; Number of long-words to copy
+
+	align	4													; DWORD align
+.copy:
+	mov		edx, DWORD [eax]									; Read a DWORD from lowmem
+	mov		DWORD [ebx], edx									; Write DWORD to himem
+
+	add		eax, $04											; Increment read ptr
+	add		ebx, $04											; Increment write ptr
+
+	loop	.copy												; Loop and copy everything
+	jmp		$100000												; Jump into relocated kernel
+
+	BITS	16
 
 ;========================================================================================
 ; Renders the partition chooser

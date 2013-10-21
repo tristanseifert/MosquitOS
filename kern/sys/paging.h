@@ -3,7 +3,7 @@
 
 #include <types.h>
 
-#define SYS_PAGE_DIR_ADDR 0x00130000
+#define SYS_PAGE_DIR_ADDR 0x00400000
 
 /*
  * Contains functions to set up and deal with paging.
@@ -30,6 +30,9 @@ typedef struct page_directory {
 	// Physical address of tablesPhysical.
 	uint32_t physicalAddr;
 } page_directory_t;
+
+void alloc_frame(page_t *page, bool is_kernel, bool is_writeable);
+void free_frame(page_t *page);
 
 void paging_init();
 void paging_switch_directory(page_directory_t *new);

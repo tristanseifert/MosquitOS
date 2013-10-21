@@ -3,7 +3,7 @@ AS=i686-pc-elf-as
 
 # Freestanding binary, strip extra shits
 CFLAGS= -c -funroll-loops -finline-functions -g -Wall -fno-builtin -static\
-		-fomit-frame-pointer -mpreferred-stack-boundary=2 -mno-sse2\
+		-mno-sse2\
 		-nostartfiles -nodefaultlibs -std=c99 -Wno-unused-variable \
 		-mfpmath=387 -fno-stack-protector -I/Users/tristanseifert/SquelchenOS/kern/\
 		-Wno-unused-function
@@ -19,7 +19,7 @@ kernel: main.c
 	$(CC) $(CFLAGS) -ffreestanding *.c
 	i686-pc-elf-gcc -Wl,-T,kern.ld -o kernel.elf -ffreestanding -O2 -nostdlib *.o 
 	gobjcopy -I elf32-i386 -O binary kernel.elf kernel.bin
-	gobjdump -b elf32-i386 -d kernel.elf > symbols.txt
+	gobjdump -b elf32-i386 -D kernel.elf > symbols.txt
 	rm -f *.o
 
 # Runtime functions, such as the C standard library (printf, fopen, strlen, etc)

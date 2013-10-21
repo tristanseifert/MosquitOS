@@ -83,14 +83,18 @@ void terminal_write_byte(uint8_t byte) {
 	terminal_putchar((unsigned char) nybble);
 }
 
-void terminal_write_word(uint16_t byte) {
-	terminal_write_byte((byte & 0xFF00) >> 0x8);
-	terminal_write_byte(byte & 0x00FF);
+void terminal_write_word(uint16_t word) {
+	terminal_write_byte((word & 0xFF00) >> 0x8);
+	terminal_write_byte(word & 0x00FF);
 }
 
-void terminal_write_dword(uint32_t byte) {
-	terminal_write_word((byte & 0xFFFF0000) >> 0x10);
-	terminal_write_word(byte & 0x0000FFFF);
+void terminal_write_dword(uint32_t dword) {
+	terminal_write_word((dword & 0xFFFF0000) >> 0x10);
+	terminal_write_word(dword & 0x0000FFFF);
+}
+
+void terminal_write_int(int value) {
+   terminal_write_dword(value);
 }
 
 void terminal_clear() {

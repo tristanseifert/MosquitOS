@@ -1,3 +1,5 @@
+.section .text
+
 /*
  * Dummy IRQ handler
  */

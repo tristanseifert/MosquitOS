@@ -1,13 +1,14 @@
 #########################################################################################
-# This function is responsible for taking control from the bootloader, enabling protected
-# mode, and starting the kernel.
+# This function is responsible for taking control from the bootloader, re-locating the
+# kernel to a more sane address, and then starting the kernel.
 #########################################################################################
 .section .text
-.globl _loader
-.type _loader, @function
 
-_loader:
-	# Set up kernel stack at 0x340000 to 0x400000
+.globl _entry
+.type _entry, @function
+
+_entry:
+	# Set up kernel stack at 0x380000 to 0x400000
 	movl	$0x400000, %esp
 
 	# Initialise kernel first
