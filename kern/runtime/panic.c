@@ -7,7 +7,7 @@ void panic_assert(char *file, uint32_t line, char *desc) {
 	__asm__ volatile("cli"); // Disable interrupts.
 
 	terminal_initialize(true);
-	
+
 	terminal_write_string("ASSERTION FAILED(");
 	terminal_write_string(desc);
 	terminal_write_string(") at ");
@@ -15,6 +15,7 @@ void panic_assert(char *file, uint32_t line, char *desc) {
 	terminal_write_string(":");
 	terminal_write_int(line);
 	terminal_write_string("\n");
+	
 	// Halt by going into an infinite loop.
 	while(1);
 }
@@ -32,6 +33,7 @@ void panic(char *message, char *file, uint32_t line) {
 	terminal_write_string(":");
 	terminal_write_int(line);
 	terminal_write_string("\n");
+
 	// Halt by going into an infinite loop.
 	while(1);
 }

@@ -1,4 +1,5 @@
 *.bin
+*.elf
 *.img
 *.flp
 qemu-1.60/

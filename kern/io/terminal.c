@@ -40,7 +40,7 @@ void terminal_putentryat(char c, uint8_t color, uint8_t x, uint8_t y) {
 void terminal_putchar(char c) {
 	if(c == '\n') {
 		terminal_row++;
-		terminal_column = terminal_startCol;
+		terminal_column = 0;
 	} else {
 		terminal_putentryat(c, terminal_colour, terminal_column, terminal_row);
 
@@ -93,8 +93,30 @@ void terminal_write_dword(uint32_t dword) {
 	terminal_write_word(dword & 0x0000FFFF);
 }
 
-void terminal_write_int(int value) {
-   terminal_write_dword(value);
+void terminal_write_int(int n) {
+	if (n == 0) {
+		terminal_putchar('0');
+		return;
+	}
+
+	int32_t acc = n;
+	char c[32];
+	int i = 0;
+	while (acc > 0) {
+		c[i] = '0' + acc%10;
+		acc /= 10;
+		i++;
+	}
+	c[i] = 0;
+
+	char c2[32];
+	c2[i--] = 0;
+	int j = 0;
+	while(i >= 0) {
+		c2[i--] = c[j++];
+	}
+
+	terminal_putchar(c2);
 }
 
 void terminal_clear() {

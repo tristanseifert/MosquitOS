@@ -31,7 +31,7 @@ void kernel_main() {
 	terminal_write_string(", d: ");
 	terminal_write_dword(d);
 
-	terminal_write_string("Hello, kernel world!\n");
+	terminal_write_string("\nHello, kernel world!\n");
 
 /*	uint8_t *mosquiten = (uint8_t *) 0x02000;
 	terminal_setPos(4, 2);
