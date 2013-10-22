@@ -2,6 +2,7 @@
 #include <io/io.h>
 #include <device/pic.h>
 #include <device/pit.h>
+#include <device/apic.h>	
 
 #include "system.h"
 
@@ -48,10 +49,33 @@ extern void isr18(void);
  * Initialises the system into a known state.
  */ 
 void system_init() {
-	// TODO: Fix GDT!
 	sys_build_gdt();
 	sys_build_idt();
 	sys_setup_ints();
+
+	// Check if we have SSE
+	uint32_t eax, ebx, ecx, edx;
+	cpuid(1, eax, ebx, ecx, edx);
+
+	if(edx & CPUID_FEAT_EDX_SSE) { // we have SSE support
+		uint32_t cr0, cr4;
+
+		// Read CR0
+		__asm__ volatile("mov %%cr0, %0" : "=r" (cr0));
+		// Clear EM bit
+		cr0 &= ~(1 << 2);
+		// Set MP bit
+		cr0 |= (1 << 1);
+		__asm__ volatile("mov %0, %%cr0" : "=r" (cr0));
+
+		// Read CR4
+		__asm__ volatile("mov %%cr4, %0" : "=r" (cr4));
+		// Set OSFXSR bit
+		cr4 |= (1 << 9);
+		// Set OSXMMEXCPT bit
+		cr4 |= (1 << 10);
+		__asm__ volatile("mov %0, %%cr4" : "=r" (cr4));
+	}
 }
 
 /*

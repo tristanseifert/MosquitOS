@@ -2,8 +2,6 @@
 #include "cpuid.h"
 #include "cpuid_data.h"
 
-#define cpuid(in, a, b, c, d) __asm__ volatile("cpuid": "=a" (a), "=b" (b), "=c" (c), "=d" (d) : "a" (in));
-
 /*
  * Detects the kind of CPU in the system.
  */
@@ -209,6 +207,9 @@ cpu_info_t* cpuid_detect_intel() {
 	uint32_t extended_family = -1;
 	
 	cpuid(1, eax, ebx, unused, unused);
+
+	// Read CPUID info into struct
+	cpuid(1, cpu_info->cpuid_eax, cpu_info->cpuid_ebx, cpu_info->cpuid_ecx, cpu_info->cpuid_edx);
 	
 	model = (eax >> 4) & 0xf;
 	family = (eax >> 8) & 0xf;
@@ -297,6 +298,9 @@ cpu_info_t* cpuid_detect_amd() {
 	uint32_t family, model, stepping, reserved;
 	
 	cpuid(1, eax, unused, unused, unused);
+
+	// Read CPUID info into struct
+	cpuid(1, cpu_info->cpuid_eax, cpu_info->cpuid_ebx, cpu_info->cpuid_ecx, cpu_info->cpuid_edx);
 	
 	model = (eax >> 4) & 0x0F;
 	family = (eax >> 8) & 0x0F;

@@ -8,7 +8,7 @@ CFLAGS= -c -funroll-loops -finline-functions -g -Wall -fno-builtin -static\
 		-mfpmath=387 -fno-stack-protector -I/Users/tristanseifert/SquelchenOS/kern/\
 		-Wno-unused-function
 
-all: runtime drivers io system loader kernel clean
+all: setup runtime drivers io system loader kernel clean
 
 # Clean up from previous build
 clean:
@@ -22,9 +22,13 @@ kernel: main.c
 	gobjcopy -I elf32-i386 -O binary kernel.elf kernel.bin
 	gobjdump -b elf32-i386 -d kernel.elf > symbols.txt
 
+# Sets up directories and stuff.
+setup:
+	rm -rf tmp
+	mkdir tmp
+
 # Runtime functions, such as the C standard library (printf, fopen, strlen, etc)
 runtime: runtime/*.c
-	mkdir tmp
 	$(CC) $(CFLAGS) -ffreestanding runtime/*.c
 
 # Drivers for hardware

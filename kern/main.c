@@ -63,6 +63,12 @@ void kernel_main() {
 		terminal_write_string("\n");
 	}
 
+	bool APIC_Support = apic_supported();
+
+	if(APIC_Support == true) {
+		terminal_write_string("\nCPU supports APIC!");
+	}
+
 /*	uint8_t *mosquiten = (uint8_t *) 0x02000;
 	terminal_setPos(4, 2);
 	terminal_write_dword(*(mosquiten));*/

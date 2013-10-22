@@ -1,4 +1,5 @@
 #include <types.h>
+#include "sys/kheap.h"
 
 /*
  * Returns the length of the string passed in str in bytes before a \0 terminator.
@@ -71,4 +72,11 @@ void* memset(void* ptr, uint8_t value, size_t num) {
 	}
 
 	return ptr;
+}
+
+/*
+ * Allocates num_bytes bytes of memory on the kernel heap.
+ */
+void* malloc(size_t num_bytes) {
+	return (void *) kmalloc_int(num_bytes, false, 0);
 }
