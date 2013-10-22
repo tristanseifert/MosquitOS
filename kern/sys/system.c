@@ -2,12 +2,14 @@
 #include <io/io.h>
 #include <device/pic.h>
 #include <device/pit.h>
+
 #include "system.h"
 
 #define	IRQ_0			0x20	// IRQ0 = PIT timer tick
 
 static void sys_set_lidt(void* base, uint16_t size);
 uint64_t sys_timer_ticks;
+cpu_info_t* sys_current_cpu_info;
 
 // Builds IDT to system defaults
 void sys_build_idt();
@@ -21,6 +23,7 @@ extern void sys_dummy_irq(void);
 extern void sys_timer_tick_irq(void);
 extern void sys_page_fault_irq(void);
 
+// ISR/Exception handlers
 extern void isr0(void);
 extern void isr1(void);
 extern void isr2(void);
@@ -191,6 +194,21 @@ static void sys_set_lidt(void* base, uint16_t size) {
 }
 
 /*
+ * Returns information about the current CPU that has been previously read,
+ * or performs a read of said info if not available in memory.
+ */
+cpu_info_t* sys_get_cpu_info() {
+	// Detect CPU if not cached
+	if(!sys_current_cpu_info) {
+		sys_current_cpu_info = cpuid_detect();
+	}
+
+	cpuid_set_strings(sys_current_cpu_info);
+
+	return sys_current_cpu_info;
+}
+
+/*
  * Returns the number of system timer ticks since the kernel was started.
  */
 uint64_t sys_get_ticks() {
@@ -204,13 +222,6 @@ bool sys_irq_enabled() {
 	int f;
 	__asm__ volatile("pushf\n\t" "popl %0" : "=g"(f));
 	return f & (1 << 9);
-}
-
-/*
- * Reads CPUID register
- */
-void sys_cpuid(uint32_t code, uint32_t* a, uint32_t* d) {
-	__asm__ volatile("cpuid" : "=a"(*a), "=d"(*d) : "0"(code) : "ebx", "ecx");
 }
 
 /*

@@ -9,7 +9,7 @@ extern page_directory_t *kernel_directory;
 heap_t *kheap = 0;
 
 uint32_t kmalloc_int(uint32_t sz, bool align, uint32_t *phys) {
-    if (kheap != 0) {
+    if (kheap != 0) { // if we have a kernel heap, use that
         void *addr = alloc(sz, align, kheap);
         if (phys != 0) {
             page_t *page = paging_get_page((uint32_t) addr, false, kernel_directory);
@@ -17,7 +17,7 @@ uint32_t kmalloc_int(uint32_t sz, bool align, uint32_t *phys) {
         }
 
         return (uint32_t) addr;
-    } else {
+    } else { // otherwise, use the 'dumb' allocation
         if (align == 1 && (kheap_placement_address & 0xFFFFF000)) {
             // Align the placement address;
             kheap_placement_address &= 0xFFFFF000;
@@ -37,19 +37,19 @@ void kfree(void *p) {
 }
 
 uint32_t kmalloc_a(uint32_t sz) {
-	return kmalloc_int(sz, 1, 0);
+	return kmalloc_int(sz, true, 0);
 }
 
 uint32_t kmalloc_p(uint32_t sz, uint32_t *phys) {
-	return kmalloc_int(sz, 0, phys);
+	return kmalloc_int(sz, false, phys);
 }
 
 uint32_t kmalloc_ap(uint32_t sz, uint32_t *phys) {
-	return kmalloc_int(sz, 1, phys);
+	return kmalloc_int(sz, true, phys);
 }
 
 uint32_t kmalloc(uint32_t sz) {
-	return kmalloc_int(sz, 0, 0);
+	return kmalloc_int(sz, false, 0);
 }
 
 static void expand(uint32_t new_size, heap_t *heap) {

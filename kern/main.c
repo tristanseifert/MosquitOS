@@ -9,29 +9,59 @@ extern "C" /* Use C linkage for kernel_main. */
 #endif
 void kernel_main() {
 	system_init();
+	// From here on, the kernel works with VIRTUAL addresses, not physical.
+	paging_init();
 
 	terminal_initialize(true);
 
-	uint32_t a = kmalloc(8);
+	terminal_write_string("Hello, kernel world!\n\n");
 
-	paging_init();
+	cpu_info_t* cpuinfo = sys_get_cpu_info();
 
-	uint32_t b = kmalloc(8);
-	uint32_t c = kmalloc(8);
-	terminal_write_string("a: ");
-	terminal_write_dword(a);
-	terminal_write_string(", b: ");
-	terminal_write_dword(b);
-	terminal_write_string("\nc: ");
-	terminal_write_dword(c);
+	if(cpuinfo->manufacturer == kCPUManufacturerIntel) {
+		terminal_write_string("Detected Intel CPU\n");
+	} else if(cpuinfo->manufacturer == kCPUManufacturerAMD) {
+		terminal_write_string("Detected AMD CPU\n");
+	} else {
+		terminal_write_string("Detected unknown CPU\n");
+	}
 
-	kfree((void *) c);
-	kfree((void *) b);
-	uint32_t d = kmalloc(12);
-	terminal_write_string(", d: ");
-	terminal_write_dword(d);
+	terminal_write_string("Family: ");
+	terminal_write_dword(cpuinfo->family);
+	terminal_write_string(" Model: ");
+	terminal_write_dword(cpuinfo->model);
+	terminal_write_string(" Stepping: ");
+	terminal_write_dword(cpuinfo->stepping);
+	terminal_write_string(" Ext. Family: ");
+	terminal_write_dword(cpuinfo->extended_family);
 
-	terminal_write_string("\nHello, kernel world!\n");
+	terminal_write_string("\nRead CPU type: ");
+	terminal_write_string(cpuinfo->detected_name);
+
+	terminal_write_string("\n\n");
+	if(cpuinfo->str_type) {
+		terminal_write_string("  CPU Type: ");
+		terminal_write_string(cpuinfo->str_type);
+		terminal_write_string("\n");
+	}
+
+	if(cpuinfo->str_family) {
+		terminal_write_string("CPU Family: ");
+		terminal_write_string(cpuinfo->str_family);
+		terminal_write_string("\n");
+	}
+
+	if(cpuinfo->str_model) {
+		terminal_write_string(" CPU Model: ");
+		terminal_write_string(cpuinfo->str_model);
+		terminal_write_string("\n");
+	}
+
+	if(cpuinfo->str_brand) {
+		terminal_write_string(" CPU Brand: ");
+		terminal_write_string(cpuinfo->str_brand);
+		terminal_write_string("\n");
+	}
 
 /*	uint8_t *mosquiten = (uint8_t *) 0x02000;
 	terminal_setPos(4, 2);
@@ -43,7 +73,7 @@ void kernel_main() {
 	uint32_t timer = 0;
 	while(1) {
 		timer = sys_get_ticks() & 0xFFFFFFFF;
-		terminal_setPos(4, 4);
+		terminal_setPos(4, 18);
 		terminal_write_dword(timer);
 	}
 }

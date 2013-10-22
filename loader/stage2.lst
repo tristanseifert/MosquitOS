@@ -179,7 +179,7 @@
    179                                  
    180 000000F6 B800300000              	mov		eax, kern_loc_phys									; Physical kernel location
    181 000000FB BB00001000              	mov		ebx, $00100000										; Destination memory address
-   182 00000100 B900400000              	mov		ecx, $4000											; Number of long-words to copy
+   182 00000100 B900400000              	mov		ecx, $4000											; Number of long-words to copy (64KB)
    183                                  
    184 00000105 90<rept>                	align	4													; DWORD align
    185                                  .copy:

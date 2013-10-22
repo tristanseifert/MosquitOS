@@ -116,7 +116,7 @@ void terminal_write_int(int n) {
 		c2[i--] = c[j++];
 	}
 
-	terminal_putchar(c2);
+	terminal_write_string((char *) &c2);
 }
 
 void terminal_clear() {

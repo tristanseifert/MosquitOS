@@ -179,7 +179,7 @@ copy_kernel:
 
 	mov		eax, kern_loc_phys									; Physical kernel location
 	mov		ebx, $00100000										; Destination memory address
-	mov		ecx, $4000											; Number of long-words to copy
+	mov		ecx, $4000											; Number of long-words to copy (64KB)
 
 	align	4													; DWORD align
 .copy:

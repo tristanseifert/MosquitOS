@@ -1,5 +1,7 @@
 #include <types.h>
 
+#include "cpuid.h"
+
 /*
  * This file (and the associated .c) contains most of the variables and code that sets
  * up the system into a defined state, and also activates and makes use of a lot of
@@ -36,16 +38,15 @@ typedef struct sys_gdt_descriptor {
 void system_init();
 
 void sys_set_idt_gate(uint8_t entry, uint32_t function, uint8_t segment, uint8_t flags);
-
 void sys_setup_ints();
+bool sys_irq_enabled();
 
 void sys_set_gdt_gate(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, uint8_t gran);
 
+cpu_info_t* sys_get_cpu_info();
+
 uint64_t sys_get_ticks();
 
-bool sys_irq_enabled();
-
-void sys_cpuid(uint32_t code, uint32_t* a, uint32_t* d);
 void sys_rdtsc(uint32_t* upper, uint32_t* lower);
 void sys_flush_tlb(uint32_t m);
 void sys_write_MSR(uint32_t msr, uint32_t lo, uint32_t hi);

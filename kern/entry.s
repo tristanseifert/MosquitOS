@@ -8,7 +8,7 @@
 .type _entry, @function
 
 _entry:
-	# Set up kernel stack at 0x380000 to 0x400000
+	# Set up kernel stack at 0x400000 to 0x380000
 	movl	$0x400000, %esp
 
 	# Initialise kernel first
