@@ -26,6 +26,7 @@ kernel: main.c
 setup:
 	rm -rf tmp
 	mkdir tmp
+	clear
 
 # Runtime functions, such as the C standard library (printf, fopen, strlen, etc)
 runtime: runtime/*.c

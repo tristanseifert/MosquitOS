@@ -27,6 +27,166 @@ cpu_info_t* cpuid_detect() {
 }
 
 /*
+ * Detects Intel-specific stuff.
+ */
+cpu_info_t* cpuid_detect_intel() {
+	cpu_info_t* cpu_info = (cpu_info_t *) kmalloc(sizeof(cpu_info_t));
+	memset(cpu_info, 0x00, sizeof(cpu_info_t));
+
+	uint32_t eax, ebx, ecx, edx, max_eax, signature, unused;
+	uint32_t model, family, type, brand, stepping, reserved;
+	uint32_t extended_family = -1;
+	
+	cpuid(1, eax, ebx, unused, unused);
+
+	// Read CPUID info into struct
+	cpuid(1, cpu_info->cpuid_eax, cpu_info->cpuid_ebx, cpu_info->cpuid_ecx, cpu_info->cpuid_edx);
+	
+	model = (eax >> 4) & 0xf;
+	family = (eax >> 8) & 0xf;
+	type = (eax >> 12) & 0x3;
+	brand = ebx & 0xff;
+	stepping = eax & 0xf;
+	reserved = eax >> 14;
+	signature = eax;
+	
+	cpu_info->model = model;
+	cpu_info->family = family;
+	cpu_info->type = type;
+	cpu_info->brand = brand;
+	cpu_info->stepping = stepping;
+	cpu_info->reserved = reserved;
+	cpu_info->signature = signature;
+	cpu_info->manufacturer = kCPUManufacturerIntel;
+
+	if(family == 15) {
+		extended_family = (eax >> 20) & 0xFF;
+		cpu_info->extended_family = extended_family;
+	}
+
+	cpuid(0x80000000, max_eax, unused, unused, unused);
+
+	/* Quok said: If the max extended eax value is high enough to support the processor brand string
+	(values 0x80000002 to 0x80000004), then we'll use that information to return the brand information. 
+	Otherwise, we'll refer back to the brand tables above for backwards compatibility with older processors. 
+	According to the Sept. 2006 Intel Arch Software Developer's Guide, if extended eax values are supported, 
+	then all 3 values for the processor brand string are supported, but we'll test just to make sure and be safe. */
+	if(max_eax >= 0x80000004) {	
+		char *det_name = (char *) kmalloc(sizeof(char) * 65);
+		memset(det_name, 0x00, sizeof(char) * 65);
+		uint8_t str_offset = 0x00;
+
+		if(max_eax >= 0x80000002) {
+			cpuid(0x80000002, eax, ebx, ecx, edx);
+			for(int w = 0; w < 4; w++) {
+				det_name[w + str_offset] = eax >> (8 * w);
+				det_name[w + 4 + str_offset] = ebx >> (8 * w);
+				det_name[w + 8 + str_offset] = ecx >> (8 * w);
+				det_name[w + 12 + str_offset] = edx >> (8 * w);
+			}
+
+			str_offset += 0x10;
+		}
+
+		if(max_eax >= 0x80000003) {
+			cpuid(0x80000003, eax, ebx, ecx, edx);
+			for(int w = 0; w < 4; w++) {
+				det_name[w + str_offset] = eax >> (8 * w);
+				det_name[w + 4 + str_offset] = ebx >> (8 * w);
+				det_name[w + 8 + str_offset] = ecx >> (8 * w);
+				det_name[w + 12 + str_offset] = edx >> (8 * w);
+			}
+
+			str_offset += 0x10;
+		}
+
+		if(max_eax >= 0x80000004) {
+			cpuid(0x80000004, eax, ebx, ecx, edx);
+			for(int w = 0; w < 4; w++) {
+				det_name[w + str_offset] = eax >> (8 * w);
+				det_name[w + 4 + str_offset] = ebx >> (8 * w);
+				det_name[w + 8 + str_offset] = ecx >> (8 * w);
+				det_name[w + 12 + str_offset] = edx >> (8 * w);
+			}
+
+			str_offset += 0x10;
+		}
+
+		cpu_info->detected_name = det_name;
+	}
+
+	return cpu_info;
+}
+
+/*
+ * Detects AMD-specific stuff
+ */
+cpu_info_t* cpuid_detect_amd() {
+	cpu_info_t* cpu_info = (cpu_info_t *) kmalloc(sizeof(cpu_info_t));
+	memset(cpu_info, 0x00, sizeof(cpu_info_t));
+
+	uint32_t extended, eax, ebx, ecx, edx, unused;
+	uint32_t family, model, stepping, reserved;
+	
+	cpuid(1, eax, unused, unused, unused);
+
+	// Read CPUID info into struct
+	cpuid(1, cpu_info->cpuid_eax, cpu_info->cpuid_ebx, cpu_info->cpuid_ecx, cpu_info->cpuid_edx);
+	
+	model = (eax >> 4) & 0x0F;
+	family = (eax >> 8) & 0x0F;
+	stepping = eax & 0x0F;
+	reserved = eax >> 12;
+	
+	cpu_info->family = family;
+	cpu_info->stepping = stepping;
+	cpu_info->model = model;
+	cpu_info->reserved = reserved;
+	cpu_info->manufacturer = kCPUManufacturerAMD;
+	
+	cpuid(0x80000000, extended, unused, unused, unused);
+	
+	if(extended == 0) {
+		return cpu_info;
+	}
+
+	cpu_info->extended = extended;
+
+	if(extended >= 0x80000002) {
+		uint32_t j;
+		char *det_name = (char *) kmalloc(sizeof(char) * 65);
+		memset(det_name, 0x00, sizeof(char) * 65);
+
+		uint8_t str_offset = 0x00;
+
+		for(j = 0x80000002; j <= 0x80000004; j++) {
+			cpuid(j, eax, ebx, ecx, edx);
+
+			for(int w = 0; w < 4; w++) {
+				det_name[w + str_offset] = eax >> (8 * w);
+				det_name[w + 4 + str_offset] = ebx >> (8 * w);
+				det_name[w + 8 + str_offset] = ecx >> (8 * w);
+				det_name[w + 12 + str_offset] = edx >> (8 * w);
+			}
+
+			str_offset += 0x10;
+		}
+
+		cpu_info->detected_name = det_name;
+	}
+
+	if(extended >= 0x80000007) {
+		cpuid(0x80000007, unused, unused, unused, edx);
+		if(edx & 1) {
+			cpu_info->temp_diode = true;
+		}
+	}
+	
+	return cpu_info;
+}
+
+
+/*
  * Sets the string variables to point to char buffers.
  */
 void cpuid_set_strings(cpu_info_t* in) {
@@ -193,163 +353,4 @@ void cpuid_set_strings(cpu_info_t* in) {
 				break;
 		}
 	}
-}
-
-/*
- * Detects Intel-specific stuff.
- */
-cpu_info_t* cpuid_detect_intel() {
-	cpu_info_t* cpu_info = (cpu_info_t *) kmalloc(sizeof(cpu_info_t));
-	memset(cpu_info, 0x00, sizeof(cpu_info_t));
-
-	uint32_t eax, ebx, ecx, edx, max_eax, signature, unused;
-	uint32_t model, family, type, brand, stepping, reserved;
-	uint32_t extended_family = -1;
-	
-	cpuid(1, eax, ebx, unused, unused);
-
-	// Read CPUID info into struct
-	cpuid(1, cpu_info->cpuid_eax, cpu_info->cpuid_ebx, cpu_info->cpuid_ecx, cpu_info->cpuid_edx);
-	
-	model = (eax >> 4) & 0xf;
-	family = (eax >> 8) & 0xf;
-	type = (eax >> 12) & 0x3;
-	brand = ebx & 0xff;
-	stepping = eax & 0xf;
-	reserved = eax >> 14;
-	signature = eax;
-	
-	cpu_info->model = model;
-	cpu_info->family = family;
-	cpu_info->type = type;
-	cpu_info->brand = brand;
-	cpu_info->stepping = stepping;
-	cpu_info->reserved = reserved;
-	cpu_info->signature = signature;
-	cpu_info->manufacturer = kCPUManufacturerIntel;
-
-	if(family == 15) {
-		extended_family = (eax >> 20) & 0xFF;
-		cpu_info->extended_family = extended_family;
-	}
-
-	cpuid(0x80000000, max_eax, unused, unused, unused);
-
-	/* Quok said: If the max extended eax value is high enough to support the processor brand string
-	(values 0x80000002 to 0x80000004), then we'll use that information to return the brand information. 
-	Otherwise, we'll refer back to the brand tables above for backwards compatibility with older processors. 
-	According to the Sept. 2006 Intel Arch Software Developer's Guide, if extended eax values are supported, 
-	then all 3 values for the processor brand string are supported, but we'll test just to make sure and be safe. */
-	if(max_eax >= 0x80000004) {	
-		char *det_name = (char *) kmalloc(sizeof(char) * 65);
-		memset(det_name, 0x00, sizeof(char) * 65);
-		uint8_t str_offset = 0x00;
-
-		if(max_eax >= 0x80000002) {
-			cpuid(0x80000002, eax, ebx, ecx, edx);
-			for(int w = 0; w < 4; w++) {
-				det_name[w + str_offset] = eax >> (8 * w);
-				det_name[w + 4 + str_offset] = ebx >> (8 * w);
-				det_name[w + 8 + str_offset] = ecx >> (8 * w);
-				det_name[w + 12 + str_offset] = edx >> (8 * w);
-			}
-
-			str_offset += 0x10;
-		}
-
-		if(max_eax >= 0x80000003) {
-			cpuid(0x80000003, eax, ebx, ecx, edx);
-			for(int w = 0; w < 4; w++) {
-				det_name[w + str_offset] = eax >> (8 * w);
-				det_name[w + 4 + str_offset] = ebx >> (8 * w);
-				det_name[w + 8 + str_offset] = ecx >> (8 * w);
-				det_name[w + 12 + str_offset] = edx >> (8 * w);
-			}
-
-			str_offset += 0x10;
-		}
-
-		if(max_eax >= 0x80000004) {
-			cpuid(0x80000004, eax, ebx, ecx, edx);
-			for(int w = 0; w < 4; w++) {
-				det_name[w + str_offset] = eax >> (8 * w);
-				det_name[w + 4 + str_offset] = ebx >> (8 * w);
-				det_name[w + 8 + str_offset] = ecx >> (8 * w);
-				det_name[w + 12 + str_offset] = edx >> (8 * w);
-			}
-
-			str_offset += 0x10;
-		}
-
-		cpu_info->detected_name = det_name;
-	}
-
-	return cpu_info;
-}
-
-/*
- * Detects AMD-specific stuff
- */
-cpu_info_t* cpuid_detect_amd() {
-	cpu_info_t* cpu_info = (cpu_info_t *) kmalloc(sizeof(cpu_info_t));
-	memset(cpu_info, 0x00, sizeof(cpu_info_t));
-
-	uint32_t extended, eax, ebx, ecx, edx, unused;
-	uint32_t family, model, stepping, reserved;
-	
-	cpuid(1, eax, unused, unused, unused);
-
-	// Read CPUID info into struct
-	cpuid(1, cpu_info->cpuid_eax, cpu_info->cpuid_ebx, cpu_info->cpuid_ecx, cpu_info->cpuid_edx);
-	
-	model = (eax >> 4) & 0x0F;
-	family = (eax >> 8) & 0x0F;
-	stepping = eax & 0x0F;
-	reserved = eax >> 12;
-	
-	cpu_info->family = family;
-	cpu_info->stepping = stepping;
-	cpu_info->model = model;
-	cpu_info->reserved = reserved;
-	cpu_info->manufacturer = kCPUManufacturerAMD;
-	
-	cpuid(0x80000000, extended, unused, unused, unused);
-	
-	if(extended == 0) {
-		return cpu_info;
-	}
-
-	cpu_info->extended = extended;
-
-	if(extended >= 0x80000002) {
-		uint32_t j;
-		char *det_name = (char *) kmalloc(sizeof(char) * 65);
-		memset(det_name, 0x00, sizeof(char) * 65);
-
-		uint8_t str_offset = 0x00;
-
-		for(j = 0x80000002; j <= 0x80000004; j++) {
-			cpuid(j, eax, ebx, ecx, edx);
-
-			for(int w = 0; w < 4; w++) {
-				det_name[w + str_offset] = eax >> (8 * w);
-				det_name[w + 4 + str_offset] = ebx >> (8 * w);
-				det_name[w + 8 + str_offset] = ecx >> (8 * w);
-				det_name[w + 12 + str_offset] = edx >> (8 * w);
-			}
-
-			str_offset += 0x10;
-		}
-
-		cpu_info->detected_name = det_name;
-	}
-
-	if(extended >= 0x80000007) {
-		cpuid(0x80000007, unused, unused, unused, edx);
-		if(edx & 1) {
-			cpu_info->temp_diode = true;
-		}
-	}
-	
-	return cpu_info;
 }

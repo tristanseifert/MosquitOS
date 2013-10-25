@@ -53,21 +53,22 @@ void system_init() {
 	sys_build_idt();
 	sys_setup_ints();
 
+	// Enable the FPU.
+	// Read CR0
+	uint32_t cr0;
+	__asm__ volatile("mov %%cr0, %0" : "=r" (cr0));
+	// Disable coprocessor emulation
+	cr0 &= ~(1 << 2);
+	// Enable coprocessor monitoring
+	cr0 |= (1 << 1);
+	__asm__ volatile("mov %0, %%cr0" : "=r" (cr0));
+
 	// Check if we have SSE
 	uint32_t eax, ebx, ecx, edx;
 	cpuid(1, eax, ebx, ecx, edx);
 
 	if(edx & CPUID_FEAT_EDX_SSE) { // we have SSE support
-		uint32_t cr0, cr4;
-
-		// Read CR0
-		__asm__ volatile("mov %%cr0, %0" : "=r" (cr0));
-		// Clear EM bit
-		cr0 &= ~(1 << 2);
-		// Set MP bit
-		cr0 |= (1 << 1);
-		__asm__ volatile("mov %0, %%cr0" : "=r" (cr0));
-
+		uint32_t cr4;
 		// Read CR4
 		__asm__ volatile("mov %%cr4, %0" : "=r" (cr4));
 		// Set OSFXSR bit
