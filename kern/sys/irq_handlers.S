@@ -9,6 +9,32 @@ sys_dummy_irq:
 	iretl
 
 /*
+ * PS2 channel 1 interrupt
+ */
+.globl	ps2_irq_ch1
+.align	16
+ps2_irq_ch1:
+	pushal
+	pushl	$0x00
+	call	ps2_irq_handler
+	popl	%eax
+	popal
+	iretl
+
+/*
+ * PS2 channel 2 interrupt
+ */
+.globl	ps2_irq_ch2
+.align	16
+ps2_irq_ch2:
+	pushal
+	pushl	$0x01
+	call	ps2_irq_handler
+	popl	%eax
+	popal
+	iretl
+
+/*
  * Timer tick handler
  */
 .globl	sys_timer_tick_irq

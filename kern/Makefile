@@ -3,10 +3,12 @@ AS=i686-pc-elf-as
 
 # Freestanding binary, strip extra shits
 CFLAGS= -c -funroll-loops -finline-functions -g -Wall -fno-builtin -static\
-		-mno-sse2\
+		-mno-sse2 -O2\
 		-nostartfiles -nodefaultlibs -std=c99 -Wno-unused-variable \
 		-mfpmath=387 -fno-stack-protector -I/Users/tristanseifert/SquelchenOS/kern/\
 		-Wno-unused-function
+
+CFLAGSNOOPT = $(filter-out -O2,$(CFLAGS))
 
 all: setup runtime drivers io system loader kernel clean
 
@@ -41,8 +43,9 @@ io: io/*.c
 	$(CC) $(CFLAGS) -ffreestanding io/*.c
 
 # System interfaces, such as syscalls and hardware setup (V86 too!)
+# These are *not* optimised as gcc likes to muck with inline assembly
 system: sys/*.c sys/*.S
-	$(CC) $(CFLAGS) -ffreestanding sys/*.c
+	$(CC) $(CFLAGSNOOPT) -ffreestanding sys/*.c
 	$(AS) -o irq_handlers.o sys/irq_handlers.S
 
 # Assembly loader

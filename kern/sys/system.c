@@ -6,9 +6,7 @@
 
 #include "system.h"
 
-#define	IRQ_0			0x20	// IRQ0 = PIT timer tick
-
-static void sys_set_lidt(void* base, uint16_t size);
+void sys_set_idt(void* base, uint16_t size);
 uint64_t sys_timer_ticks;
 cpu_info_t* sys_current_cpu_info;
 
@@ -92,7 +90,7 @@ void sys_build_idt() {
 		sys_set_idt_gate(i, (uint32_t) sys_dummy_irq, 0x08, 0x8E);
 	}
 
-	// Set IDT gate for IRQ0
+	// Set IDT gate for IRQ0 (timer)
 	sys_set_idt_gate(IRQ_0, (uint32_t) sys_timer_tick_irq, 0x08, 0x8E);
 
 	// Install exception handlers
@@ -119,19 +117,19 @@ void sys_build_idt() {
 	sys_set_idt_gate(14, (uint32_t) isr14, 0x08, 0x8E);
 
 	// Install IDT (LIDT instruction)
-	sys_set_lidt((void *) idt, sizeof(idt_entry_t)*256);
+	sys_set_idt((void *) idt, sizeof(idt_entry_t)*256);
 }
 
 void sys_setup_ints() {
 	// Remap PICs
 	sys_pic_irq_remap(0x20, 0x28);
 
-	// Unmask timer interrupt
+	// Unmask timer and both PS2 channel interrupts
 	sys_pic_irq_clear_mask(0);
 
 	// Initialise PIT ch0 to hardware int
 	sys_pit_init(0, 0);
-	//  time in ms = reload_value / (3579545 / 3) * 1000
+	// time in ms = reload_value / (3579545 / 3) * 1000
 	// Reload counter of 0x078, giving an int every 0.10057144134 ms
 	sys_pit_set_reload(0, 0x078);
 
@@ -139,7 +137,7 @@ void sys_setup_ints() {
 
 	// Re-enable interrupts now
 	__asm__("sti");
-	//__asm__("int $0x20");
+//	__asm__("int $0x2C");
 }
 
 void sys_set_idt_gate(uint8_t entry, uint32_t function, uint8_t segment, uint8_t flags) {
@@ -199,7 +197,7 @@ void sys_install_gdt(void* location) {
 		uint32_t base;
 	} __attribute__((__packed__)) IDTR;
  
-	IDTR.length = (0x18 + (SYS_NUM_TSS * 0x08))-1;
+	IDTR.length = (0x18 + (SYS_NUM_TSS * 0x08)) - 1;
 	IDTR.base = (uint32_t) location;
 	__asm__ volatile("lgdt (%0)" : : "p"(&IDTR));
 }
@@ -207,7 +205,7 @@ void sys_install_gdt(void* location) {
 /*
  * Loads the IDTR register.
  */
-static void sys_set_lidt(void* base, uint16_t size) {
+void sys_set_idt(void* base, uint16_t size) {
 	struct {
 		uint16_t length;
 		uint32_t base;
@@ -215,7 +213,7 @@ static void sys_set_lidt(void* base, uint16_t size) {
  
 	IDTR.length = size;
 	IDTR.base = (uint32_t) base;
-	__asm__ volatile("lidt (%0)" : : "p"(&IDTR));
+	__asm__("lidt (%0)": : "p"(&IDTR));
 }
 
 /*

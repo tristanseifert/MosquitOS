@@ -18,6 +18,23 @@
 #define SYS_NUM_TSS 8
 #define SYS_TSS_LEN	0x80
 
+#define	IRQ_0			0x20	// IRQ0 = PIT timer tick
+#define	IRQ_1			0x21	// IRQ1 = PS2 channel 1
+#define	IRQ_2			0x22
+#define	IRQ_3			0x23
+#define	IRQ_4			0x24
+#define	IRQ_5			0x25
+#define	IRQ_6			0x26
+#define	IRQ_7			0x27
+#define	IRQ_8			0x28
+#define	IRQ_9			0x29
+#define	IRQ_10			0x2A
+#define	IRQ_11			0x2B
+#define	IRQ_12			0x2C	// IRQ12 = PS2 channel 2
+#define	IRQ_13			0x2D
+#define	IRQ_14			0x2E
+#define	IRQ_15			0x2F
+
 typedef struct sys_idt_descriptor {
    uint16_t offset_1;	// offset bits 0..15
    uint16_t selector;	// a code segment selector in GDT or LDT
