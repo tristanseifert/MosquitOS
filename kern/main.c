@@ -45,7 +45,8 @@ void kernel_main() {
 			terminal_write_word(ps2);
 		}
 
-		__asm__("mov $0xDEADBEEF, %ebx; sysenter");
+		// Explanation of the 7: The MOV opcode is 5 bytes, SYSENTER is 2.
+		__asm__("mov %esp, %ecx; mov $0xDEADBEEF, %ebx; mov $.+7, %edx; sysenter;");
 	}
 }
 

@@ -3,8 +3,11 @@
 
 #include <types.h>
 
-#define SYSCALL_SYSENTER_OPCODE 0x0F34
-#define SYSCALL_SYSEXIT_OPCODE 0x0F35
+#define SYSCALL_STRUCT_MAGIC "ARSE"
+
+// these are endian swapped because gcc sucks
+#define SYSCALL_SYSENTER_OPCODE 0x340F
+#define SYSCALL_SYSEXIT_OPCODE 0x350F
 
 typedef struct registers {
    uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.

@@ -31,12 +31,21 @@ void syscall_init() {
  * restore into ECX.
  */
 int syscall_handler(syscall_callstack_t regs) {
-	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_BLUE));
+	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_GREEN));
 	terminal_clear();
-	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_BLUE));
+	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_GREEN));
 
-	terminal_setPos(4, 8);
-	terminal_write_string("Syscall Triggered!\n");
+	terminal_setPos(4, 2);
+	terminal_write_string("Syscall Triggered!\n\n");
+
+	uint32_t syscall_id = regs.ebx;
+	void* syscall_struct = (void *) regs.eax;
+
+	terminal_setPos(4, 4);
+	terminal_write_string("Syscall: 0x");
+	terminal_write_dword(syscall_id);
+	terminal_write_string(" Param Ptr: 0x");
+	terminal_write_dword((uint32_t) syscall_struct);
 
 	static char reg_names[8][8] = {
 		"EDI: 0x",
@@ -55,16 +64,26 @@ int syscall_handler(syscall_callstack_t regs) {
 	};
 
 	for(uint8_t i = 0; i < 8; i+=2) {
-		terminal_setPos(4, (i/2)+10);
+		terminal_setPos(4, (i/2)+6);
 
 		terminal_write_string((char *) &reg_names[i]);
 		terminal_write_dword(registers[i]);
 
-		terminal_setPos(22, (i/2)+10);
+		terminal_setPos(22, (i/2)+6);
 
 		terminal_write_string((char *) &reg_names[i+1]);
 		terminal_write_dword(registers[i+1]);
 	}
+
+	// Before we run the syscall, ensure the return address in EDX is valid
+	uint16_t *returnAddress = ((uint16_t *) regs.edx)-1; // 1 word = size of SYSENTER opcode
+	uint16_t opcode = *returnAddress;
+
+	if(opcode != SYSCALL_SYSENTER_OPCODE) {
+		terminal_setPos(4, 11);
+		terminal_write_string("Invalid return address: process will be killed!");
+	}
+
 
 	while(1);
 

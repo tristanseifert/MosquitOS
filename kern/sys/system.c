@@ -5,6 +5,7 @@
 #include <device/apic.h>	
 
 #include "system.h"
+#include "sched.h"
 #include "syscall.h"
 
 void sys_set_idt(void* base, uint16_t size);
@@ -132,8 +133,7 @@ void sys_setup_ints() {
 	// Initialise PIT ch0 to hardware int
 	sys_pit_init(0, 0);
 	// time in ms = reload_value / (3579545 / 3) * 1000
-	// Reload counter of 0x078, giving an int every 0.10057144134 ms
-	sys_pit_set_reload(0, 0x078);
+	sys_pit_set_reload(0, SCHED_TIMESLICE);
 
 	sys_timer_ticks = 0;
 
