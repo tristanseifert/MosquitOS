@@ -31,6 +31,13 @@ void syscall_init() {
  * restore into ECX.
  */
 int syscall_handler(syscall_callstack_t regs) {
+	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_BLUE));
+	terminal_clear();
+	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_BLUE));
+
+	terminal_setPos(4, 8);
+	terminal_write_string("Syscall Triggered!\n");
+
 	static char reg_names[8][8] = {
 		"EDI: 0x",
 		"ESI: 0x",

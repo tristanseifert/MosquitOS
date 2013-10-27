@@ -1,3 +1,6 @@
+#ifndef VGA_H
+#define VGA_H
+
 // VGA registers
 #define	VGA_AC_INDEX		0x3C0
 #define	VGA_AC_WRITE		0x3C0
@@ -59,3 +62,4 @@ void vga_write_regs(uint8_t *regs);
 
 // Turns a character and colour value into a VGA attribute entry
 uint16_t vga_txt_makentry(unsigned char c, uint8_t color);
+#endif
