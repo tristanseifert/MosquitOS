@@ -15,6 +15,16 @@ void kernel_main() {
 
 	terminal_initialize(true);
 
+	uint32_t eax, ebx, ecx, edx;
+	cpuid(1, eax, ebx, ecx, edx);
+
+	if(edx & CPUID_FEAT_EDX_SSE) {
+		terminal_write_string("SSE Supported !!!\n");
+	}
+
+    // Set up TSS and their stack shits
+    sys_init_tss();
+
 	if(ps2_init() != 0) {
 		terminal_write_string("ERROR: Could not initialise PS2 driver\n\n");
 	}
@@ -34,6 +44,8 @@ void kernel_main() {
 			terminal_setPos(14, 18);
 			terminal_write_word(ps2);
 		}
+
+		__asm__("mov $0xDEADBEEF, %ebx; sysenter");
 	}
 }
 
@@ -42,7 +54,11 @@ void kernel_main() {
  * Called BEFORE kernel_main, so kernel structures may NOT be accessed!
  */
 void kernel_init() {
-	extern char __bss, __end;
+	extern uint32_t __bss, __end;
 
-	memset(&__bss, 0x00, (&__end - &__bss));
+	uint32_t *ptr = (uint32_t *) __bss;
+
+	for(int i = 0; i < ((&__end - &__bss) >> 2); i++) {
+		ptr[i] = 0;
+	}
 }

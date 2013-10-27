@@ -47,6 +47,7 @@ io: io/*.c
 system: sys/*.c sys/*.S
 	$(CC) $(CFLAGSNOOPT) -ffreestanding sys/*.c
 	$(AS) -o irq_handlers.o sys/irq_handlers.S
+	$(AS) -o syscall_asm.o sys/syscall.S
 
 # Assembly loader
 loader: entry.s

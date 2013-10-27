@@ -18,6 +18,9 @@ uint32_t nframes;
 extern uint32_t kheap_placement_address;
 extern heap_t *kheap;
 
+// Defined in system.c
+void sys_init_tss();
+
 // Macros used in the bitset algorithms.
 #define INDEX_FROM_BIT(a) (a/(8*4))
 #define OFFSET_FROM_BIT(a) (a%(8*4))

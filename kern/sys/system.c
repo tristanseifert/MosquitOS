@@ -5,6 +5,7 @@
 #include <device/apic.h>	
 
 #include "system.h"
+#include "syscall.h"
 
 void sys_set_idt(void* base, uint16_t size);
 uint64_t sys_timer_ticks;
@@ -47,10 +48,6 @@ extern void isr18(void);
  * Initialises the system into a known state.
  */ 
 void system_init() {
-	sys_build_gdt();
-	sys_build_idt();
-	sys_setup_ints();
-
 	// Enable the FPU.
 	// Read CR0
 	uint32_t cr0;
@@ -69,12 +66,17 @@ void system_init() {
 		uint32_t cr4;
 		// Read CR4
 		__asm__ volatile("mov %%cr4, %0" : "=r" (cr4));
-		// Set OSFXSR bit
-		cr4 |= (1 << 9);
-		// Set OSXMMEXCPT bit
-		cr4 |= (1 << 10);
+		// Set OSFXSR and OSXMMEXCPT bit
+		cr4 |= (3 << 9);
 		__asm__ volatile("mov %0, %%cr4" : "=r" (cr4));
 	}
+
+	sys_build_gdt();
+	sys_build_idt();
+	sys_setup_ints();
+
+	// Set up syscalls
+	syscall_init();
 }
 
 /*
@@ -93,7 +95,7 @@ void sys_build_idt() {
 	// Set IDT gate for IRQ0 (timer)
 	sys_set_idt_gate(IRQ_0, (uint32_t) sys_timer_tick_irq, 0x08, 0x8E);
 
-	// Install exception handlers
+	// Install exception handlers (BSOD)
 	sys_set_idt_gate(0, (uint32_t) isr0, 0x08, 0x8E);
 	sys_set_idt_gate(1, (uint32_t) isr1, 0x08, 0x8E);
 	sys_set_idt_gate(2, (uint32_t) isr2, 0x08, 0x8E);
@@ -161,10 +163,12 @@ void sys_build_gdt() {
 	memset(gdt, 0x00, sizeof(gdt_entry_t));
 
 	// Kernel code segment and data segments
-	sys_set_gdt_gate(1, 0x00000000, 0xFFFFFFFF, 0x9A, 0xCF);
-	sys_set_gdt_gate(2, 0x00000000, 0xFFFFFFFF, 0x92, 0xCF);
-	sys_set_gdt_gate(3, 0x00000000, 0xFFFFFFFF, 0xFA, 0xCF);
-	sys_set_gdt_gate(4, 0x00000000, 0xFFFFFFFF, 0xF2, 0xCF);
+	sys_set_gdt_gate((SYS_KERN_CODE_SEG >> 3), 0x00000000, 0xFFFFFFFF, 0x9A, 0xCF);
+	sys_set_gdt_gate((SYS_KERN_DATA_SEG >> 3), 0x00000000, 0xFFFFFFFF, 0x92, 0xCF);
+
+	// User code and data segments
+	sys_set_gdt_gate((SYS_USER_CODE_SEG >> 3), 0x00000000, 0xFFFFFFFF, 0xFA, 0xCF);
+	sys_set_gdt_gate((SYS_USER_DATA_SEG >> 3), 0x00000000, 0xFFFFFFFF, 0xF2, 0xCF);
 
 	// Create the correct number of TSS descriptors
 	for(int i = 0; i < SYS_NUM_TSS; i++) {
@@ -172,6 +176,29 @@ void sys_build_gdt() {
 	}
 
 	sys_install_gdt(gdt);
+}
+
+/*
+ * Initialises the TSS structs: this should be called with paging enabled to
+ * allow the use of the kernel heap at 0xC0000000 or whereever.
+ */
+void sys_init_tss() {
+	// Create the correct number of TSS descriptors
+	for(int i = 0; i < SYS_NUM_TSS; i++) {
+		// Initialise the TSS and zero it
+		i386_thread_state_t *tss = (i386_thread_state_t *) (SYS_TSS_MEMLOC + (i * SYS_TSS_LEN));
+		memset(tss, 0x00, sizeof(i386_thread_state_t));
+
+		// Set up kernel stack meepen
+		tss->iomap = (uint16_t) sizeof(i386_thread_state_t);
+		tss->ss0 = SYS_KERN_DATA_SEG;
+	
+		// Allocate a kernel stack
+		uint32_t* stack = (uint32_t *) kmalloc(SYS_KERN_STACK_SIZE);
+
+		// Stack grows downwards
+		tss->esp0 = ((uint32_t) stack) + SYS_KERN_STACK_SIZE;
+	}
 }
 
 void sys_set_gdt_gate(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, uint8_t gran) {

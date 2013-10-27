@@ -11,7 +11,7 @@ _entry:
 	# Set up kernel stack at 0x400000 to 0x380000
 	movl	$0x400000, %esp
 
-	# Initialise kernel first
+	# Initialise kernel first (clear memory, etc)
 	call	kernel_init
 
 	# Now jump into the kernel's main function
