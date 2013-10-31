@@ -33,7 +33,7 @@ void terminal_setColour(uint8_t colour) {
 }
  
 void terminal_putentryat(char c, uint8_t color, uint8_t x, uint8_t y) {
-	const uint16_t index = (y * VGA_TEXT_COLS) + x;
+	uint16_t index = (y * VGA_TEXT_COLS) + x;
 	terminal_buffer[index] = vga_txt_makentry(c, color);
 }
  

@@ -149,8 +149,8 @@ int ps2_init() {
 	ps2_ch1_buffer_off = 0;
 	ps2_ch2_buffer_off = 0;
 
-	ps2_ch1_buffer = (uint8_t *) malloc(PS2_BUF_SIZE);
-	ps2_ch2_buffer = (uint8_t *) malloc(PS2_BUF_SIZE);
+	ps2_ch1_buffer = (uint8_t *) kmalloc(PS2_BUF_SIZE);
+	ps2_ch2_buffer = (uint8_t *) kmalloc(PS2_BUF_SIZE);
 
 	return 0;
 }

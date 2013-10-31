@@ -11,26 +11,26 @@ SECTIONS {
 	 * it makes sense to keep the low 1M of memory available for use with
 	 * stuff like V86 mode, and allow us to expand beyond about 600K.
 	 */
-	. = 1M;
-	.text BLOCK(1K) : ALIGN(1K) {
-		__code = .;
-		*(.text)
+	. = 0x00100000;
+
+	.text : {
+		kern_code_start = .;
+		*(.text);
 	}
 
 	/* Data segment */
-	.rodata BLOCK(1K) : ALIGN(1K) {
-		__data = .;
-		*(.data)
-		*(.rodata)
+	.rodata : {
+		kern_data_start = .;
+		*(.data);
+		*(.rodata);
 	}
 
 	/* Read-write data (uninitialized) and stack */
-	.bss BLOCK(4K) : ALIGN(1K) {
-		__bss = .;
-		*(.bss)
+	.bss : {
+		kern_bss_start = .;
+		*(.bss);
 	}
 
-    __end = .;
-
-    __size = __bss - __code;
+    kern_end = .;
+    kern_size = kern_bss_start - kern_code_start;
 }

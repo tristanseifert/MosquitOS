@@ -49,35 +49,15 @@ extern void isr18(void);
  * Initialises the system into a known state.
  */ 
 void system_init() {
-	// Enable the FPU.
-	// Read CR0
-	uint32_t cr0;
-	__asm__ volatile("mov %%cr0, %0" : "=r" (cr0));
-	// Disable coprocessor emulation
-	cr0 &= ~(1 << 2);
-	// Enable coprocessor monitoring
-	cr0 |= (1 << 1);
-	__asm__ volatile("mov %0, %%cr0" : "=r" (cr0));
-
-	// Check if we have SSE
-	uint32_t eax, ebx, ecx, edx;
-	cpuid(1, eax, ebx, ecx, edx);
-
-	if(edx & CPUID_FEAT_EDX_SSE) { // we have SSE support
-		uint32_t cr4;
-		// Read CR4
-		__asm__ volatile("mov %%cr4, %0" : "=r" (cr4));
-		// Set OSFXSR and OSXMMEXCPT bit
-		cr4 |= (3 << 9);
-		__asm__ volatile("mov %0, %%cr4" : "=r" (cr4));
-	}
-
 	sys_build_gdt();
 	sys_build_idt();
 	sys_setup_ints();
 
 	// Set up syscalls
 	syscall_init();
+
+	// Set up scheduler
+	sched_init();
 }
 
 /*

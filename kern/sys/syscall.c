@@ -84,7 +84,6 @@ int syscall_handler(syscall_callstack_t regs) {
 		terminal_write_string("Invalid return address: process will be killed!");
 	}
 
-
 	while(1);
 
 	return 0;

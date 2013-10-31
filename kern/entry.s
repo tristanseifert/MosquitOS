@@ -14,6 +14,15 @@ _entry:
 	# Initialise kernel first (clear memory, etc)
 	call	kernel_init
 
+	# Check for SSE, and if it exists, enable it
+	mov		$0x1, %eax
+	cpuid
+	test	$(1 << 25), %edx
+	jz 		.noSSE
+	
+	call	sse_init
+
+.noSSE:
 	# Now jump into the kernel's main function
 	call	kernel_main
 
@@ -23,3 +32,19 @@ _entry:
 .Lhang:
 	hlt
 	jmp .Lhang
+
+sse_init:
+	mov		%cr0, %eax
+
+	# clear coprocessor emulation CR0.EM
+	and		$0xFFFB, %ax
+
+	# set coprocessor monitoring CR0.MP
+	or		$0x2, %ax
+	mov		%eax, %cr0
+	mov		%cr4, %eax
+
+	# set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
+	or		$(3 << 9), %ax
+	mov		%eax, %cr4
+	ret
