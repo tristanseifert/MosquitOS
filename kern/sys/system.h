@@ -36,8 +36,8 @@
 #define	IRQ_0			0x20	// IRQ0 = PIT timer tick
 #define	IRQ_1			0x21	// IRQ1 = PS2 channel 1
 #define	IRQ_2			0x22
-#define	IRQ_3			0x23
-#define	IRQ_4			0x24
+#define	IRQ_3			0x23	// COM 2 or 4
+#define	IRQ_4			0x24	// COM 1 or 3
 #define	IRQ_5			0x25
 #define	IRQ_6			0x26
 #define	IRQ_7			0x27
