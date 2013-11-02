@@ -26,4 +26,6 @@ cp kern/kernel.bin /Volumes/MOSQUITOS/KERNEL.BIN
 # Unmount disk image
 diskutil unmount /Volumes/MOSQUITOS/
 
-qemu-1.60/qemu-system-i386 -hda /Users/tristanseifert/SquelchenOS/disk_image.img -boot c -m 32M -soundhw adlib -vga std -s
+clear
+
+qemu-1.60/qemu-system-i386 -hda /Users/tristanseifert/SquelchenOS/disk_image.img -boot c -m 32M -soundhw adlib -serial stdio -vga std -s

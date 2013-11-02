@@ -13,14 +13,14 @@ extern uint32_t kern_bss_start, kern_end, kern_size, kern_data_start, kern_code_
 extern "C" /* Use C linkage for kernel_main. */
 #endif
 void kernel_main() {
-	rs232_init();
-
 	terminal_initialize(true);
 
 	system_init();
 
 	// From here on, the kernel works with VIRTUAL addresses, not physical.
 	paging_init();
+
+	rs232_write(kRS232_COM1, 32, "Hello World!\nRS232!\n");
 
 	uint32_t eax, ebx, ecx, edx;
 	cpuid(1, eax, ebx, ecx, edx);
@@ -47,6 +47,11 @@ void kernel_main() {
 	terminal_write_string(" Size: 0x");
 	terminal_write_dword(kern_size);
 
+	void *doomers = (void *) kmalloc(32);
+	rs232_read(kRS232_COM1, 4, doomers, false);
+	terminal_write_string("\n\nGot RS232 data: ");
+	terminal_write_string(doomers);
+
 	//		while(1);
 
 	uint32_t timer = 0;
@@ -65,8 +70,26 @@ void kernel_main() {
 			terminal_write_word(ps2);
 		}
 
+/*
+	info.tx_buf_off = buffer.tx_buf_off;
+	info.rx_buf_off = buffer.rx_buf_off;
+	info.delta_flags = buffer.delta_flags;
+	info.line_status = buffer.line_status;
+	info.io_port = buffer.io_port;
+*/
+		rs232_port_info_t info = rs232_get_port_info(kRS232_COM1);
+		terminal_setPos(4, 10);
+		terminal_write_string("Delta Flags: 0x");
+		terminal_write_dword(info.delta_flags);
+		terminal_write_string(" Line state: 0x");
+		terminal_write_dword(info.line_status);
+		terminal_write_string(" TX Off: 0x");
+		terminal_write_dword(info.tx_buf_off);
+		terminal_write_string(" RX Off: 0x");
+		terminal_write_dword(info.rx_buf_off);
+
 		// Explanation of the 7: The MOV opcode is 5 bytes, SYSENTER is 2.
-		__asm__("mov %esp, %ecx; mov $0xDEADBEEF, %ebx; mov $.+7, %edx; sysenter;");
+		// __asm__("mov %esp, %ecx; mov $0xDEADBEEF, %ebx; mov $.+7, %edx; sysenter;");
 	}
 }
 

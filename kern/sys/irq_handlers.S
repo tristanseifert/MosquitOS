@@ -57,14 +57,25 @@ sys_page_fault_irq:
 	iretl
 
 /*
- * RS232/serial IRQ handler
+ * RS232/serial IRQ handlers
  */
-.globl	sys_rs232_irq_handler
+.globl	sys_rs232_irq_handler1
 .align	16
-sys_rs232_irq_handler:
+sys_rs232_irq_handler1: # COM 1, 3
+	pushal
+	pushl	$0x01
+	call	rs232_irq_handler
+	popl	%eax
+	popal
+	iretl
+
+.globl	sys_rs232_irq_handler2
+.align	16 
+sys_rs232_irq_handler2: # COM 2, 4
 	pushal
 	pushl	$0x00
 	call	rs232_irq_handler
+	popl	%eax
 	popal
 	iretl
 

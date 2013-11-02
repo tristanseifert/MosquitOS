@@ -7,6 +7,9 @@
  * RS232 driver
  */
 
+#define RS232_BUF_SIZE	2048 // power of 2
+#define RS232_READ_TIMEOUT 0x50000
+
 typedef enum {
 	kRS232_Null = 0,
 	kRS232_COM1 = 1,
@@ -29,10 +32,20 @@ typedef enum {
 	kRS232_Baud300 = 384,
 } rs232_baud_t;
 
+typedef struct {
+	int tx_buf_off;
+	int rx_buf_off;
+	uint8_t delta_flags;
+	uint8_t line_status;
+	uint16_t io_port;
+} rs232_port_info_t;
+
 void rs232_init();
 void rs232_set_baud(rs232_port_t port, rs232_baud_t baudrate);
 void rs232_write(rs232_port_t port, size_t num_bytes, void* data);
-void rs232_read(rs232_port_t port, size_t num_bytes, void* out, bool timeout);
+int rs232_read(rs232_port_t port, size_t num_bytes, void* out, bool timeout);
+
+rs232_port_info_t rs232_get_port_info(rs232_port_t port);
 
 uint16_t rs232_get_io_addr(rs232_port_t port);
 

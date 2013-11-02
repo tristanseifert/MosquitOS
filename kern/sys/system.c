@@ -2,6 +2,7 @@
 #include <io/io.h>
 #include <device/pic.h>
 #include <device/pit.h>
+#include <device/rs232.h>
 #include <device/apic.h>	
 
 #include "system.h"
@@ -18,6 +19,8 @@ void sys_build_idt();
 void sys_build_gdt();
 // Sets location of GDT
 void sys_install_gdt(void* location);
+
+extern void rs232_set_up_irq();
 
 // Define the assembly IRQ handlers
 extern void sys_dummy_irq(void);
@@ -58,6 +61,10 @@ void system_init() {
 
 	// Set up scheduler
 	sched_init();
+
+	// Set up RS232
+	rs232_init();
+	rs232_set_up_irq();
 }
 
 /*
@@ -119,7 +126,6 @@ void sys_setup_ints() {
 
 	// Re-enable interrupts now
 	__asm__("sti");
-//	__asm__("int $0x2C");
 }
 
 void sys_set_idt_gate(uint8_t entry, uint32_t function, uint8_t segment, uint8_t flags) {

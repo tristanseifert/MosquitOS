@@ -24,7 +24,7 @@ void panic(char *message, char *file, uint32_t line) {
 	// We encountered a massive problem and have to stop.
 	__asm__ volatile("cli"); // Disable interrupts.
 
-	terminal_initialize(true);
+	terminal_initialize(false);
 
 	terminal_write_string("PANIC(");
 	terminal_write_string(message);
