@@ -1,6 +1,6 @@
 MosquitOS is an open-source hobby operating system that I write in my free time because I have no life and like being different.
 
-== License ==
+## License
 The source code is released under the BSD license.
 
 Copyright (c) 2013, Tristan Seifert
