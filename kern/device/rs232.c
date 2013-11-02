@@ -18,6 +18,7 @@ typedef struct {
 
 static void rs232_wait_write_avail(rs232_port_t port);
 static void rs232_wait_read_avail(rs232_port_t port);
+static void rs232_shift_buffer(rs232_buffer_t* buffer, bool tx, size_t bytes);
 
 extern void sys_rs232_irq_handler1(void);
 extern void sys_rs232_irq_handler2(void);
@@ -39,20 +40,20 @@ void rs232_init() {
 	for(uint8_t i = 0; i < 4; i++) {
 		port = rs232_to_io_map[i];
 
+		rs232_buffer_ptrs[i].tx_buf = (uint8_t *) kmalloc(RS232_BUF_SIZE);
+		rs232_buffer_ptrs[i].rx_buf = (uint8_t *) kmalloc(RS232_BUF_SIZE);
+
+		rs232_buffer_ptrs[i].tx_buf_off = 0;
+		rs232_buffer_ptrs[i].rx_buf_off = 0;
+
 		io_outb(port + 1, 0x00);	// Disable all interrupts
 		io_outb(port + 3, 0x80);	// Enable DLAB (set baud rate divisor)
 		io_outb(port + 0, 0x01);	// Set divisor to 1 (lo byte) 115.2kbaud
 		io_outb(port + 1, 0x00);	//					(hi byte)
 		io_outb(port + 3, 0x03);	// 8 bits, no parity, one stop bit
 		io_outb(port + 2, 0xC7);	// Enable FIFO, clear them, with 14-byte threshold
-		io_outb(port + 4, 0x0B);	// IRQs enabled, RTS/DSR set
-		io_outb(port + 1, 0x03);	// Enable RX threshold and TX empty interrupts
-
-		rs232_buffer_ptrs[i].tx_buf = (uint8_t *) kmalloc(RS232_BUF_SIZE);
-		rs232_buffer_ptrs[i].rx_buf = (uint8_t *) kmalloc(RS232_BUF_SIZE);
-
-		rs232_buffer_ptrs[i].tx_buf_off = 0;
-		rs232_buffer_ptrs[i].rx_buf_off = 0;
+		io_outb(port + 4, 0x0F);	// IRQs enabled, RTS/DSR set
+		io_outb(port + 1, 0x0F);	// Enable all interrupts
 	}
 }
 
@@ -86,10 +87,8 @@ void rs232_set_baud(rs232_port_t port, rs232_baud_t baudrate) {
 /*
  * Writes num_bytes from data to the specified RS232 port
  *
- * To accelerate the write process, we only check for FIFO overflow after
- * writing 8 bytes instead of every byte. While this *may* cause data
- * loss in some cases, it should work reasonably well for both high and low
- * baud rates.
+ * Up to 16 bytes of data are written directly to the port's FIFO, with the
+ * remainder of data ending up in the TX buffer.
  */
 void rs232_write(rs232_port_t port, size_t num_bytes, void* data) {
 	volatile uint16_t portnum = rs232_to_io_map[port-1];
@@ -97,15 +96,24 @@ void rs232_write(rs232_port_t port, size_t num_bytes, void* data) {
 	uint8_t* data_read = data;
 	static uint8_t counter;
 
-	for(int i = 0; i < num_bytes; i++) {
-		rs232_wait_write_avail(num_bytes);
-		io_outb(portnum, *data_read++);
-
-		// Check for FIFO overflow
-		if((counter++) == 8) {
-			rs232_wait_write_avail(port);
-			counter = 0;
+	// If less than or equal to 16 total bytes, write directly
+	if(num_bytes =< 16) {
+		for(int i = 0; i < num_bytes; i++) {
+			io_outb(portnum, *data_read++);
 		}
+	} else {
+		for(int i = 0; i < num_bytes; i++) {
+			io_outb(portnum, *data_read++);
+		}
+
+	// Get buffer info struct
+	rs232_buffer_t *bufInfo = &rs232_buffer_ptrs[port-1];
+
+	// Loop through the rest of the data
+	for(int i = 0; i < num_bytes-1; i++) {
+		bufInfo->tx_buf[bufInfo->tx_buf_off++] = *data_read++;
+	}
+
 	}
 }
 
@@ -192,6 +200,7 @@ void rs232_irq_handler(uint32_t portSet) {
 	uint8_t irq_port1 = io_inb(port_addr[portSet & 0x01][0]+2);
 	uint8_t irq_port2 = io_inb(port_addr[portSet & 0x01][1]+2);
 
+process_irq: ; // gcc is stupid
 	// Determine which port triggered it
 	uint8_t triggered_port = 0;
 	if((irq_port2 & 0x01)) triggered_port = 0;
@@ -199,40 +208,63 @@ void rs232_irq_handler(uint32_t portSet) {
 	else return; // none of the two ports wants to ack the interrupt
 
 	// Shift the entire value right one bit, and get low 3 bits only
-	// We could use the high two bits to determine if FIFOs are on, but without
-	// them we wouldn't have a working driver
-	uint8_t irq = (((triggered_port == 0) ? irq_port1 : irq_port2) >> 0x01) & 0x07;
-	uint16_t port = port_addr[portSet & 0x03][triggered_port];
+	uint8_t irq = ((triggered_port == 0) ? irq_port1 : irq_port2);
+	uint16_t port = port_addr[portSet & 0x01][triggered_port];
+
+	if(irq != 0xFF) {
+		irq = (irq >> 0x01) & 0x07;
+	} else {
+		goto done;
+	}
+
+	terminal_setPos(4, 13);
+	terminal_write_string("IRQ : 0x");
+	terminal_write_byte(irq);
 
 	// Get the struct
 	rs232_buffer_t *port_info = &rs232_buffer_ptrs[portSet + (triggered_port << 1)];
 
-	terminal_write_string("IRQ : 0x");
-	terminal_write_byte(irq);
-
 	// Service appropriate IRQ
 	switch(irq) {
-		case 0: { // Modem bits have changed
+		case 0: { // Modem bits have changed (Read MSR to service)
 			port_info->delta_flags = io_inb(port + 6);
 			break;
 		}
 		
-		case 1: { // Transmitter FIFO empty
+		case 1: { // Transmitter FIFO empty (Write to THR/read IIR)
+			// Check if we have any data in the TX buffer
+			if(port_info->tx_buf_off == 0) break;
+
+			int offset = port_info->tx_buf_off;
+			uint8_t *data_read = port_info->tx_buf;
+
+			// Write 14 bytes if more than 14 are pending
+			int num_bytes_write = (offset > 14) ? 14 : offset;
+
+			for(int i = 0; i < num_bytes_write; i++) {
+				io_outb(port, *data_read++);
+			}
+
+			// Shift buffer
+			rs232_shift_buffer(port_info, true, num_bytes_write);
 
 			break;
 		}
 		
-		case 2: { // RX FIFO threshold (14 bytes) reached or Data Ready
-
+		case 2: { // RX FIFO threshold (14 bytes) reached (Read RBR to service)
+			// TODO: replace with real stuff
+			for(int i = 0; i < 16; i++) {
+				io_inb(port);
+			}
 			break;
 		}
 		
-		case 3: { // Status changed
+		case 3: { // Status changed (Read LSR to service)
 			port_info->line_status = io_inb(port + 5);
 			break;
 		}
 		
-		case 6: { // No RX FIFO for 4 words, but data is available
+		case 6: { // No RX act for 4 words, but data avail (Read RBR to service)
 
 			break;
 		}
@@ -242,6 +274,17 @@ void rs232_irq_handler(uint32_t portSet) {
 			PANIC("Got unrecognised RS232 interrupt");
 			break;
 	}
+
+	// Re-read the IRQ states for both ports
+	irq_port1 = io_inb(port_addr[portSet & 0x01][0]+2);
+	irq_port2 = io_inb(port_addr[portSet & 0x01][1]+2);
+
+	// If any of them do NOT have bit 0 clear, process IRQ again
+	if(!(irq_port1 & 0x01)) goto process_irq;
+	if(!(irq_port2 & 0x01)) goto process_irq;
+
+	done: ;
+	sys_pic_irq_eoi(3); // send int ack to PIC
 }
 
 /*
@@ -253,4 +296,8 @@ void rs232_irq_handler(uint32_t portSet) {
  */
 static void rs232_shift_buffer(rs232_buffer_t* buffer, bool tx, size_t bytes) {
 	uint8_t *buf = tx ? buffer->tx_buf : buffer->rx_buf;
+
+	for(int i = 0; i < RS232_BUF_SIZE-bytes; i++) {
+		buf[i] = buf[i+bytes];
+	}
 }

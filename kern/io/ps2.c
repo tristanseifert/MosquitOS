@@ -189,8 +189,6 @@ uint16_t ps2_id_device(bool secondPort) {
 void ps2_irq_handler(bool secondPort) {
 	uint8_t readValue = io_inb(PS2_DATA);
 
-	PANIC("PS2 Int");
-
 	ps2_ch1_buffer_off = readValue;
 
 	if(!secondPort) { // first port

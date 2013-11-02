@@ -48,7 +48,7 @@ void kernel_main() {
 	terminal_write_dword(kern_size);
 
 	void *doomers = (void *) kmalloc(32);
-	rs232_read(kRS232_COM1, 4, doomers, false);
+//	rs232_read(kRS232_COM1, 4, doomers, false);
 	terminal_write_string("\n\nGot RS232 data: ");
 	terminal_write_string(doomers);
 
@@ -83,7 +83,8 @@ void kernel_main() {
 		terminal_write_dword(info.delta_flags);
 		terminal_write_string(" Line state: 0x");
 		terminal_write_dword(info.line_status);
-		terminal_write_string(" TX Off: 0x");
+		terminal_setPos(4, 11);
+		terminal_write_string("TX Off: 0x");
 		terminal_write_dword(info.tx_buf_off);
 		terminal_write_string(" RX Off: 0x");
 		terminal_write_dword(info.rx_buf_off);
