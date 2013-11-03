@@ -6,13 +6,13 @@
 static uint32_t next_pid;
 
 // Used to speed up linked-list stuff
-static i386_task_t *task_first;
-static i386_task_t *task_last;
+static i386_task_t* task_first;
+static i386_task_t* task_last;
 
 // External assembly routines
 void task_restore_context(i386_task_state_t*);
 
-static uint8_t task_temp_fxsave_region[512] __attribute__((aligned(16)));
+uint8_t task_temp_fxsave_region[512] __attribute__((aligned(16)));
 
 /*
  * Saves the state of the task.
@@ -23,12 +23,14 @@ void task_save_state(i386_task_t* task, void *regPtr) {
 
 	// If FPU state memory area is not allocated, allocate it
 	if(state->fpu_state == NULL) {
-		state->fpu_state = (uint8_t *) kmalloc(512);
+		state->fpu_state = (void *) kmalloc(512);
 	}
+
+	ASSERT(state->fpu_state != NULL);
 
 	__asm__ volatile(" fxsave %0; " : "=m" (task_temp_fxsave_region));
 
-	// Copy into the thread context table
+	// Copy FPU state into the thread context table
 	memcpy(state->fpu_state, &task_temp_fxsave_region, 512);
 
 	// Cast the register struct pointer to what it really is
@@ -44,18 +46,24 @@ void task_save_state(i386_task_t* task, void *regPtr) {
  * Performs a context switch to the specified task.
  */
 void task_switch(i386_task_t* task) {
-	// Restore CPU state
 	i386_task_state_t *state = task->task_state;
+
+	// Get pointer to page tables
+	state->page_table = (uint32_t) state->page_directory->tablesPhysical;
+
+	// Copy backed-up FPU state to memory
+	memcpy(&task_temp_fxsave_region, state->fpu_state, 512);
+
+	// Restore CPU state
 	task_restore_context(state);
 }
 
 /*
  * Allocates a new task.
  */
-i386_task_t *task_allocate() {
+i386_task_t* task_allocate() {
 	// Try to get some memory for the task
 	i386_task_t *task = (i386_task_t*) kmalloc(sizeof(i386_task_t));
-
 	ASSERT(task != NULL);
 
 	// Set up the task struct
@@ -66,7 +74,13 @@ i386_task_t *task_allocate() {
 
 	task->pid = next_pid++;
 
-	task->task_state->fpu_state = (uint8_t *) kmalloc(512);
+	// Try to get memory for the state struct
+	i386_task_state_t *state = (i386_task_state_t*) kmalloc(sizeof(i386_task_state_t));
+	ASSERT(state != NULL);
+	task->task_state = state;
+
+	// Set up the state struct
+	task->task_state->fpu_state = (void *) kmalloc(512);
 
 	// TODO: Set up paging for the task, allocating some memory for it
 
@@ -103,16 +117,17 @@ void task_deallocate(i386_task_t* task) {
 
 	// Clean up memory.
 	kfree(task->task_state->fpu_state);
+	kfree(task->task_state);
 	kfree(task);
 }
 
 /*
  * Access to the linked list pointers
  */
-i386_task_t *task_get_first() {
+i386_task_t* task_get_first() {
 	return task_first;
 }
 
-i386_task_t *task_get_last() {
+i386_task_t* task_get_last() {
 	return task_last;
 }

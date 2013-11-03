@@ -12,6 +12,7 @@
 
 	+0x40 uint8_t *fpu_state; 
   */
+.extern task_temp_fxsave_region
 .globl task_restore_context
 task_restore_context:
 	# Get pointer to the structure in edi
@@ -40,7 +41,11 @@ task_restore_context:
 	# Restore stack pointer
 	mov		%eax, %esp
 
-	# Change the struct so that the esp we pop using popal is the current
+	# Restore FPU state
+	fxrstor	task_temp_fxsave_region
+
+	# Change the struct so that the esp we pop using popal is the current one,
+	# since the IRET restores the USP anyways
 	mov		%eax, 0x1C(%edi)
 
 	# Get page table pointer and set it

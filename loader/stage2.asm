@@ -9,22 +9,19 @@ kern_len:				EQU 32									; Length in sectors
 
 ; Location to store various BIOS info at
 Kern_Info_Struct:		EQU $0160								; $001600 phys (len = $400 max)
+Kern_Info_StructPhys:	EQU (Kern_Info_Struct<<4)
 VESA_SupportedModes:	EQU	$01A0								; $001A00 phys (len = $200)
 BIOS_MemMapSeg:			EQU	$0200								; $002000 phys (len = $800 max)
 
-struc KernInfoStruct
-	.munchieValue	resd	0									; X Munchie value
-	.supportBits	resw	0									; Support Bitfield
-	.high16Mem		resw	0									; X 64K blocks above 16M
-	.low16Mem		resw	0									; X 1K blocks below 16M
-	.memMap			resd	0									; X Physical pointer to memory map
-	.numMemMapEnt	resw	0									; X Number of entries in memory map
-	.vesaSupport	resb	0									; VESA support byte
-	.bootDrive		resb	0									; X Boot drive
-	.vesaMap		resd	0									; Physical pointer to VESA mode map
-endstruc
-
-%define KINFO(x)  (Kern_Info_Struct<<4) + KernInfoStruct. %+ x
+;	+$00 uint32_t munchieValue; // Should be "KERN"
+;	+$04 uint16_t supportBits;
+;	+$06 uint16_t high16Mem; // 64K blocks above 16M
+;	+$08 uint16_t low16Mem; // 1k blocks below 16M
+;	+$0A uint32_t memMap; // 32-bit ptr to list
+;	+$0E uint16_t numMemMapEnt; // Number of entries in above map
+;	+$10 uint8_t vesaSupport;
+;	+$11 uint8_t bootDrive;
+;	+$12 uint32_t vesaMap;
 
 stage2_start:
 	mov		ax, $8000											; AX = stack segment value (Stack to go at $80000)
@@ -37,15 +34,10 @@ stage2_start:
 	mov		BYTE [BootDevice], dl								; Save boot device number
 	mov		BYTE [FAT_Drive], dl								; Set FAT read drive
 
-	; Set up GS to point to a place in memory that houses the kernel info structure
-	mov		ax, Kern_Info_Struct								; Place that houses the struct
-	mov		gs, ax												; Set up register
-
-	xor		di, di												; Clear DI
-	mov		[KINFO(munchieValue)], DWORD "KERN"					; Set magic value for kern struct
+	mov		DWORD [Kern_Info_StructPhys], "KERN"				; Set magic value for kern struct
 
 	mov		al, [BootDevice]									; Set boot drive
-	mov		[KINFO(bootDrive)], al								; ""
+	mov		BYTE [Kern_Info_StructPhys+$11], al					; ""
 
 	; Set up video
 	mov		ah, $00												; Change video mode
@@ -89,13 +81,9 @@ stage2_start:
 .useax:
 	xor		di, di												; Clear DI
 	mov		WORD [MemBlocksAbove16M], bx						; Store amount of memory available
-
-	mov		ax, Kern_Info_Struct								; Place that houses the struct
-	mov		gs, ax												; Set up register
-
-	mov		[KINFO(high16Mem)], bx								; ""
+	mov		WORD [Kern_Info_StructPhys+$06], bx					; Highmem
 	mov		WORD [MemBlocksBelow16M], ax						; ""
-	mov		[KINFO(low16Mem)], ax								; ""
+	mov		WORD [Kern_Info_StructPhys+$08], ax					; Lowmem
 
 	call	display_memsize										; Display the memory size
 
@@ -107,11 +95,8 @@ stage2_start:
 	call	fetch_mem_map										; Fetch a memory map
 	jc 		SHORT error_memoryDetect							; Branch if error
 
-	mov		ax, Kern_Info_Struct								; Place that houses the struct
-	mov		gs, ax												; Set up register
-
-	mov		WORD [KINFO(numMemMapEnt)], bp						; ""
-	mov		WORD [KINFO(memMap)], (BIOS_MemMapSeg<<4)			; Physical location of table
+	mov		WORD [Kern_Info_StructPhys+$0E], bp					; ""
+	mov		DWORD [Kern_Info_StructPhys+$0A], (BIOS_MemMapSeg<<4); Physical location of table
 
 	; Initialise FAT library
 	call	FAT_Init
@@ -149,8 +134,6 @@ boot:
 	; Set up GDT
 	cli															; Disable ints
 	lgdt	[gdt_table]											; Set up GDTR
-
-	mov		si, [KernInfoStruct]								; Load address to kernel info struct in SI
 
 	; Jump into protected mode, woot!
 	mov		eax, cr0											; Get control reg

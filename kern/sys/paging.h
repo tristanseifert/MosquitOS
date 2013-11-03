@@ -24,19 +24,19 @@ typedef struct page_table {
 
 typedef struct page_directory {
 	// Array of ptrs to page_table structs.
-	page_table_t *tables[1024];
+	page_table_t* tables[1024];
 	// Array of pointers to page tables above, but giving their physical location
 	uint32_t tablesPhysical[1024];
 	// Physical address of tablesPhysical.
 	uint32_t physicalAddr;
 } page_directory_t;
 
-void alloc_frame(page_t *page, bool is_kernel, bool is_writeable);
-void free_frame(page_t *page);
+void alloc_frame(page_t* page, bool is_kernel, bool is_writeable);
+void free_frame(page_t* page);
 
 void paging_init();
-void paging_switch_directory(page_directory_t *new);
-page_t *paging_get_page(uint32_t address, bool make, page_directory_t *dir);
+void paging_switch_directory(page_directory_t* new);
+page_t* paging_get_page(uint32_t address, bool make, page_directory_t* dir);
 
 void paging_page_fault_handler();
 

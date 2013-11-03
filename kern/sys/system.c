@@ -12,6 +12,7 @@
 void sys_set_idt(void* base, uint16_t size);
 uint64_t sys_timer_ticks;
 cpu_info_t* sys_current_cpu_info;
+sys_kern_info_t* sys_kern_params;
 
 // Builds IDT to system defaults
 void sys_build_idt();
@@ -19,6 +20,8 @@ void sys_build_idt();
 void sys_build_gdt();
 // Sets location of GDT
 void sys_install_gdt(void* location);
+// Validates kernel info struct
+void sys_validate_kern_struct();
 
 extern void rs232_set_up_irq();
 
@@ -65,6 +68,44 @@ void system_init() {
 	// Set up RS232
 	rs232_init();
 	rs232_set_up_irq();
+
+	// Check out the kernel info struct
+	sys_validate_kern_struct();
+}
+
+/*
+ * Ensures validity of the kernel info struct the bootloader passed to us, and
+ * copies it to a safe place to move it out of lowmem.
+ */
+void sys_validate_kern_struct() {
+	sys_kern_info_t* kern_info = (sys_kern_info_t *) SYS_KERN_INFO_LOC;
+
+	if(memcmp(&kern_info->munchieValue, "KERN", 4) != 0) {
+		PANIC("Invalid kernel info structure, check SYS_KERN_INFO_LOC");
+	}
+
+	if(((uint32_t) kern_info->memMap) > 0x20000 || !kern_info->memMap) {
+		PANIC("BIOS memory map at invalid location");
+	}
+
+	// Copy it into kernel memory
+	sys_kern_params = (sys_kern_info_t *) kmalloc(sizeof(sys_kern_info_t));
+	memcpy(sys_kern_params, kern_info, sizeof(sys_kern_info_t));
+
+	// Copy BIOS memory struct
+	size_t bios_mem_map_size = sizeof(sys_smap_entry_t) * kern_info->numMemMapEnt;
+	sys_smap_entry_t* sys_bios_map = (sys_smap_entry_t *) kmalloc(bios_mem_map_size);
+	
+	memcpy(sys_bios_map, kern_info->memMap, bios_mem_map_size);
+
+	sys_kern_params->memMap = sys_bios_map;
+}
+
+/*
+ * Returns kernel pointer to the copy of the kernel argument struct.
+ */
+sys_kern_info_t* sys_get_kern_info() {
+	return sys_kern_params;
 }
 
 /*

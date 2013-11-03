@@ -3,6 +3,7 @@
 
 #include <types.h>
 #include "sched.h"
+#include "paging.h"
 
 // Task's context information
 typedef struct task_state {
@@ -18,6 +19,9 @@ typedef struct task_state {
 
 	// FPU/SSE state memory (must be aligned to 16 byte boundary)
 	void *fpu_state; // FXSAVE/FXRSTOR
+
+	// Paging-specific stuff
+	page_directory_t *page_directory;
 } i386_task_state_t;
 
 // Struct with information about task
@@ -53,11 +57,11 @@ void task_save_state(i386_task_t* task, void *regPtr);
 void task_switch(i386_task_t* task);
 
 // Creation/destruction of tasks
-i386_task_t *task_allocate();
+i386_task_t* task_allocate();
 void task_deallocate(i386_task_t* task);
 
 // Access to the linked list
-i386_task_t *task_get_first();
-i386_task_t *task_get_last();
+i386_task_t* task_get_first();
+i386_task_t* task_get_last();
 
 #endif
