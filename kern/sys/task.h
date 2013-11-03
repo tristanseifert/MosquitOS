@@ -22,7 +22,7 @@ typedef struct task_state {
 
 	// Paging-specific stuff
 	page_directory_t *page_directory;
-} i386_task_state_t;
+} __attribute__((packed)) i386_task_state_t;
 
 // Struct with information about task
 typedef struct task {

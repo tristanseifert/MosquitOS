@@ -34,12 +34,12 @@ void task_save_state(i386_task_t* task, void *regPtr) {
 	memcpy(state->fpu_state, &task_temp_fxsave_region, 512);
 
 	// Cast the register struct pointer to what it really is
-	sched_trap_regs_t *regs = regPtr;
+	sched_trap_regs_t *regs = regPtr+offsetof(sched_trap_regs_t, gs);
 
 	// Since starting at gs and ending with ss, the format of sched_trap_regs_t
 	// and i386_task_state_t is identical, we can simply perform a memcpy of
 	// 68 bytes (17 dwords) the relevant places in the struct.
-	memcpy(state, regs+offsetof(sched_trap_regs_t, gs), 0x44);
+	memcpy(state, regs, 0x44);
 }
 
 /*

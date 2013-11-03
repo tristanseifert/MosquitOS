@@ -6,11 +6,11 @@
 	+0x00 uint32_t gs, fs, es, ds; *
 
 	+0x10 uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; *
-	+0x2C uint32_t eip, cs, eflags, useresp, ss; *
+	+0x30 uint32_t eip, cs, eflags, useresp, ss; *
 
-	+0x3C uint32_t page_table; *
+	+0x44 uint32_t page_table; *
 
-	+0x40 uint8_t *fpu_state; 
+	+0x48 uint8_t *fpu_state; 
   */
 .extern task_temp_fxsave_region
 .globl task_restore_context
@@ -18,46 +18,37 @@ task_restore_context:
 	# Get pointer to the structure in edi
 	push	%ebp
 	mov		%esp, %ebp
-	mov		0x8(%ebp), %edi
+	mov		8(%ebp), %edi
 
 	# Push location to IRET image onto stack
 	mov		%edi, %eax
-	add		$0x2C, %edi
-	pushl	%eax
+	add		$0x30, %eax
+	mov		%eax, iret_image_loc
 
-	# Get pointer to FPU state
-	mov		0x40(%edi), %eax
-
-	# Back up previous stack pointer
-	mov		%esp, %eax
-
-	# Set up stack pointer so we can pop DS-GS
-	mov		%edi, %esp
-	popl	%gs
-	popl	%fs
-	popl	%es
-	popl	%ds
-
-	# Restore stack pointer
-	mov		%eax, %esp
+	# Read GS through DS from the image
+	mov		(%edi), %gs
+	mov		4(%edi), %fs
+	mov		8(%edi), %es
+	mov		12(%edi), %ds
 
 	# Restore FPU state
 	fxrstor	task_temp_fxsave_region
 
-	# Change the struct so that the esp we pop using popal is the current one,
-	# since the IRET restores the USP anyways
-	mov		%eax, 0x1C(%edi)
-
 	# Get page table pointer and set it
-	mov		0x3C(%edi), %eax
-	mov		%eax, %cr3
+	mov		0x44(%edi), %eax
+#	mov		%eax, %cr3
+
+	# Move stack pointer to top of PUSHAL image
+	mov		%edi, %eax
+	add		$0x10, %eax
+	mov		%eax, %esp
 
 	# Restore registers by using POPAL
 	popal
 
 	# The value we just popped off the stack is the IRET image that we want to
 	# pop to restore the process' EIP and privilege level.
-	popl	%esp
+	mov		iret_image_loc, %esp
 
 	# Restore EFLAGS, ESP, EIP, all that fun stuff from user mode
 	iret
@@ -67,3 +58,5 @@ task_restore_context:
  * the BSS segment and initialised to zero.
  */
 .bss
+iret_image_loc:
+	.word	0

@@ -156,6 +156,9 @@ void paging_init() {
 		alloc_frame(paging_get_page(i, 1, kernel_directory), 0, 0);
 	}
 
+	// Set page fault handler
+	// sys_set_idt_gate(14, (uint32_t) isr14, 0x08, 0x8E);
+
 	// Now, enable paging!
 	paging_switch_directory(kernel_directory);
 

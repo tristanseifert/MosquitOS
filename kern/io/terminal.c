@@ -139,3 +139,7 @@ void terminal_setPos(uint8_t col, uint8_t row) {
 	terminal_column = col;
 	terminal_row = row;	
 }
+
+void terminal_setCol(uint8_t col) {
+	terminal_column = col;
+}

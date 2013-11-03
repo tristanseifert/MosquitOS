@@ -21,7 +21,7 @@ typedef struct sched_trap_registers {
 
 	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
 	uint32_t eip, cs, eflags, useresp, ss; // Pushed by the processor automatically.
-} sched_trap_regs_t;
+} __attribute__((packed)) sched_trap_regs_t;
 
 typedef struct sched_info {
 	// The last "scheduling cycle" this process was ran.

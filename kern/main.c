@@ -48,17 +48,42 @@ typedef struct sys_smap_entry {
 	sys_smap_entry_t *entry = info->memMap;
 	uint32_t total_usable_RAM = 0;
 
-	terminal_write_string("Base Address       | Length             | Type\n");
+	terminal_putchar(0xC9);
+	for(int i = 0; i < 64; i++) {
+		if(i == 20 || i == 41) {
+			terminal_putchar(0xD1);
+		} else {
+			terminal_putchar(0xCD);
+		}
+	}
+	terminal_putchar(0xBB);
+	terminal_putchar('\n');
+
+	terminal_write_string("\xBA Base Address       \xB3 Length             \xB3 Type");
+	terminal_setCol(65);
+	terminal_putchar(0xBA);
+	terminal_putchar('\n');
+
+	terminal_write_string("\xC7");
+	for(int i = 0; i < 64; i++) {
+		if(i == 20 || i == 41) {
+			terminal_putchar(0xC5);
+		} else {
+			terminal_putchar(0xC4);
+		}
+	}
+	terminal_putchar(0xB6);
+	terminal_putchar('\n');
 
 	for(int i = 0; i < info->numMemMapEnt; i++) {
-		terminal_write_string("0x");
+		terminal_write_string("\xBA 0x");
 		terminal_write_dword(entry->baseH);
 		terminal_write_dword(entry->baseL);
-		terminal_write_string(" | 0x");
+		terminal_write_string(" \xB3 0x");
 
 		terminal_write_dword(entry->lengthH);
 		terminal_write_dword(entry->lengthL);
-		terminal_write_string(" | ");
+		terminal_write_string(" \xB3 ");
 
 		switch(entry->type) {
 			case 1:
@@ -89,13 +114,29 @@ typedef struct sys_smap_entry {
 				break;
 		}
 
+		terminal_setCol(65);
+		terminal_putchar(0xBA);
 		terminal_putchar('\n');
 
 		entry++;
 	}
 
+	terminal_putchar(0xC8);
+	for(int i = 0; i < 64; i++) {
+		if(i == 20 || i == 41) {
+			terminal_putchar(0xCF);
+		} else {
+			terminal_putchar(0xCD);
+		}
+	}
+	terminal_putchar(0xBC);
+
 	terminal_write_string("\n\nTotal usable memory (bytes): 0x");
 	terminal_write_dword(total_usable_RAM);
+
+	terminal_write_string("\n Attempting to switch contexts...");
+	__asm__("mov $0xDEADC0DE, %edx; int $0x88");
+	terminal_write_string("\n Context switch OK !!!");
 
 	uint32_t timer = 0;
 	uint16_t ps2, temp;

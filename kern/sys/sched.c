@@ -21,6 +21,8 @@ static i386_task_t *nextTask;
 void sched_init() {
 	// Set up a trap gate in the IDT
 	sys_set_idt_gate(SCHED_TRAP_NUM, (uint32_t) sched_trap, 0x08, 0x8F);
+
+	currTask = task_allocate();
 }
 
 /*
@@ -28,12 +30,15 @@ void sched_init() {
  *
  * This is usually done by a process executing "int $0x88" and the CPU
  * taking the trap to an assembly wrapper.
+ *
+ * NOTE: This function never returns, but still has to be CALLed to retain the
+ * proper stack alignment when passing arguments on the stack.
  */
 void sched_yield(sched_trap_regs_t regs) {
 	// Save the task state
 	task_save_state(currTask, &regs);
 
-	// Prepare the next process for execution
+	/*// Prepare the next process for execution
 	prevTask = currTask;
 	currTask = nextTask;
 
@@ -43,6 +48,7 @@ void sched_yield(sched_trap_regs_t regs) {
 	// Update scheduler cycle info
 	sched_task_t *schedInfo = currTask->scheduler_info;
 	schedInfo->last_cycle = scheduler_cycle;
+	*/
 
 	// Do context switch
 	task_switch(currTask);
