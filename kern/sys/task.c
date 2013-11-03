@@ -9,18 +9,44 @@ static uint32_t next_pid;
 static i386_task_t *task_first;
 static i386_task_t *task_last;
 
+// External assembly routines
+void task_restore_context(i386_task_state_t*);
+
+static uint8_t task_temp_fxsave_region[512] __attribute__((aligned(16)));
+
 /*
  * Saves the state of the task.
  */
-void task_save_state(i386_task_t task) {
+void task_save_state(i386_task_t* task, void *regPtr) {
+	// Back up the process' FPU/SSE state
+	i386_task_state_t *state = task->task_state;
 
+	// If FPU state memory area is not allocated, allocate it
+	if(state->fpu_state == NULL) {
+		state->fpu_state = (uint8_t *) kmalloc(512);
+	}
+
+	__asm__ volatile(" fxsave %0; " : "=m" (task_temp_fxsave_region));
+
+	// Copy into the thread context table
+	memcpy(state->fpu_state, &task_temp_fxsave_region, 512);
+
+	// Cast the register struct pointer to what it really is
+	sched_trap_regs_t *regs = regPtr;
+
+	// Since starting at gs and ending with ss, the format of sched_trap_regs_t
+	// and i386_task_state_t is identical, we can simply perform a memcpy of
+	// 68 bytes (17 dwords) the relevant places in the struct.
+	memcpy(state, regs+offsetof(sched_trap_regs_t, gs), 0x44);
 }
 
 /*
  * Performs a context switch to the specified task.
  */
-void task_switch(i386_task_t task) {
-
+void task_switch(i386_task_t* task) {
+	// Restore CPU state
+	i386_task_state_t *state = task->task_state;
+	task_restore_context(state);
 }
 
 /*
@@ -39,6 +65,8 @@ i386_task_t *task_allocate() {
 	task_last = task;
 
 	task->pid = next_pid++;
+
+	task->task_state->fpu_state = (uint8_t *) kmalloc(512);
 
 	// TODO: Set up paging for the task, allocating some memory for it
 
@@ -74,7 +102,7 @@ void task_deallocate(i386_task_t* task) {
 	sched_task_deleted(task);
 
 	// Clean up memory.
-	kfree(task->fpu_state);
+	kfree(task->task_state->fpu_state);
 	kfree(task);
 }
 

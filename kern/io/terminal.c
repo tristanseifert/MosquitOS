@@ -1,5 +1,6 @@
 #include <types.h>
 #include <device/vga.h>
+#include <device/rs232.h>
 
 #include "terminal.h"
 
@@ -51,11 +52,15 @@ void terminal_putchar(char c) {
 			}
 		}
 	}
+
+	rs232_putchar(KERN_DEBUG_SERIAL_PORT, c);
 }
 
 void terminal_write_string(char *string) {
 	size_t datalen = strlen(string);
 	
+	// rs232_write(KERN_DEBUG_SERIAL_PORT, datalen, string);
+
 	for(int i = 0; i < datalen; i++) {
 		terminal_putchar(string[i]);
 	}

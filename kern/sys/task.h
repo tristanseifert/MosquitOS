@@ -4,7 +4,11 @@
 #include <types.h>
 #include "sched.h"
 
-typedef struct task {
+// Task's context information
+typedef struct task_state {
+	// Manually backed up
+	uint32_t gs, fs, es, ds;
+
 	// These can be directly copied from the stack when the task is interrupted
 	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
 	uint32_t eip, cs, eflags, useresp, ss; // Pushed by the processor automatically.
@@ -12,8 +16,14 @@ typedef struct task {
 	// Page table address
 	uint32_t page_table;
 
-	// FPU/SSE state memory pointer (must be aligned to 16 byte boundary, kernel ptr)
-	void* fpu_state; // FXSAVE/FXRSTOR
+	// FPU/SSE state memory (must be aligned to 16 byte boundary)
+	void *fpu_state; // FXSAVE/FXRSTOR
+} i386_task_state_t;
+
+// Struct with information about task
+typedef struct task {
+	// Task state structure
+	i386_task_state_t* task_state;
 
 	// Miscellaneous task info
 	uint32_t pid;
@@ -38,9 +48,9 @@ typedef struct task {
 } i386_task_t;
 
 // Saves the state of the task in an interrupt/syscall handler
-void task_save_state(i386_task_t task);
+void task_save_state(i386_task_t* task, void *regPtr);
 // Switches to the specified task
-void task_switch(i386_task_t task);
+void task_switch(i386_task_t* task);
 
 // Creation/destruction of tasks
 i386_task_t *task_allocate();

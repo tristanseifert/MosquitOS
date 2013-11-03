@@ -2,6 +2,8 @@
 #include "panic.h"
 #include "io/terminal.h"
 
+extern void panic_halt_loop(void);
+
 void panic_assert(char *file, uint32_t line, char *desc) {
 	// An assertion failed, and we have to panic.
 	__asm__ volatile("cli"); // Disable interrupts.
@@ -17,7 +19,7 @@ void panic_assert(char *file, uint32_t line, char *desc) {
 	terminal_write_string("\n");
 	
 	// Halt by going into an infinite loop.
-	while(1);
+	panic_halt_loop();
 }
 
 void panic(char *message, char *file, uint32_t line) {
@@ -35,5 +37,5 @@ void panic(char *message, char *file, uint32_t line) {
 	terminal_write_string("\n");
 
 	// Halt by going into an infinite loop.
-	while(1);
+	panic_halt_loop();
 }

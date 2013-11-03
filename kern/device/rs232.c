@@ -97,7 +97,7 @@ void rs232_write(rs232_port_t port, size_t num_bytes, void* data) {
 	static uint8_t counter;
 
 	// If less than or equal to 16 total bytes, write directly
-	if(num_bytes =< 16) {
+	if(num_bytes <= 16) {
 		for(int i = 0; i < num_bytes; i++) {
 			io_outb(portnum, *data_read++);
 		}
@@ -106,14 +106,30 @@ void rs232_write(rs232_port_t port, size_t num_bytes, void* data) {
 			io_outb(portnum, *data_read++);
 		}
 
-	// Get buffer info struct
-	rs232_buffer_t *bufInfo = &rs232_buffer_ptrs[port-1];
+		// Get buffer info struct
+		rs232_buffer_t *bufInfo = &rs232_buffer_ptrs[port-1];
 
-	// Loop through the rest of the data
-	for(int i = 0; i < num_bytes-1; i++) {
-		bufInfo->tx_buf[bufInfo->tx_buf_off++] = *data_read++;
+		// Loop through the rest of the data
+		for(int i = 0; i < num_bytes-16; i++) {
+			bufInfo->tx_buf[bufInfo->tx_buf_off++] = *data_read++;
+		}
 	}
+}
 
+/*
+ * Writes a single character to the RS232 port.
+ */
+void rs232_putchar(rs232_port_t port, char value) {
+	volatile uint16_t portnum = rs232_to_io_map[port-1];
+
+	if(!(io_inb(portnum + 5) & 0x20)) {
+		// Get buffer info struct
+		rs232_buffer_t *bufInfo = &rs232_buffer_ptrs[port-1];
+
+		// Stuff into buffer
+		bufInfo->tx_buf[bufInfo->tx_buf_off++] = value;
+	} else {
+		io_outb(portnum, value);
 	}
 }
 
@@ -217,12 +233,9 @@ process_irq: ; // gcc is stupid
 		goto done;
 	}
 
-	terminal_setPos(4, 13);
-	terminal_write_string("IRQ : 0x");
-	terminal_write_byte(irq);
-
 	// Get the struct
 	rs232_buffer_t *port_info = &rs232_buffer_ptrs[portSet + (triggered_port << 1)];
+
 
 	// Service appropriate IRQ
 	switch(irq) {

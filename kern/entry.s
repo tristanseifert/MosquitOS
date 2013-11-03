@@ -33,6 +33,9 @@ _entry:
 	hlt
 	jmp .Lhang
 
+/*
+ * Enables the SSE features of the processor.
+ */
 sse_init:
 	mov		%cr0, %eax
 
@@ -48,3 +51,11 @@ sse_init:
 	or		$(3 << 9), %ax
 	mov		%eax, %cr4
 	ret
+
+/*
+ * Panic halt loop
+ */
+.globl panic_halt_loop
+panic_halt_loop:
+	hlt
+	jmp		panic_halt_loop

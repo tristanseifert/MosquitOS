@@ -6,10 +6,13 @@
 sched_trap:
 	pusha														# Pushes edi, esi, ebp, esp, ebx, edx, ecx, eax
 
+	# Push the segment registers not backed up automagically
+	pushl	%ds
+	pushl	%es
+	pushl	%fs
+	pushl	%gs
+
+	# Set up some stuff and call scheduler
 	pushl	$0x00												# Event status
 	pushl	$0x80000000											# Event being waited for (yield)
-	call	sched_yield											# Run scheduler
-	add 	$0x8, %esp											# Cleans up the pushed event information
-
-	popa														# Pops edi, esi, ebp, esp, ebx, edx, ecx, eax
-	iret														# Pops CS, EIP, EFLAGS, SS, and ESP
+	jmp		sched_yield											# Run scheduler

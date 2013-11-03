@@ -49,6 +49,8 @@ system: sys/*.c sys/*.S
 	$(AS) -o irq_handlers.o sys/irq_handlers.S
 	$(AS) -o syscall_alt.o sys/syscall.S
 	$(AS) -o sched_alt.o sys/sched.S
+	$(AS) -o task_alt.o sys/task.S
+	$(AS) -o vm_alt.o sys/vm.S
 
 # Assembly loader
 loader: entry.s

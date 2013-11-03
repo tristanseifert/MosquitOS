@@ -30,6 +30,9 @@ void sched_init() {
  * taking the trap to an assembly wrapper.
  */
 void sched_yield(sched_trap_regs_t regs) {
+	// Save the task state
+	task_save_state(currTask, &regs);
+
 	// Prepare the next process for execution
 	prevTask = currTask;
 	currTask = nextTask;
@@ -41,12 +44,8 @@ void sched_yield(sched_trap_regs_t regs) {
 	sched_task_t *schedInfo = currTask->scheduler_info;
 	schedInfo->last_cycle = scheduler_cycle;
 
-	// Copy current task struct onto stack
-	i386_task_t task;
-	memcpy(&task, currTask, sizeof(i386_task_t));
-
 	// Do context switch
-	task_switch(task);
+	task_switch(currTask);
 }
 
 /*

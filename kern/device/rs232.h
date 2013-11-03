@@ -18,6 +18,8 @@ typedef enum {
 	kRS232_COM4,
 } rs232_port_t;
 
+#define KERN_DEBUG_SERIAL_PORT kRS232_COM1
+
 typedef enum {
 	kRS232_Baud115200 = 1,
 	kRS232_Baud57600 = 2,
@@ -43,6 +45,7 @@ typedef struct {
 void rs232_init();
 void rs232_set_baud(rs232_port_t port, rs232_baud_t baudrate);
 void rs232_write(rs232_port_t port, size_t num_bytes, void* data);
+void rs232_putchar(rs232_port_t port, char value);
 int rs232_read(rs232_port_t port, size_t num_bytes, void* out, bool timeout);
 
 rs232_port_info_t rs232_get_port_info(rs232_port_t port);
