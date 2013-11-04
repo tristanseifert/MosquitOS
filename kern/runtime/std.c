@@ -110,7 +110,6 @@ void* malloc(size_t num_bytes) {
  * Clears count of memory, starting at start, with 0x00.
  */
 void* memclr(void* start, size_t count) {
-
 	// Programmer is an idiot
 	if(!count) return start;
 

@@ -8,11 +8,8 @@
 .type _entry, @function
 
 _entry:
-	# Set up kernel stack at 0x400000 to 0x380000
-	movl	$0x400000, %esp
-
-	# Initialise kernel first (clear memory, etc)
-	call	kernel_init
+	# Set up kernel stack at 0xC0400000 to 0xC0380000
+	movl	$0xC0400000, %esp
 
 	# Check for SSE, and if it exists, enable it
 	mov		$0x1, %eax
@@ -23,6 +20,9 @@ _entry:
 	call	sse_init
 
 .noSSE:
+	# Initialise kernel first (clear memory, etc)
+	call	kernel_init
+
 	# Now jump into the kernel's main function
 	call	kernel_main
 

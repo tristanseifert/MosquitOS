@@ -7,11 +7,11 @@ ENTRY(_entry)
 SECTIONS {
 	/*
 	 * The bootloader contains code that relocates the entire kernel to address
-	 * 0x00100000 in memory, since we now are running in protected mode and
+	 * 0xC0000000 in memory, since we now are running in protected mode and
 	 * it makes sense to keep the low 1M of memory available for use with
 	 * stuff like V86 mode, and allow us to expand beyond about 600K.
 	 */
-	. = 0x00100000;
+	. = 0xC0000000;
 
 	.text : {
 		kern_code_start = .;

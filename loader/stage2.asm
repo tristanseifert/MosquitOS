@@ -1,8 +1,8 @@
 	BITS	16
 	org		$0500
 
-; Kernel will be loaded to segment $0300, or $003000 physical
-kern_loc:				EQU $0300
+; Kernel will be loaded to segment $0A80, or $00A800 physical
+kern_loc:				EQU $0A80
 kern_loc_phys:			EQU kern_loc<<4
 kern_start:				EQU 6
 kern_len:				EQU 32									; Length in sectors
@@ -12,6 +12,14 @@ Kern_Info_Struct:		EQU $0160								; $001600 phys (len = $400 max)
 Kern_Info_StructPhys:	EQU (Kern_Info_Struct<<4)
 VESA_SupportedModes:	EQU	$01A0								; $001A00 phys (len = $200)
 BIOS_MemMapSeg:			EQU	$0200								; $002000 phys (len = $800 max)
+
+; Physical protected mode addresses
+MMU_PageDir:			EQU $003000
+MMU_PageTable1:			EQU $004000
+MMU_PageTable2:			EQU $005000
+MMU_PageTable3:			EQU $006000
+MMU_PageTable4:			EQU $007000
+MMU_PageTable5:			EQU $008000
 
 ;	+$00 uint32_t munchieValue; // Should be "KERN"
 ;	+$04 uint16_t supportBits;
@@ -173,7 +181,65 @@ copy_kernel:
 	add		ebx, $04											; Increment write ptr
 
 	loop	.copy												; Loop and copy everything
-	jmp		$100000												; Jump into relocated kernel
+
+	; Here, we build a page directory and table to map $C0000000 to $00100000.
+	xor		eax, eax
+	mov		ebx, MMU_PageDir
+	mov		ecx, $1000
+
+.clrTablesLoop:
+	mov		DWORD [ebx], eax
+	add		ebx, $04
+	loop	.clrTablesLoop
+
+
+	; Since we only need to map 4M for right now, concern ourselves only with entry 0x300 and 0x000
+	; Also, map 0x00000000 to 0x003FFFFF
+	mov		DWORD [MMU_PageDir+0x000], (MMU_PageTable1 | $3)
+
+	mov		DWORD [MMU_PageDir+0xC00], (MMU_PageTable2 | $3)
+	mov		DWORD [MMU_PageDir+0xC04], (MMU_PageTable3 | $3)
+	mov		DWORD [MMU_PageDir+0xC08], (MMU_PageTable4 | $3)
+	mov		DWORD [MMU_PageDir+0xC0C], (MMU_PageTable5 | $3)
+
+
+	; Run a loop 1024 times to fill the first page table
+	mov		ecx, $400
+	xor		ebx, ebx											; Page table offset
+	mov		eax, DWORD $00000007									; Physical address start
+
+.fillPageTable1:
+	mov		DWORD [MMU_PageTable1+ebx*4], eax					; Write physical location
+
+	inc		ebx													; Go to next entry in page table
+	add		eax, $1000											; Increment physical address
+	loop	.fillPageTable1
+
+
+	; Run a loop 8192 times to fill the second page table
+	mov		ecx, $1000
+	xor		ebx, ebx											; Page table offset
+	mov		eax, DWORD $00100007								; Physical address start
+
+.fillPageTable2:
+	mov		DWORD [MMU_PageTable2+ebx*4], eax					; Write physical location
+
+	inc		ebx													; Go to next entry in page table
+	add		eax, $1000											; Increment physical address
+	loop	.fillPageTable2
+
+
+	; Set paging directory to CR3
+	mov		eax, MMU_PageDir
+	mov		cr3, eax
+
+	; Enable paging in CR0
+	mov		eax, cr0
+	or		eax, $80000000
+	mov		cr0, eax
+
+	; Jump into kernel
+	jmp		$0C0000000
 
 	BITS	16
 

@@ -36,7 +36,7 @@ task_restore_context:
 
 	# Get page table pointer and set it
 	mov		0x44(%edi), %eax
-#	mov		%eax, %cr3
+	mov		%eax, %cr3
 
 	# Move stack pointer to top of PUSHAL image
 	mov		%edi, %eax

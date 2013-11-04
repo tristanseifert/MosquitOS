@@ -61,11 +61,13 @@ static uint32_t test_frame(uint32_t frame_addr) {
 static uint32_t first_frame() {
 	uint32_t i, j;
 	for (i = 0; i < INDEX_FROM_BIT(nframes); i++) {
-		if (frames[i] != 0xFFFFFFFF) { // nothing free, exit early
-			// at least one bit is free here
+		if (frames[i] != 0xFFFFFFFF) { // nothing free, check next
+			// At least one bit is free here
 			for (j = 0; j < 32; j++) {
 				uint32_t toTest = 0x1 << j;
-				if (!(frames[i]&toTest)) {
+
+				// If this frame is free, return
+				if (!(frames[i] & toTest)) {
 					return i*4*8+j;
 				}
 			}
@@ -83,14 +85,15 @@ void alloc_frame(page_t* page, bool is_kernel, bool is_writeable) {
 		return;
 	} else {
 		uint32_t idx = first_frame();
-		if (idx == (uint32_t)-1) {
+		if (idx == (uint32_t) -1) {
 			PANIC("No Free Frames");
-			// PANIC! no free frames!!
 		}
-		set_frame(idx*0x1000);
+
+		set_frame(idx * 0x1000);
+
 		page->present = 1;
-		page->rw = (is_writeable)?1:0;
-		page->user = (is_kernel)?0:1;
+		page->rw = (is_writeable) ? 1 : 0;
+		page->user = (is_kernel) ? 0 : 1;
 		page->frame = idx;
 	}
 }
@@ -117,80 +120,123 @@ void paging_init() {
 	uint32_t mem_end_page = 0x02000000;
 	
 	nframes = mem_end_page / 0x1000;
+	
+	terminal_write_string("Frame memory: 0x");
+	terminal_write_dword(INDEX_FROM_BIT(nframes));
+
 	frames = (uint32_t *) kmalloc(INDEX_FROM_BIT(nframes));
 	memset(frames, 0, INDEX_FROM_BIT(nframes));
 	
 	// Let's make a page directory.
-	kernel_directory = (page_directory_t *)kmalloc_a(sizeof(page_directory_t));
+	kernel_directory = (page_directory_t *) kmalloc_a(sizeof(page_directory_t));
+
+	ASSERT(kernel_directory != NULL);
+	terminal_write_string("\nKernel directory: 0x");
+	terminal_write_dword((uint32_t) kernel_directory);
+
 	memset(kernel_directory, 0, sizeof(page_directory_t));
 	current_directory = kernel_directory;
+
+	terminal_write_string("\nKernel heap addr: 0x");
+	terminal_write_dword((uint32_t) kheap_placement_address);
+
+	kheap = 0;
 
 	// Map some pages in the kernel heap area.
 	// Here we call get_page but not alloc_frame. This causes page_table_t's 
 	// to be created where necessary. We can't allocate frames yet because they
 	// they need to be identity mapped first below, and yet we can't increase
 	// placement_address between identity mapping and enabling the heap!
-	int i = 0;
-	for (i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000) {
-		paging_get_page(i, 1, kernel_directory);
+	uint32_t i = 0;
+	for(i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000) {
+		paging_get_page(i, true, kernel_directory);
+	}
+
+	// Map 0xC0000000 to 0xC7FFFFFF to 0x00100000 to 0x08000FFF
+	for(i = 0xC0000000; i < 0xC7FFF000; i += 0x1000) {
+		page_t* page = paging_get_page(i, true, kernel_directory);
+
+		page->present = 1;
+		page->rw = 1;
+		page->user = 0;
+		page->frame = (((i & 0x0FFFF000) + 0x100000) >> 12);
 	}
 
 	// We need to identity map (phys addr = virt addr) from
-	// 0x0 to the end of used memory, so we can access this
-	// transparently, as if paging wasn't enabled.
+	// 0x0 to the end of used memory, so we can have access to the
+	// low memory.
+	//
 	// NOTE that we use a while loop here deliberately.
 	// inside the loop body we actually change placement_address
 	// by calling kmalloc(). A while loop causes this to be
 	// computed on-the-fly rather than once at the start.
-	// Allocate a lil' bit extra so the kernel heap can be
+	// Also allocate a little bit extra so the kernel heap can be
 	// initialised properly.
-	i = 0;
-	while (i < kheap_placement_address + 0x1000) {
+	i = 0x00000000;
+	while(i < (kheap_placement_address & 0x0FFFFFFF) + 0x1000) { // 
 		// Kernel code is readable but not writeable from userspace.
-		alloc_frame(paging_get_page(i, 1, kernel_directory), 0, 0);
+		alloc_frame(paging_get_page(i, true, kernel_directory), false, false);
 		i += 0x1000;
 	}
 
 	// Now allocate those pages we mapped earlier.
-	for (i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000) {
-		alloc_frame(paging_get_page(i, 1, kernel_directory), 0, 0);
+	for(i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000) {
+		alloc_frame(paging_get_page(i, false, kernel_directory), false, false);
 	}
 
 	// Set page fault handler
 	// sys_set_idt_gate(14, (uint32_t) isr14, 0x08, 0x8E);
 
+	// Convert logical addresses to physical
+	for(i = 0; i < 1024; i++) {
+		uint32_t physAddr = kernel_directory->tablesPhysical[i];
+
+		if((physAddr & 0xC0000000) == 0xC0000000) {
+			physAddr &= 0x0FFFFFFF; // get rid of high nybble
+			physAddr += 0x00100000; // Add 1M offset
+
+			kernel_directory->tablesPhysical[i] = physAddr;
+		}
+	}
+
 	// Now, enable paging!
 	paging_switch_directory(kernel_directory);
 
 	// Initialise the kernel heap.
-	kheap = create_heap(KHEAP_START, KHEAP_START+KHEAP_INITIAL_SIZE, 0xCFFFF000, 0, 0);
-
-	// Set up the TSS and their stacks
-	sys_init_tss();
+	kheap = create_heap(KHEAP_START, KHEAP_START+KHEAP_INITIAL_SIZE, 0xCFFFF000, false, false);
 }
 
 /*
  * Switches the currently-used page directory.
  */
 void paging_switch_directory(page_directory_t* new) {
+	terminal_write_string("\nPage directory phys addr: 0x");
+	terminal_write_dword((uint32_t) new->tablesPhysical[0]);
+
+	uint32_t tables_phys_ptr = &new->tablesPhysical;
+	tables_phys_ptr &= 0x0FFFFFFF;
+	tables_phys_ptr += 0x00100000;
+
 	current_directory = new;
-	__asm__ volatile("mov %0, %%cr3":: "r"(&new->tablesPhysical));
+	__asm__ volatile("mov %0, %%cr3":: "r"(tables_phys_ptr));
 	uint32_t cr0;
 	__asm__ volatile("mov %%cr0, %0": "=r"(cr0));
 	cr0 |= 0x80000000; // Enable paging!
 	__asm__ volatile("mov %0, %%cr0":: "r"(cr0));
-
 }
 
 /*
  * Returns pointer to the specified page, and if not present and make = true,
  * creates it.
+ *
+ * Note that address = the logical address we wish to map.
  */
 page_t* paging_get_page(uint32_t address, bool make, page_directory_t* dir) {
 	// Turn the address into an index.
 	address /= 0x1000;
 	// Find the page table containing this address.
 	uint32_t table_idx = address / 1024;
+
 	if (dir->tables[table_idx]) { // If this table is already assigned
 		return &dir->tables[table_idx]->pages[address % 0x400];
 	} else if(make == true) {

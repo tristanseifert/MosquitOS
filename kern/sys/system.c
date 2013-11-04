@@ -58,6 +58,9 @@ void system_init() {
 	sys_build_gdt();
 	sys_build_idt();
 	sys_setup_ints();
+	
+	// Set up the TSS and their stacks
+	sys_init_tss();
 
 	// Set up syscalls
 	syscall_init();
@@ -95,7 +98,7 @@ void sys_validate_kern_struct() {
 	// Copy BIOS memory struct
 	size_t bios_mem_map_size = sizeof(sys_smap_entry_t) * kern_info->numMemMapEnt;
 	sys_smap_entry_t* sys_bios_map = (sys_smap_entry_t *) kmalloc(bios_mem_map_size);
-	
+
 	memcpy(sys_bios_map, kern_info->memMap, bios_mem_map_size);
 
 	sys_kern_params->memMap = sys_bios_map;

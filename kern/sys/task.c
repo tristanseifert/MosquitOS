@@ -51,6 +51,10 @@ void task_switch(i386_task_t* task) {
 	// Get pointer to page tables
 	state->page_table = (uint32_t) state->page_directory->tablesPhysical;
 
+	uint32_t cr3;
+	__asm__ volatile("mov %%cr3, %0" : "=r" (cr3));
+	state->page_table = cr3;
+
 	// Copy backed-up FPU state to memory
 	memcpy(&task_temp_fxsave_region, state->fpu_state, 512);
 

@@ -3,7 +3,7 @@
 #include "kheap.h"
 #include "paging.h"
 
-uint32_t kheap_placement_address = (uint32_t) 0x00580000; // After kernel
+uint32_t kheap_placement_address = (uint32_t) 0xC0430000; // After kernel TSS/etc
 extern page_directory_t *kernel_directory;
 heap_t *kheap = 0;
 
@@ -12,7 +12,12 @@ uint32_t kmalloc_int(uint32_t sz, bool align, uint32_t *phys) {
 		void *addr = alloc(sz, align, kheap);
 		if (phys != 0) {
 			page_t *page = paging_get_page((uint32_t) addr, false, kernel_directory);
-			*phys = (page->frame * 0x1000) + ((uint32_t) addr & 0xFFF);
+
+			// 0xC0000000 -> 0x00100000 phys
+			uint32_t physAddr = ((page->frame * 0x1000) + ((uint32_t) addr & 0xFFF));
+			physAddr &= 0x0FFFFFFF; // get rid of high nybble
+			physAddr += 0x00100000; // Add 1M offset
+			*phys = physAddr;
 		}
 
 		return (uint32_t) addr;

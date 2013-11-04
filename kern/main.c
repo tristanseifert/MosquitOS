@@ -13,12 +13,12 @@ extern uint32_t kern_bss_start, kern_end, kern_size, kern_data_start, kern_code_
 extern "C" /* Use C linkage for kernel_main. */
 #endif
 void kernel_main() {
+	// From here on, the kernel works with VIRTUAL addresses, not physical.
+	paging_init();
+
 	terminal_initialize(true);
 
 	system_init();
-
-	// From here on, the kernel works with VIRTUAL addresses, not physical.
-	paging_init();
 
 	uint32_t eax, ebx, ecx, edx;
 	cpuid(1, eax, ebx, ecx, edx);
