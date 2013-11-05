@@ -7,22 +7,9 @@
 #include "error_handler.h"
 
 void error_dump_regs(err_registers_t regs);
+extern void panic_halt_loop(void);
 
 uint32_t error_cr0, error_cr1, error_cr2, error_cr3;
-
-/*
- * Initialises the VGA hardware for displaying an error screen.
- */
-void error_init() {
-	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_BLUE));
-	terminal_clear();
-
-	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_BLUE));
-	terminal_setPos(32, 2);
-	terminal_write_string("GURU MEDITATION");
-	terminal_setPos(21, 4);
-	terminal_write_string("(Or, \"piss off, you broke something!\")");
-}
 
 /*
  * Dumps registers and exception name.
@@ -48,16 +35,9 @@ void error_dump_regs(err_registers_t regs) {
 		"Coprocessor Fault",
 		"Alignment Check Exception",
 		"Machine Check Exception"
-		};
+	};
 
-	terminal_setPos(4, 6);
-	terminal_setColour(vga_make_colour(VGA_COLOUR_RED, VGA_COLOUR_WHITE));
-	terminal_write_string((char *) &err_names[regs.int_no]);
-	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_BLUE));
-
-	terminal_setPos(4, 8);
-	terminal_write_string("Error Code: ");
-	terminal_write_byte(regs.err_code);
+	kprintf("\n\n%s\nError code: %X\n\n", &err_names[regs.int_no], regs.err_code);
 
 	// Dump the registers now.
 	static char reg_names[18][8] = {
@@ -88,16 +68,12 @@ void error_dump_regs(err_registers_t regs) {
 	};
 
 	for(uint8_t i = 0; i < 18; i+=2) {
-		terminal_setPos(4, (i/2)+10);
-
-		terminal_write_string((char *) &reg_names[i]);
-		terminal_write_dword(registers[i]);
-
-		terminal_setPos(22, (i/2)+10);
-
-		terminal_write_string((char *) &reg_names[i+1]);
-		terminal_write_dword(registers[i+1]);
+		kprintf("%s: 0x%8X\t %s: 0x%8X\n", &reg_names[i], registers[i], &reg_names[i+1], registers[i+1]);
 	}
+
+
+	// Halt by going into an infinite loop.
+	panic_halt_loop();
 }
 
 /*
@@ -115,7 +91,6 @@ void error_handler(err_registers_t regs) {
 		__asm__ volatile("mov %%cr3, %0" : "=r" (obama));
 		error_cr3 = obama;
 
-		error_init();
 		error_dump_regs(regs);
 
 		while(1);

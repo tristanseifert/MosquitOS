@@ -11,5 +11,4 @@ typedef struct registers {
    uint32_t eip, cs, eflags, useresp, ss; // Pushed by the processor automatically.
 } err_registers_t;
 
-void error_init();
 void error_handler(err_registers_t regs);
