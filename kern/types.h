@@ -10,6 +10,7 @@
 // This gives us all the runtime functions
 #include <runtime/std.h>
 #include <sys/kheap.h>
+#include <io/console.h>
 // Include panic functions
 #include <runtime/panic.h>
 

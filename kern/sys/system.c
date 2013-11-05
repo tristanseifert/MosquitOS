@@ -69,7 +69,6 @@ void system_init() {
 	sched_init();
 
 	// Set up RS232
-	rs232_init();
 	rs232_set_up_irq();
 
 	// Check out the kernel info struct

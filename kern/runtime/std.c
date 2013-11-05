@@ -3,6 +3,7 @@
 #include "std.h"
 #include "sys/kheap.h"
 #include "sys/system.h"
+#include "sys/cpuid.h"
 
 typedef void* (*memclr_prototype)(void*, size_t);
 
@@ -13,9 +14,11 @@ memclr_prototype std_memclr_fp;
  * Sets up function pointers to SEE/non-SSE versions of some STD functions.
  */
 void std_set_up_fp() {
-	cpu_info_t *info = sys_get_cpu_info();
+	uint32_t cpuid_edx, temp;
+	cpuid(1, cpuid_edx, temp, temp, temp);
+	
 	// We have SSE support
-	if(info->cpuid_edx & CPUID_FEAT_EDX_SSE) {
+	if(cpuid_edx & CPUID_FEAT_EDX_SSE) {
 		std_memclr_fp = &memclr_sse;
 	} else {
 		std_memclr_fp = &memclr_std;
@@ -113,7 +116,10 @@ void* memclr(void* start, size_t count) {
 	// Programmer is an idiot
 	if(!count) return start;
 
-	if(sys_get_cpu_info()->cpuid_edx & CPUID_FEAT_EDX_SSE) {
+	uint32_t cpuid_edx, temp;
+	cpuid(1, cpuid_edx, temp, temp, temp);
+
+	if(cpuid_edx & CPUID_FEAT_EDX_SSE) {
 		return memclr_sse(start, count);
 	} else {
 		return memclr_std(start, count);

@@ -103,7 +103,6 @@ int ps2_init() {
 	uint8_t temp = io_inb(PS2_DATA);
 
 	if(temp == 0xFA) {
-		terminal_write_string("Keyboard test OK\n");
 		ps2_keyboard_ok = true;
 
 		// We will probably get 0xAA too
@@ -111,7 +110,7 @@ int ps2_init() {
 		io_inb(PS2_DATA);
 	} else if(temp == 0xFC) {
 		ps2_keyboard_ok = false;
-		terminal_write_string("Keyboard failure\n");
+		PANIC("Keyboard failure");
 		return -16;
 	}
 
@@ -136,14 +135,6 @@ int ps2_init() {
 	// Set up IRQ handlers
 	sys_set_idt_gate(IRQ_1, (uint32_t) ps2_irq_ch1, 0x08, 0x8E);
 	sys_set_idt_gate(IRQ_12, (uint32_t) ps2_irq_ch2, 0x08, 0x8E);
-
-	terminal_write_string("PS2 Cfg: 0x");
-	terminal_write_byte(ps2_config_byte);
-
-	terminal_write_string("\nPS2 Device 1 Type: 0x");
-	terminal_write_word(ps2_device1_type);
-	terminal_write_string("\nPS2 Device 2 Type: 0x");
-	terminal_write_word(ps2_device2_type);
 
 	// Set up buffers
 	ps2_ch1_buffer_off = 0;

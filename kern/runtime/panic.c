@@ -10,13 +10,7 @@ void panic_assert(char *file, uint32_t line, char *desc) {
 
 	terminal_initialize(true);
 
-	terminal_write_string("ASSERTION FAILED(");
-	terminal_write_string(desc);
-	terminal_write_string(") at ");
-	terminal_write_string(file);
-	terminal_write_string(":");
-	terminal_write_int(line);
-	terminal_write_string("\n");
+	kprintf("ASSERTION FAILED(%s) at %s:%i\n", desc, file, line);
 	
 	// Halt by going into an infinite loop.
 	panic_halt_loop();
@@ -28,13 +22,7 @@ void panic(char *message, char *file, uint32_t line) {
 
 	terminal_initialize(false);
 
-	terminal_write_string("PANIC(");
-	terminal_write_string(message);
-	terminal_write_string(") at ");
-	terminal_write_string(file);
-	terminal_write_string(":");
-	terminal_write_int(line);
-	terminal_write_string("\n");
+	kprintf("PANIC(%s) at %s:%i\n", message, file, line);
 
 	// Halt by going into an infinite loop.
 	panic_halt_loop();

@@ -120,25 +120,17 @@ void paging_init() {
 	uint32_t mem_end_page = 0x02000000;
 	
 	nframes = mem_end_page / 0x1000;
-	
-	terminal_write_string("Frame memory: 0x");
-	terminal_write_dword(INDEX_FROM_BIT(nframes));
 
 	frames = (uint32_t *) kmalloc(INDEX_FROM_BIT(nframes));
-	memset(frames, 0, INDEX_FROM_BIT(nframes));
+	memclr(frames, INDEX_FROM_BIT(nframes));
 	
 	// Let's make a page directory.
 	kernel_directory = (page_directory_t *) kmalloc_a(sizeof(page_directory_t));
 
 	ASSERT(kernel_directory != NULL);
-	terminal_write_string("\nKernel directory: 0x");
-	terminal_write_dword((uint32_t) kernel_directory);
 
-	memset(kernel_directory, 0, sizeof(page_directory_t));
+	memclr(kernel_directory, sizeof(page_directory_t));
 	current_directory = kernel_directory;
-
-	terminal_write_string("\nKernel heap addr: 0x");
-	terminal_write_dword((uint32_t) kheap_placement_address);
 
 	kheap = 0;
 
@@ -210,10 +202,7 @@ void paging_init() {
  * Switches the currently-used page directory.
  */
 void paging_switch_directory(page_directory_t* new) {
-	terminal_write_string("\nPage directory phys addr: 0x");
-	terminal_write_dword((uint32_t) new->tablesPhysical[0]);
-
-	uint32_t tables_phys_ptr = &new->tablesPhysical;
+	uint32_t tables_phys_ptr = (uint32_t) &new->tablesPhysical;
 	tables_phys_ptr &= 0x0FFFFFFF;
 	tables_phys_ptr += 0x00100000;
 
@@ -267,14 +256,12 @@ void paging_page_fault_handler(err_registers_t regs) {
 
 	terminal_setPos(0, 0);
 
-	terminal_write_string("Page fault! ( ");
-	if (present) {terminal_write_string("present ");}
-	if (rw) {terminal_write_string("read-only ");}
-	if (us) {terminal_write_string("user-mode ");}
-	if (reserved) {terminal_write_string("reserved ");}
-	terminal_write_string(") at 0x");
-	terminal_write_dword(faulting_address);
-	terminal_write_string("\n");
+	kprintf("Page fault! ( ");
+	if (present) {kprintf("present ");}
+	if (rw) {kprintf("read-only ");}
+	if (us) {kprintf("user-mode ");}
+	if (reserved) {kprintf("reserved ");}
+	kprintf(") at 0x%X\n", faulting_address);
 
 	while(1);
 

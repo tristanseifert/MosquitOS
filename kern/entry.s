@@ -20,6 +20,9 @@ _entry:
 	call	sse_init
 
 .noSSE:
+	# Initialise paging
+	call	paging_init
+
 	# Initialise kernel first (clear memory, etc)
 	call	kernel_init
 

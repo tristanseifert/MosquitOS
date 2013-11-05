@@ -52,8 +52,6 @@ void terminal_putchar(char c) {
 			}
 		}
 	}
-
-	rs232_putchar(KERN_DEBUG_SERIAL_PORT, c);
 }
 
 void terminal_write_string(char *string) {
