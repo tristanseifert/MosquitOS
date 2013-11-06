@@ -14,4 +14,7 @@ void *memset(void* ptr, uint8_t value, size_t num);
 void* malloc(size_t num_bytes);
 void* memclr(void* start, size_t count);
 
+// sprintf (defined in kprintf.c)
+void sprintf(char* s, char *fmt, ...);
+
 #endif

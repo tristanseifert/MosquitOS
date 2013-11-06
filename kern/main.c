@@ -78,9 +78,6 @@ void kernel_main() {
 		entry++;
 	}
 
-	float meeper = 3/0;
-	kprintf("%f\n", meeper);
-
 	kprintf("\n\nTotal usable memory (bytes): 0x%X\n", total_usable_RAM);
 
 	kprintf("Attempting to switch contexts...\n");

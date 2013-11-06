@@ -9,11 +9,7 @@
 #define sprintf tfp_sprintf 
 
 typedef void (*putcf) (void*, char);
-
-void init_printf(void* putp,void (*putf) (void*,char));
-void tfp_sprintf(char* s,char *fmt, ...);
-void tfp_printf(char *fmt, ...);
-void tfp_format(void* putp, putcf putf, char *fmt, va_list va);
+void kprintf_format(void* putp, putcf putf, char *fmt, va_list va);
 
 /*
  * Outputs a character to the display.
@@ -37,6 +33,6 @@ void console_init() {
 void kprintf(char *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
-	tfp_format(NULL, console_putc, fmt, va);
+	kprintf_format(NULL, console_putc, fmt, va);
 	va_end(va);
 }
