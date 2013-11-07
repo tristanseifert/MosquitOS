@@ -51,6 +51,14 @@ typedef struct task {
 	struct task* next;
 } i386_task_t;
 
+// Struct passed to the task's specified entry point
+typedef struct task_entry_info {
+	char* path;
+
+	char* arguments;
+	int num_arguments;
+} task_entry_info_t;
+
 // Saves the state of the task in an interrupt/syscall handler
 void task_save_state(i386_task_t* task, void *regPtr);
 // Switches to the specified task

@@ -21,6 +21,7 @@ void kernel_main() {
 	cpuid(1, eax, ebx, ecx, edx);
 
 	kprintf("MosquitOS Kernel v0.1 compiled %s on %s\n", __DATE__, __TIME__);
+	kprintf("Kernel size: 0x%x\n", kern_size);
 
 	if(edx & CPUID_FEAT_EDX_SSE) {
 		kprintf("CPU supports SSE\n");

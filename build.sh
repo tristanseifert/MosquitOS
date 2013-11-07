@@ -1,7 +1,13 @@
-echo "Building Bootloader..."
+echo "Building first stage bootloader..."
 
 nasm -f bin -i./loader/ -o loader/stage1.bin -l loader/stage1.lst loader/stage1.asm
-nasm -f bin -i./loader/ -o loader/stage2.bin -l loader/stage2.lst loader/stage2.asm
+nasm -f bin -i./loader/stage2/ -o loader/stage2.bin -l loader/stage2/stage2.lst loader/stage2/stage2.asm
+
+echo "Building second stage bootloader..."
+cd loader/stage2
+make
+cd ..
+cd ..
 
 echo "Building kernel..."
 

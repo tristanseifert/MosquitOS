@@ -13,21 +13,21 @@ SECTIONS {
 	 */
 	. = 0xC0000000;
 
+	kern_code_start = .;
 	.text : {
-		kern_code_start = .;
 		*(.text);
 	}
 
 	/* Data segment */
+	kern_data_start = .;
 	.rodata : {
-		kern_data_start = .;
 		*(.data);
 		*(.rodata);
 	}
 
 	/* Read-write data (uninitialized) and stack */
+	kern_bss_start = .;
 	.bss : {
-		kern_bss_start = .;
 		*(.bss);
 	}
 

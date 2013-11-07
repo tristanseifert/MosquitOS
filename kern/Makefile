@@ -10,6 +10,8 @@ CFLAGS= -c -funroll-loops -finline-functions -g -Wall -fno-builtin -static\
 
 CFLAGSNOOPT = $(filter-out -O2,$(CFLAGS))
 
+ASFLAGS =
+
 all: setup runtime drivers io system loader kernel clean
 
 # Clean up from previous build
@@ -46,13 +48,13 @@ io: io/*.c
 # These are *not* optimised as gcc likes to muck with inline assembly
 system: sys/*.c sys/*.S
 	$(CC) $(CFLAGSNOOPT) -ffreestanding sys/*.c
-	$(AS) -o irq_handlers.o sys/irq_handlers.S
-	$(AS) -o syscall_alt.o sys/syscall.S
-	$(AS) -o sched_alt.o sys/sched.S
-	$(AS) -o task_alt.o sys/task.S
-	$(AS) -o vm_alt.o sys/vm.S
+	$(AS) $(ASFLAGS) -o irq_handlers.o sys/irq_handlers.S
+	$(AS) $(ASFLAGS) -o syscall_alt.o sys/syscall.S
+	$(AS) $(ASFLAGS) -o sched_alt.o sys/sched.S
+	$(AS) $(ASFLAGS) -o task_alt.o sys/task.S
+	$(AS) $(ASFLAGS) -o vm_alt.o sys/vm.S
 
 # Assembly loader
 loader: entry.s
-	$(AS) -o entry.o entry.s
+	$(AS) $(ASFLAGS) -o entry.o entry.s
 	mv entry.o tmp/entry.o
