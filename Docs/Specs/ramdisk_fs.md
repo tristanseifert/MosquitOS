@@ -17,7 +17,7 @@ At offset `0x00000000` of any valid QRFS is a 512-byte header that is used to id
 	} qrfs_header_t;
 
 **`magic`:** Differentiates any other volume from a valid QRFS volume. Should be "QRFS" (`0x51524653`) on valid volumes for them to be recognised.
-**`version`:`` Version of QRFS this image contains. The current version is `0x00000001`.
+**`version`:** Version of QRFS this image contains. The current version is `0x00000001`.
 **`file_table`:** Pointer to the first entry in the file table.
 
 ## File Table
