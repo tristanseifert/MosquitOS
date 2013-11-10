@@ -1,10 +1,20 @@
 .section .text
 
 /*
+ * Restores the kernel page table.
+ */
+.globl sys_restore_kern_pagetable
+.extern kern_dir_phys
+.align	16
+sys_restore_kern_pagetable:
+	mov		%eax, kern_dir_phys
+	mov		%cr3, %eax
+	ret
+
+/*
  * Dummy IRQ handler
  */
 .globl	sys_dummy_irq
-.align	16
 sys_dummy_irq:
 	iretl
 
@@ -12,7 +22,6 @@ sys_dummy_irq:
  * PS2 channel 1 interrupt
  */
 .globl	ps2_irq_ch1
-.align	16
 ps2_irq_ch1:
 	pushal
 	pushl	$0x00
@@ -25,7 +34,6 @@ ps2_irq_ch1:
  * PS2 channel 2 interrupt
  */
 .globl	ps2_irq_ch2
-.align	16
 ps2_irq_ch2:
 	pushal
 	pushl	$0x01
@@ -38,7 +46,6 @@ ps2_irq_ch2:
  * Timer tick handler
  */
 .globl	sys_timer_tick_irq
-.align	16
 sys_timer_tick_irq:
 	pushal
 	call	sys_timer_tick_handler
@@ -49,7 +56,6 @@ sys_timer_tick_irq:
  * Page fault handler
  */
 .globl	sys_page_fault_irq
-.align	16
 sys_page_fault_irq:
 	pushal
 	call	sys_page_fault_handler
@@ -60,7 +66,6 @@ sys_page_fault_irq:
  * RS232/serial IRQ handlers
  */
 .globl	sys_rs232_irq_handler1
-.align	16
 sys_rs232_irq_handler1: # COM 1, 3
 	pushal
 	pushl	$0x01
@@ -70,7 +75,6 @@ sys_rs232_irq_handler1: # COM 1, 3
 	iretl
 
 .globl	sys_rs232_irq_handler2
-.align	16 
 sys_rs232_irq_handler2: # COM 2, 4
 	pushal
 	pushl	$0x00
@@ -102,7 +106,6 @@ sys_rs232_irq_handler2: # COM 2, 4
 .globl	isr16
 .globl	isr17
 .globl	isr18
-.align	16
 isr0:
 	cli                 										# Disable interrupts
 	pushl	$0x00												# Push a dummy error code
@@ -196,7 +199,6 @@ isr18:
 /*
  * BSoD handler
  */
-.align	16
 error_common_stub:
 	pusha														# Pushes edi,esi,ebp,esp,ebx,edx,ecx,eax
 
@@ -209,6 +211,7 @@ error_common_stub:
 	mov 	%ax, %fs
 	mov 	%ax, %gs
 
+	call	sys_restore_kern_pagetable							# Restore kernel pagetable
 	call 	error_handler
 
 	pop 	%eax												# reload the original data segment descriptor

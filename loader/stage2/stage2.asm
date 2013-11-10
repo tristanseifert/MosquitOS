@@ -107,7 +107,7 @@ stage2_start:
 	mov		DWORD [Kern_Info_StructPhys+$0A], (BIOS_MemMapSeg<<4); Physical location of table
 
 	; Initialise FAT library
-	; call	FAT_Init
+	call	FAT_Init
 
 	; Check which partitions are bootable from MBR partition map
 	call	find_bootable_partitions
@@ -394,8 +394,6 @@ partition_chooser_enter:
 	cmp		al, $80
 	jne		.noBootErr											; If not bootable, branch
 
-
-	;call	fat_loader_entry									; Call FAT handling shits
 
 	mov		si, kernel_filename									; Filename to find
 	call	FAT_FindFileAtRoot									; Find file
@@ -867,9 +865,9 @@ write_crtc:
 	pop 	si
 	ret
 
-	align	32
-fat_loader_entry:
-	incbin		"./loader_c.bin"
+;	align	32
+;fat_loader_entry:
+;	incbin		"./loader_c.bin"
 
 ;========================================================================================
 ; DATA SECTION

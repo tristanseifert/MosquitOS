@@ -15,4 +15,5 @@ sched_trap:
 	# Set up some stuff and call scheduler
 	pushl	$0x00												# Event status
 	pushl	$0x80000000											# Event being waited for (yield)
+
 	call	sched_yield											# Run scheduler

@@ -33,7 +33,7 @@ void kernel_main() {
 
 	sys_kern_info_t* info = sys_get_kern_info();
 
-	kprintf("BIOS Memory Map:\n");
+	kprintf("\nBIOS Memory Map:\n");
 
 	sys_smap_entry_t *entry = info->memMap;
 	uint32_t total_usable_RAM = 0;
@@ -81,16 +81,15 @@ void kernel_main() {
 
 	kprintf("\n\nTotal usable memory (bytes): 0x%X\n", total_usable_RAM);
 
-	kprintf("Attempting to switch contexts...\n");
+	/*kprintf("Attempting to switch contexts...\n");
 	__asm__("mov $0xDEADC0DE, %edx; int $0x88");
-	kprintf("Context switch OK !!!\n");
+	kprintf("Context switch OK !!!\n");*/
 
-	uint32_t timer = 0;
-	uint16_t ps2, temp;
-	while(1) {
-		// Explanation of the 7: The MOV opcode is 5 bytes, SYSENTER is 2.
-		// __asm__("mov %esp, %ecx; mov $0xDEADBEEF, %ebx; mov $.+7, %edx; sysenter;");
-	}
+	// Explanation of the 7: The MOV opcode is 5 bytes, SYSENTER is 2.
+	// __asm__("mov %esp, %ecx; mov $0x0, %ebx; mov $.+7, %edx; sysenter;");
+
+
+	while(1);
 }
 
 /*

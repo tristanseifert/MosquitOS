@@ -3,8 +3,6 @@
 
 #include <types.h>
 
-#define SYS_PAGE_DIR_ADDR 0x00400000
-
 /*
  * Contains functions to set up and deal with paging.
  */

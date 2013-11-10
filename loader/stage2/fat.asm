@@ -520,7 +520,7 @@ FAT_ReadCluster:
 
 	xor		bx, bx												; Clear BX
 	mov		bl, BYTE [FAT_BPB_SectorsPerCluster]				; Read sectors/cluster
-	mov		WORD [FAT_ERTable+0x02], $7F							; Write sectors/cluster 
+	mov		WORD [FAT_ERTable+0x02], $1FF							; Write sectors/cluster 
 	mov		DWORD [FAT_ERTable+0x08], eax						; Write LBA
 	mov		WORD [FAT_ERTable+0x04], di							; Offset in segment
 	mov		WORD [FAT_ERTable+0x06], es							; Segment

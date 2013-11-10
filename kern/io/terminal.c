@@ -39,6 +39,16 @@ void terminal_putentryat(char c, uint8_t color, uint8_t x, uint8_t y) {
 }
  
 void terminal_putchar(char c) {
+	// Scroll everything upwards one row if we try to print past the end of the screen
+	if(terminal_row >= VGA_TEXT_ROWS) {
+		terminal_row--;
+
+		for(int i = 0; i < ((VGA_TEXT_ROWS - 1) * VGA_TEXT_COLS); i++) {
+			terminal_buffer[i] = terminal_buffer[i + VGA_TEXT_COLS];
+		}
+	}
+
+	// Handle newline
 	if(c == '\n') {
 		terminal_row++;
 		terminal_column = 0;
@@ -47,9 +57,6 @@ void terminal_putchar(char c) {
 
 		if (++terminal_column == VGA_TEXT_COLS) {
 			terminal_column = 0;
-			if (++terminal_row == VGA_TEXT_ROWS) {
-				terminal_row = 0;
-			}
 		}
 	}
 }

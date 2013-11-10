@@ -15,6 +15,9 @@ static i386_task_t *prevTask;
 static i386_task_t *currTask;
 static i386_task_t *nextTask;
 
+// Selects the next process to run
+void sched_chose_next();
+
 /*
  * Initialises the scheduler.
  */
@@ -118,6 +121,8 @@ void sched_task_deleted(void *in) {
 			nextTask = task_get_first();
 		}
 	}
+
+	kfree(task);
 }
 
 /*
@@ -132,4 +137,11 @@ void sched_task_created(void *in) {
 	memset(schedInfo, 0x00, sizeof(sched_task_t));
 
 	task->scheduler_info = schedInfo;
+}
+
+/*
+ * Returns a pointer to the current task that's being run.
+ */
+void* sched_curr_task() {
+	return currTask;
 }

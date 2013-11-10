@@ -19,7 +19,7 @@ typedef enum {
 typedef struct disk_info_struct {
 	uint8_t disk_id;
 	uint8_t bus;
-	bool masterAndServant;
+	bool masterOrServant;
 
 	// Tells the disk driver what physical device driver to use
 	disk_interface_t connection;

@@ -37,11 +37,11 @@ typedef struct sched_info {
 void sched_init();
 // Called when a process yields control to the scheduler
 void sched_yield(sched_trap_regs_t regs);
-// Selects the next process to run
-void sched_chose_next();
 // Called when a task is destroyed
 void sched_task_deleted(void *in);
 // Called when a task is created
 void sched_task_created(void *in);
+// Returns the currently executing task.
+void* sched_curr_task();
 
 #endif

@@ -30,7 +30,7 @@ SECTIONS {
 	.bss : {
 		*(.bss);
 	}
-
     kern_end = .;
+    
     kern_size = kern_bss_start - kern_code_start;
 }

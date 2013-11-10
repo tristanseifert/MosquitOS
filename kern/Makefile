@@ -12,7 +12,7 @@ CFLAGSNOOPT = $(filter-out -O2,$(CFLAGS))
 
 ASFLAGS =
 
-all: setup runtime drivers io system loader kernel clean
+all: setup runtime drivers io system fs loader kernel clean
 
 # Clean up from previous build
 clean:
@@ -53,6 +53,10 @@ system: sys/*.c sys/*.S
 	$(AS) $(ASFLAGS) -o sched_alt.o sys/sched.S
 	$(AS) $(ASFLAGS) -o task_alt.o sys/task.S
 	$(AS) $(ASFLAGS) -o vm_alt.o sys/vm.S
+
+# Filesystem libraries
+fs: fs/*.c
+	$(CC) $(CFLAGS) -ffreestanding fs/*.c
 
 # Assembly loader
 loader: entry.s

@@ -2,11 +2,27 @@
 #include "io/terminal.h"
 #include "syscall.h"
 #include "system.h"
+#include "sched.h"
+#include "syscalls.h"
 
 extern void syscall_handler_stub(void);
 
+/* Stores the return value of the function to be placed in %eax on return by the assembly
+ * syscall handler so we don't need to modify the stack image
+ */
+int syscall_return_value;
+
 /*
- * Initialises the syscall environment by configuring MSRS.
+ * This table holds an array for each available syscall in the system. The compiler will
+ * fetch the address of the function, place it in the array, and then we can jump to it
+ * from our syscall handler.
+ */
+syscall_routine syscall_table[SYSCALL_TABLE_SIZE] = {
+		syscall_stub
+	};
+
+/*
+ * Initialises the syscall environment by configuring MSRs.
  */
 void syscall_init() {
 	// Set GDT entry for system code segment
@@ -24,55 +40,25 @@ void syscall_init() {
  *
  * The C library (or whatever other library is in use) will have placed the syscall
  * that it wants executed into the EBX register, and a pointer to a syscall-specific
- * information struct in the EAX register, if any.
+ * information struct in the EAX register, if any. Alternatively, if the syscall takes
+ * only a single argument that can fit in a register, it is placed into EAX.
  *
  * Before calling this function, it's imperative that the caller places the return
  * address directly after the SYSENTER opcode into EDX, and the stack pointer to
- * restore into ECX.
+ * restore into ECX. This is done by the _kern_syscall stub in process memory.
  */
 int syscall_handler(syscall_callstack_t regs) {
-	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_GREEN));
-	terminal_clear();
-	terminal_setColour(vga_make_colour(VGA_COLOUR_WHITE, VGA_COLOUR_GREEN));
-
-	terminal_setPos(4, 2);
-	terminal_write_string("Syscall Triggered!\n\n");
-
+	// Syscall number and info
 	uint32_t syscall_id = regs.ebx;
 	void* syscall_struct = (void *) regs.eax;
 
-	terminal_setPos(4, 4);
-	terminal_write_string("Syscall: 0x");
-	terminal_write_dword(syscall_id);
-	terminal_write_string(" Param Ptr: 0x");
-	terminal_write_dword((uint32_t) syscall_struct);
+	// The task that called this syscall
+	i386_task_t *task = sched_curr_task();
 
-	static char reg_names[8][8] = {
-		"EDI: 0x",
-		"ESI: 0x",
-		"EBP: 0x",
-		"ESP: 0x",
-		"EBX: 0x",
-		"EDX: 0x",
-		"ECX: 0x",
-		"EAX: 0x",
-	};
-
-	uint32_t registers[8] = {
-		regs.edi, regs.esi, regs.ebp, regs.esp, regs.ebx, regs.edx, regs.ecx,
-		regs.eax,
-	};
-
-	for(uint8_t i = 0; i < 8; i+=2) {
-		terminal_setPos(4, (i/2)+6);
-
-		terminal_write_string((char *) &reg_names[i]);
-		terminal_write_dword(registers[i]);
-
-		terminal_setPos(22, (i/2)+6);
-
-		terminal_write_string((char *) &reg_names[i+1]);
-		terminal_write_dword(registers[i+1]);
+	if(syscall_id > SYSCALL_TABLE_SIZE) {
+		kprintf("Got invalid syscall 0x%X\n", syscall_id);
+	} else {
+		syscall_return_value = (syscall_table[syscall_id](task, regs, syscall_struct));
 	}
 
 	// Before we run the syscall, ensure the return address in EDX is valid
@@ -80,11 +66,8 @@ int syscall_handler(syscall_callstack_t regs) {
 	uint16_t opcode = *returnAddress;
 
 	if(opcode != SYSCALL_SYSENTER_OPCODE) {
-		terminal_setPos(4, 11);
-		terminal_write_string("Invalid return address: process will be killed!");
+		kprintf("Invalid return address: process will be killed!");
 	}
-
-	while(1);
 
 	return 0;
 }

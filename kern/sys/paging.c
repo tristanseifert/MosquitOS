@@ -7,6 +7,7 @@
 
 // The kernel's page directory
 page_directory_t *kernel_directory = 0;
+uint32_t kern_dir_phys;
 // The current page directory;
 page_directory_t *current_directory = 0;
 
@@ -115,6 +116,8 @@ void free_frame(page_t* page) {
  * Initialises paging and sets up page tables.
  */
 void paging_init() {
+	kheap = NULL;
+
 	// The size of physical memory. For the moment we 
 	// assume it is 32MB big.
 	uint32_t mem_end_page = 0x02000000;
@@ -123,8 +126,8 @@ void paging_init() {
 
 	frames = (uint32_t *) kmalloc(INDEX_FROM_BIT(nframes));
 	memclr(frames, INDEX_FROM_BIT(nframes));
-	
-	// Let's make a page directory.
+
+	// Allocate mem for a page directory.
 	kernel_directory = (page_directory_t *) kmalloc_a(sizeof(page_directory_t));
 
 	ASSERT(kernel_directory != NULL);
@@ -132,13 +135,11 @@ void paging_init() {
 	memclr(kernel_directory, sizeof(page_directory_t));
 	current_directory = kernel_directory;
 
-	kheap = 0;
-
 	// Map some pages in the kernel heap area.
 	// Here we call get_page but not alloc_frame. This causes page_table_t's 
 	// to be created where necessary. We can't allocate frames yet because they
 	// they need to be identity mapped first below, and yet we can't increase
-	// placement_address between identity mapping and enabling the heap!
+	// placement_address between identity mapping and enabling the heap
 	uint32_t i = 0;
 	for(i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000) {
 		paging_get_page(i, true, kernel_directory);
@@ -165,13 +166,13 @@ void paging_init() {
 	// Also allocate a little bit extra so the kernel heap can be
 	// initialised properly.
 	i = 0x00000000;
-	while(i < (kheap_placement_address & 0x0FFFFFFF) + 0x1000) { // 
+	while(i < (kheap_placement_address & 0x0FFFFFFF) + 0x1000) {
 		// Kernel code is readable but not writeable from userspace.
 		alloc_frame(paging_get_page(i, true, kernel_directory), false, false);
 		i += 0x1000;
 	}
 
-	// Now allocate those pages we mapped earlier.
+	// Allocate pages mapped earlier.
 	for(i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000) {
 		alloc_frame(paging_get_page(i, false, kernel_directory), false, false);
 	}
@@ -191,10 +192,15 @@ void paging_init() {
 		}
 	}
 
-	// Now, enable paging!
+	// Convert kernel directory address to physical and save it
+	kern_dir_phys = (uint32_t) &kernel_directory->tablesPhysical;
+	kern_dir_phys &= 0x0FFFFFFF;
+	kern_dir_phys += 0x00100000;
+
+	// Enable paging
 	paging_switch_directory(kernel_directory);
 
-	// Initialise the kernel heap.
+	// Initialise a kernel heap
 	kheap = create_heap(KHEAP_START, KHEAP_START+KHEAP_INITIAL_SIZE, 0xCFFFF000, false, false);
 }
 
