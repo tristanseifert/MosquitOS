@@ -5,6 +5,8 @@
 
 #define SVGA_DEFAULT_MODE 0x117
 
+#define SVGA_24TO16BPP(x) ((x & 0xF80000) >> 8) | ((x & 0xFC00) >> 5) | ((x & 0xF8) >> 3)
+
 typedef struct svga_mode_info {
 	uint16_t attributes;
 	uint8_t windowA, windowB;

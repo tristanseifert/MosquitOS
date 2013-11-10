@@ -21,12 +21,11 @@ static bool next_char_is_escape_seq, is_bold;
 
 // Colour code -> 16bpp
 static uint16_t fb_console_col_map[16] = {
-	0x0000, 0xFFFF, 0xF800, 0x07E0, 
-	0x001F, 0x0000, 0x0000, 0x0000,
+	SVGA_24TO16BPP(0x000000), SVGA_24TO16BPP(0x1d01b7), SVGA_24TO16BPP(0x2cb600), SVGA_24TO16BPP(0x39b7b8), 
+	SVGA_24TO16BPP(0xb7000b), SVGA_24TO16BPP(0xb700b7), SVGA_24TO16BPP(0xb76809), SVGA_24TO16BPP(0xb7b7b7),
 
-	// 0x08-0x0F are black (unused)
-	0x00000000, 0x00000000, 0x00000000, 0x00000000,
-	0x00000000, 0x00000000, 0x00000000, 0x00000000
+	SVGA_24TO16BPP(0x686868), SVGA_24TO16BPP(0x6868ff), SVGA_24TO16BPP(0x68ff68), SVGA_24TO16BPP(0x68fffe),
+	SVGA_24TO16BPP(0xf86868), SVGA_24TO16BPP(0xfb68ff), SVGA_24TO16BPP(0xfcff67), SVGA_24TO16BPP(0xffffff)
 };
 
 /*
@@ -51,7 +50,7 @@ void fb_console_init() {
 
 	is_bold = false;
 	next_char_is_escape_seq = false;
-	fg_colour = 0x01;
+	fg_colour = 0x0F;
 	bg_colour = 0x00;
 
 	//kprintf("Screen mode %ix%i, %i bpp\n", width, height, svga_mode_info->bpp);
@@ -82,25 +81,40 @@ void fb_console_putchar(unsigned char c) {
 	} else { // Handle printing of a regular character
 		// Characters are 16 px tall, i.e. 0x10 bytes in stored rep
 		uint8_t *read_ptr = ((is_bold) ? font_bold : font_reg) + (c * CHAR_HEIGHT);
-		uint16_t *write_ptr = (uint16_t *) video_base + ((row * CHAR_HEIGHT) * (bytesPerLine / depth)) + (col * CHAR_WIDTH);
+		uint32_t *write_ptr = (uint32_t *) video_base + ((row * CHAR_HEIGHT) * (bytesPerLine / depth) / 2) + (col * CHAR_WIDTH/2);
 
 		static const uint8_t x_to_bitmap[CHAR_WIDTH] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
+		static uint8_t fontChar;
+		static uint32_t out;
 
 		for(uint8_t y = 0; y < CHAR_HEIGHT; y++) {
-			uint8_t fontChar = read_ptr[y];
+			fontChar = read_ptr[y];
 
-			for(uint8_t x = 0; x < CHAR_WIDTH; x++) {
-				if(x_to_bitmap[x] & fontChar) {
-					write_ptr[x] = fb_console_col_map[fg_colour];
+			// This loop processes two pixels at once for maximum throughput.
+			for(uint8_t x = 0; x < CHAR_WIDTH/2; x++) {
+				// Left pixel
+				if(x_to_bitmap[(x*2)] & fontChar) {
+					out = fb_console_col_map[fg_colour] << 0x10;
 				} else {
-					write_ptr[x] = fb_console_col_map[bg_colour];
+					out = fb_console_col_map[bg_colour] << 0x10;
 				}
+
+				// Right pixel
+				if(x_to_bitmap[(x*2) + 1] & fontChar) {
+					out |= fb_console_col_map[fg_colour];
+				} else {
+					out |= fb_console_col_map[bg_colour];
+				}
+
+				// Write two pixels at once
+				write_ptr[x] = out;
 			}
 		
-			// go to next line
-			write_ptr += (bytesPerLine / depth);
+			// Go to next line
+			write_ptr += (bytesPerLine / depth)/2;
 		}
 
+		// Increment column and check row
 		col++;
 
 		if(col > (width / CHAR_WIDTH)) {
@@ -131,14 +145,4 @@ void fb_console_control(unsigned char c) {
 void fb_console_set_font(void* reg, void* bold) {
 	if(reg) font_reg = reg;
 	if(bold) font_bold = bold;
-}
-
-/*
- * Maps a console colour to an RGB colour by changing VGA DAC.
- */
-void fb_console_set_colour(uint8_t index, uint32_t rgb) {
-	io_outb(0x3C8, index);
-	io_outb(0x3C9, (rgb >> 0x10) & 0xFF);
-	io_outb(0x3C9, (rgb >> 0x08) & 0xFF);
-	io_outb(0x3C9, rgb & 0xFF);
 }
