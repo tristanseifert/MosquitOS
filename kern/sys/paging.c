@@ -260,8 +260,6 @@ void paging_page_fault_handler(err_registers_t regs) {
 	int reserved = regs.err_code & 0x8;	  // Overwritten CPU-reserved bits of page entry?
 	int id = regs.err_code & 0x10;			 // Caused by an instruction fetch?
 
-	terminal_setPos(0, 0);
-
 	kprintf("Page fault! ( ");
 	if (present) {kprintf("present ");}
 	if (rw) {kprintf("read-only ");}

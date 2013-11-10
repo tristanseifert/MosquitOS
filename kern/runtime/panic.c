@@ -8,8 +8,6 @@ void panic_assert(char *file, uint32_t line, char *desc) {
 	// An assertion failed, and we have to panic.
 	__asm__ volatile("cli"); // Disable interrupts.
 
-	terminal_initialize(true);
-
 	kprintf("ASSERTION FAILED(%s) at %s:%i\n", desc, file, line);
 	
 	// Halt by going into an infinite loop.
@@ -19,8 +17,6 @@ void panic_assert(char *file, uint32_t line, char *desc) {
 void panic(char *message, char *file, uint32_t line) {
 	// We encountered a massive problem and have to stop.
 	__asm__ volatile("cli"); // Disable interrupts.
-
-	terminal_initialize(false);
 
 	kprintf("PANIC(%s) at %s:%i\n", message, file, line);
 

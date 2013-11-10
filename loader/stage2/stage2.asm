@@ -139,6 +139,15 @@ boot:
 	xor		bh, bh												; Video page 0 (BH = 0)
 	int		$10													; Set cursor
 
+	; Go into SVGA mode $101 (640x480x8bpp)
+	mov		bx, $8101											; SVGA mode
+	mov		ax, $4F02											; SVGA routine calls
+	int		$10													; Call video BIOS
+
+;	mov		ax, $0013
+;	int		$10
+
+
 	; Set up GDT
 	cli															; Disable ints
 	lgdt	[gdt_table]											; Set up GDTR

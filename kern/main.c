@@ -1,4 +1,5 @@
 #include "types.h"
+#include "sys/kinfo.h"
 #include "sys/system.h"
 #include "sys/kheap.h"
 #include "sys/paging.h"
@@ -7,7 +8,7 @@
 #include "device/rs232.h"
 #include "runtime/error_handler.h"
  
-extern uint32_t kern_bss_start, kern_end, kern_size, kern_data_start, kern_code_start;
+extern uint32_t __kern_size, __kern_bss_start;
 
 #if defined(__cplusplus)
 extern "C" /* Use C linkage for kernel_main. */
@@ -20,8 +21,8 @@ void kernel_main() {
 	uint32_t eax, ebx, ecx, edx;
 	cpuid(1, eax, ebx, ecx, edx);
 
-	kprintf("MosquitOS Kernel v0.1 compiled %s on %s\n", __DATE__, __TIME__);
-	kprintf("Kernel size: 0x%x\n", kern_size);
+	kprintf("\x01\x11MosquitOS\x01\x10 Kernel v0.1 compiled %s on %s with %s\n", KERN_BDATE, KERN_BTIME, KERN_COMPILER);
+	kprintf("Kernel size: 0x%X\n", __kern_size);
 
 	if(edx & CPUID_FEAT_EDX_SSE) {
 		kprintf("CPU supports SSE\n");
@@ -79,7 +80,7 @@ void kernel_main() {
 		entry++;
 	}
 
-	kprintf("\n\nTotal usable memory (bytes): 0x%X\n", total_usable_RAM);
+	kprintf("\n\nTotal usable memory (bytes): 0x%X\n\n", total_usable_RAM);
 
 	/*kprintf("Attempting to switch contexts...\n");
 	__asm__("mov $0xDEADC0DE, %edx; int $0x88");
@@ -97,10 +98,6 @@ void kernel_main() {
  * Called BEFORE kernel_main, so kernel structures may NOT be accessed!
  */
 void kernel_init() {
-/*	for(int i = 0; i < ((__end - __bss) / 4); i++) {
-		__bss[i] = 0;
-	}*/
-
 	extern heap_t *kheap;
 	kheap = 0;
 }

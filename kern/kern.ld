@@ -13,24 +13,30 @@ SECTIONS {
 	 */
 	. = 0xC0000000;
 
-	kern_code_start = .;
+	__kern_code_start = .;
 	.text : {
 		*(.text);
-	}
-
-	/* Data segment */
-	kern_data_start = .;
-	.rodata : {
-		*(.data);
 		*(.rodata);
 	}
 
-	/* Read-write data (uninitialized) and stack */
-	kern_bss_start = .;
-	.bss : {
-		*(.bss);
+	/* Data segment */
+	. = ALIGN(4);
+	__kern_data_start = .;
+	.rodata : {
+		*(.data);
 	}
-    kern_end = .;
-    
-    kern_size = kern_bss_start - kern_code_start;
+
+	/* Read-write data (uninitialized) and stack */
+	. = ALIGN(4);
+	__kern_bss_start = .;
+	
+	.bss : {
+		*(.bss COMMON);
+	}
+
+	. = ALIGN(4);
+	__kern_end = .;
+
+	__kern_bss_size = __kern_end - __kern_bss_start;
+	__kern_size = __kern_bss_start - __kern_code_start;
 }
