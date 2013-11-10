@@ -3,7 +3,6 @@
 
 #include "vga/fb_console.h"
 #include "console.h"
-#include "terminal.h"
 #include "device/rs232.h"
 
 #define printf tfp_printf 

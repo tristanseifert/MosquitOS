@@ -14,27 +14,26 @@ SECTIONS {
 	. = 0xC0000000;
 
 	__kern_code_start = .;
+
 	.text : {
 		*(.text);
-		*(.rodata);
 	}
 
 	/* Data segment */
-	. = ALIGN(4);
 	__kern_data_start = .;
+
 	.rodata : {
+		*(.rodata);
 		*(.data);
 	}
 
 	/* Read-write data (uninitialized) and stack */
-	. = ALIGN(4);
 	__kern_bss_start = .;
-	
+
 	.bss : {
 		*(.bss COMMON);
 	}
 
-	. = ALIGN(4);
 	__kern_end = .;
 
 	__kern_bss_size = __kern_end - __kern_bss_start;

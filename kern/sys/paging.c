@@ -3,7 +3,7 @@
 #include "paging.h"
 #include "kheap.h"
 #include "runtime/error_handler.h"
-#include "io/terminal.h"
+#include "vga/svga.h"
 
 // The kernel's page directory
 page_directory_t *kernel_directory = 0;
@@ -155,6 +155,24 @@ void paging_init() {
 		page->frame = (((i & 0x0FFFF000) + 0x100000) >> 12);
 	}
 
+	// Map selected VESA mode's framebuffer to 0xD0000000 (2MB of framebuffer)
+	svga_mode_info_t *svga_mode_info = svga_mode_get_info(SVGA_DEFAULT_MODE);
+
+	uint32_t fb_addr;
+	uint32_t fb_real_addr = svga_mode_info->physbase;
+	for(i = 0xD0000000; i < 0xD01FF000; i += 0x1000) {
+		page_t* page = paging_get_page(i, true, kernel_directory);
+
+		fb_addr = (i & 0x0FFFF000) + fb_real_addr;
+
+		page->present = 1;
+		page->rw = 1;
+		page->user = 0;
+		page->frame = fb_addr >> 12;
+		
+		//kprintf("Allocated 0x%X -> 0x%X\n", i, fb_addr);
+	}
+
 	// We need to identity map (phys addr = virt addr) from
 	// 0x0 to the end of used memory, so we can have access to the
 	// low memory.
@@ -270,4 +288,11 @@ void paging_page_fault_handler(err_registers_t regs) {
 	while(1);
 
 	PANIC("Page Fault");
+}
+
+/*
+ * Flushes an address out of the MMU's cache.
+ */
+void paging_flush_tlb(uint32_t addr) {
+	__asm__ volatile("invlpg (%0)" : : "r" (addr) : "memory");
 }

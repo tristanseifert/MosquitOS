@@ -1,6 +1,5 @@
 #include <types.h>
 #include "panic.h"
-#include "io/terminal.h"
 
 extern void panic_halt_loop(void);
 

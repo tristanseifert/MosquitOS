@@ -2,13 +2,13 @@ CC=i686-pc-elf-gcc
 AS=i686-pc-elf-as
 
 # Freestanding binary, strip extra shits
-CFLAGS= -c -funroll-loops -finline-functions -g -Wall -fno-builtin -static\
-		-mno-sse2 -O2\
+CFLAGS= -c -finline-functions -g -Wall -fno-builtin -static\
+		-mno-sse2 -Os\
 		-nostartfiles -nodefaultlibs -std=c99 -Wno-unused-variable \
 		-mfpmath=387 -fno-stack-protector -I/Users/tristanseifert/SquelchenOS/kern/\
 		-Wno-unused-function
 
-CFLAGSNOOPT = $(filter-out -O2,$(CFLAGS))
+CFLAGSNOOPT = $(filter-out -Os,$(CFLAGS))
 
 ASFLAGS =
 

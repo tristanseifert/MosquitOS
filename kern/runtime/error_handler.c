@@ -1,6 +1,4 @@
 #include <types.h>
-#include <device/vga.h>
-#include <io/terminal.h>
 #include <sys/system.h>
 #include <sys/paging.h>
 
@@ -70,7 +68,6 @@ void error_dump_regs(err_registers_t regs) {
 	for(uint8_t i = 0; i < 18; i+=2) {
 		kprintf("%s: 0x%8X\t %s: 0x%8X\n", &reg_names[i], registers[i], &reg_names[i+1], registers[i+1]);
 	}
-
 
 	// Halt by going into an infinite loop.
 	panic_halt_loop();

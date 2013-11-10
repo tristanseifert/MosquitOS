@@ -9,6 +9,6 @@ void fb_console_putchar(unsigned char c);
 void fb_console_control(unsigned char c);
 
 void fb_console_set_font(void* reg, void* bold);
-void fb_console_set_col(uint8_t index, uint32_t rgb);
+void fb_console_set_colour(uint8_t index, uint32_t rgb);
 
 #endif

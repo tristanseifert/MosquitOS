@@ -7,19 +7,23 @@ kern_loc_phys:			EQU kern_loc<<4
 kern_start:				EQU 6
 kern_len:				EQU 32									; Length in sectors
 
+SVGA_Mode:				EQU $117
+
 ; Location to store various BIOS info at
 Kern_Info_Struct:		EQU $0160								; $001600 phys (len = $400 max)
 Kern_Info_StructPhys:	EQU (Kern_Info_Struct<<4)
 VESA_SupportedModes:	EQU	$01A0								; $001A00 phys (len = $200)
-BIOS_MemMapSeg:			EQU	$0200								; $002000 phys (len = $800 max)
+VESA_ModeInfos:			EQU	$01C0								; $001C00 phys (len = $100)
+
+BIOS_MemMapSeg:			EQU	$0300								; $003000 phys (len = $800 max)
 
 ; Physical protected mode addresses
-MMU_PageDir:			EQU $003000
-MMU_PageTable1:			EQU $004000
-MMU_PageTable2:			EQU $005000
-MMU_PageTable3:			EQU $006000
-MMU_PageTable4:			EQU $007000
-MMU_PageTable5:			EQU $008000
+MMU_PageDir:			EQU $004000
+MMU_PageTable1:			EQU $005000
+MMU_PageTable2:			EQU $006000
+MMU_PageTable3:			EQU $007000
+MMU_PageTable4:			EQU $008000
+MMU_PageTable5:			EQU $009000
 
 ;	+$00 uint32_t munchieValue; // Should be "KERN"
 ;	+$04 uint16_t supportBits;
@@ -66,6 +70,14 @@ stage2_start:
 
 	mov		ax, $4F00											; VESA BIOS routines — get supported modes
 	int		$10													; Perform lookup
+
+	mov		ax, VESA_ModeInfos									; Buffer
+	mov		es, ax
+	xor		di, di												; Offset 0 into buffer
+	mov		ax, $4F01											; Get VESA mode info function
+	mov		cx, SVGA_Mode										; Mode to get info for
+	int		$10
+
 
 	test	ah, ah												; Is AH not zero (i.e. error)
 	je		.vesaDone											; If so, VESA is unsupported
@@ -139,20 +151,16 @@ boot:
 	xor		bh, bh												; Video page 0 (BH = 0)
 	int		$10													; Set cursor
 
-	; Go into SVGA mode $101 (640x480x8bpp)
-	mov		bx, $8101											; SVGA mode
+	; Go into SVGA mode specified, linear framebuffer, clear memory
+	mov		bx, ($4000 | SVGA_Mode)								; SVGA mode
 	mov		ax, $4F02											; SVGA routine calls
 	int		$10													; Call video BIOS
-
-;	mov		ax, $0013
-;	int		$10
-
 
 	; Set up GDT
 	cli															; Disable ints
 	lgdt	[gdt_table]											; Set up GDTR
 
-	; Jump into protected mode, woot!
+	; Enable protected mode
 	mov		eax, cr0											; Get control reg
 	or		al, 00000001b										; Set PE bit
 	mov		cr0, eax											; Write control reg
@@ -173,6 +181,7 @@ boot:
 	dd		copy_kernel											; Jump to kernel copying routine
 	dw		$08													; Selector for CODE32_DESCRIPTOR
 
+	; Protected mode code runs as 32-bits
 	BITS	32
 copy_kernel:
 	mov		esp, $400000										; Stackzors at $400000
@@ -238,7 +247,7 @@ copy_kernel:
 	loop	.fillPageTable2
 
 
-	; Set paging directory to CR3
+	; Set paging directory in CR3
 	mov		eax, MMU_PageDir
 	mov		cr3, eax
 
@@ -250,8 +259,8 @@ copy_kernel:
 	; Jump into kernel
 	jmp		$0C0000000
 
+	; Rest of bootloader runs in real mode, so 16-bit code
 	BITS	16
-
 ;========================================================================================
 ; Renders the partition chooser
 ;========================================================================================

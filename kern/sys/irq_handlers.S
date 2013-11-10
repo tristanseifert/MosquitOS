@@ -58,7 +58,7 @@ sys_timer_tick_irq:
 .globl	sys_page_fault_irq
 sys_page_fault_irq:
 	pushal
-	call	sys_page_fault_handler
+	call	paging_page_fault_handler
 	popal
 	iretl
 
@@ -171,10 +171,6 @@ isr13:
 	cli                 										# Disable interrupts
 	pushl	$0x0D												# Push the interrupt number
 	jmp		error_common_stub									# Go to our common handler.
-isr14:
-	cli                 										# Disable interrupts
-	pushl	$0x0E												# Push the interrupt number
-	jmp		error_common_stub									# Go to our common handler.
 isr15:
 	cli                 										# Disable interrupts
 	pushl	$0x00												# Push a dummy error code
@@ -195,6 +191,33 @@ isr18:
 	pushl	$0x00												# Push a dummy error code
 	pushl	$0x12												# Push the interrupt number
 	jmp		error_common_stub									# Go to our common handler.
+
+isr14:
+	cli                 										# Disable interrupts
+	pushl	$0x0E												# Push the interrupt number
+	pusha														# Pushes edi,esi,ebp,esp,ebx,edx,ecx,eax
+
+	mov		%ds, %ax											# Lower 16-bits of eax = ds.
+	push	%eax												# save the data segment descriptor
+
+	mov 	$0x10, %ax											# load the kernel data segment descriptor
+	mov 	%ax, %ds
+	mov 	%ax, %es
+	mov 	%ax, %fs
+	mov 	%ax, %gs
+
+	call	paging_page_fault_handler							# Go to our page fault handler.
+	
+	pop 	%eax												# reload the original data segment descriptor
+	mov 	%ax, %ds
+	mov 	%ax, %es
+	mov 	%ax, %fs
+	mov 	%ax, %gs
+
+	popa														# Pops edi,esi,ebp...
+	add 	$0x8, %esp											# Cleans up the pushed error code and pushed ISR number
+	sti
+	iret														# pops 5 things at once: CS, EIP, EFLAGS, SS, and ESP
 
 /*
  * BSoD handler

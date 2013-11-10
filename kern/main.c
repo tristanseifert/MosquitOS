@@ -3,8 +3,8 @@
 #include "sys/system.h"
 #include "sys/kheap.h"
 #include "sys/paging.h"
-#include "io/terminal.h"
 #include "io/ps2.h"
+#include "vga/svga.h"
 #include "device/rs232.h"
 #include "runtime/error_handler.h"
  
@@ -80,7 +80,14 @@ void kernel_main() {
 		entry++;
 	}
 
-	kprintf("\n\nTotal usable memory (bytes): 0x%X\n\n", total_usable_RAM);
+	kprintf("\n\nTotal usable memory (bytes): 0x%X\n", total_usable_RAM);
+	
+	svga_mode_info_t *svga_mode_info = svga_mode_get_info(0x101);
+	kprintf("Mode 0x101 framebuffer: 0x%X\n", svga_mode_info->physbase);
+
+/*	uint32_t *doomen = 0x1800DEAD;
+	uint32_t test = *doomen;
+	kprintf("Pagefaulting read: 0x%X\n", test);*/
 
 	/*kprintf("Attempting to switch contexts...\n");
 	__asm__("mov $0xDEADC0DE, %edx; int $0x88");

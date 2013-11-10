@@ -38,4 +38,6 @@ page_t* paging_get_page(uint32_t address, bool make, page_directory_t* dir);
 
 void paging_page_fault_handler();
 
+void paging_flush_tlb(uint32_t addr);
+
 #endif

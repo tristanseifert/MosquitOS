@@ -1,5 +1,4 @@
 #include <types.h>
-#include "io/terminal.h"
 #include "syscall.h"
 #include "system.h"
 #include "sched.h"

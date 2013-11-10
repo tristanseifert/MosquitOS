@@ -25,6 +25,8 @@ extern void sys_rs232_irq_handler2(void);
 
 static uint16_t rs232_to_io_map[4] = {0x3F8, 0x2F8, 0x3E8, 0x2E8};
 
+static bool tx_fifo_free;
+
 // Structs describing each port's buffers
 static rs232_buffer_t rs232_buffer_ptrs[4];
 
@@ -102,7 +104,7 @@ void rs232_write(rs232_port_t port, size_t num_bytes, void* data) {
 			io_outb(portnum, *data_read++);
 		}
 	} else {
-		for(int i = 0; i < num_bytes; i++) {
+		for(int i = 0; i < 16; i++) {
 			io_outb(portnum, *data_read++);
 		}
 
