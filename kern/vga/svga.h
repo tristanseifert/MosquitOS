@@ -5,6 +5,7 @@
 
 #define SVGA_DEFAULT_MODE 0x117
 
+// RRRRR GGGGGG BBBBB
 #define SVGA_24TO16BPP(x) ((x & 0xF80000) >> 8) | ((x & 0xFC00) >> 5) | ((x & 0xF8) >> 3)
 
 typedef struct svga_mode_info {

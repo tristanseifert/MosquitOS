@@ -58,7 +58,7 @@ void system_init() {
 	sys_build_gdt();
 	sys_build_idt();
 	sys_setup_ints();
-	
+
 	// Set up the TSS and their stacks
 	sys_init_tss();
 

@@ -3,6 +3,9 @@
 
 #include <types.h>
 
+#define CONSOLE_BOLD "\x01\x11"
+#define CONSOLE_REG "\x01\x10"
+
 // Initialises the console.
 void console_init();
 void kprintf(char *fmt, ...);

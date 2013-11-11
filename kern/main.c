@@ -5,6 +5,7 @@
 #include "sys/paging.h"
 #include "io/ps2.h"
 #include "vga/svga.h"
+#include "vga/gui.h"
 #include "device/rs232.h"
 #include "runtime/error_handler.h"
  
@@ -26,8 +27,8 @@ void kernel_main() {
 
 	if(edx & CPUID_FEAT_EDX_SSE) {
 		kprintf("CPU supports SSE\n");
-	}
-
+	}	
+	
 	if(ps2_init() != 0) {
 		kprintf("ERROR: Could not initialise PS2 driver\n");
 	}
@@ -80,10 +81,27 @@ void kernel_main() {
 		entry++;
 	}
 
-	kprintf("\n\nTotal usable memory (bytes): 0x%X\n", total_usable_RAM);
+	kprintf(CONSOLE_BOLD "\nTotal usable memory (bytes): 0x%X\n" CONSOLE_REG, total_usable_RAM);
 	
 	svga_mode_info_t *svga_mode_info = svga_mode_get_info(0x101);
 	kprintf("Mode 0x101 framebuffer: 0x%X\n", svga_mode_info->physbase);
+	gui_set_screen_mode(svga_mode_info);
+
+	window_t *window = malloc(sizeof(window_t));
+
+	window->position.pt.x = 32;
+	window->position.pt.y = 32;
+	window->position.size.width = 320;
+	window->position.size.height = 240;
+	window->isDialogue = false;
+	window->isActive = true;
+
+	framebuffer_t* fb = malloc(sizeof(framebuffer_t));
+	fb->ptr = (uint16_t *) 0xD0000000;
+	fb->size.width = 1024;
+	fb->size.height = 768;
+
+	gui_draw_window_frame(fb, window);
 
 /*	uint32_t *doomen = 0x1800DEAD;
 	uint32_t test = *doomen;
