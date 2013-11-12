@@ -12,7 +12,7 @@ CFLAGSNOOPT = $(filter-out -Os,$(CFLAGS))
 
 ASFLAGS =
 
-all: setup runtime drivers io vga system fs loader kernel clean
+all: setup runtime drivers io vga system fs bus loader kernel clean
 
 # Clean up from previous build
 clean:
@@ -61,6 +61,10 @@ fs: fs/*.c
 # Video-related modules
 vga: vga/*.c
 	$(CC) $(CFLAGS) -ffreestanding vga/*.c
+
+# Modules for interfacing with various busses (PCI, ISA, etc)
+bus: bus/*.c
+	$(CC) $(CFLAGS) -ffreestanding bus/*.c
 
 # Assembly loader
 loader: entry.s
