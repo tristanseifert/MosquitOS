@@ -6,30 +6,35 @@ Therefore, the MosquitOS kernel exposes an interface that filesystem modules can
 In order to allow modules to register and interract with the kernel, it exposes the following functions:
 
 ## `fs_register`
-Registers a filesystem with the kernel. The only argument is a struct of type `fs_type_t`, which identifies the fileystem type to the kernel. This struct is defined as follows:
+Registers a filesystem with the kernel. The only argument is a pointer to a struct of type `fs_type_t`, which identifies the fileystem type to the kernel. This struct is defined as follows:
 
 	typedef struct fs_type {
 		const char *name;
 		uint32_t flags;
+		uint32_t handle; // set by kernel, should be 0
 	
 		kern_module_t *owner;
 
 		fs_superblock_t* (*create_super) (fs_superblock_t*, partition_t*);
+
+		struct fs_type *next; // held internally as linked list
 	} fs_type_t;
 
 
-Theis kernel function will return an identifier logical `OR`ed with `0x80000000`, or an error code between `0x00000000` to `0x7FFFFFFF`. Later calls to the kernel filesystem API should use this handle to identify the filesystem to the kernel.
+This kernel function will return an identifier logical `OR`ed with `0x80000000`, or an error code between `0x00000000` to `0x7FFFFFFF`. Later calls to the kernel filesystem API should use this handle to identify the filesystem to the kernel.
 
-### `create_super` function pointer
-`create_super` is a function pointer to a function in the filesystem module that will read the required filesystem information from the partition specified in the second argument, then create a superblock from this information and place it into the memory pointed by the first argument. 
-
-If there is an error while creating the superblock, the function shall return `NULL`, otherwise the original superblock pointer.
+Note that the pointer to the `fs_type_t` struct must remain valid for the entire time the filesystem is loaded into the kernel. Deallocate the memory only when it has been successfully unloaded.
 
 ## `fs_deregister`
-Takes the handle (logical `AND`ed with `0x7FFFFFFF`) returned by `fs_register` and removes it from the kernel's table of supported filesystems.
+Takes a previously-registered filesystem (pointer to the `fs_type_t` struct used to register the filesystem) and removes it from the kernel's list of supported filesystems.
 
 Note that any partitions that utilise this filesystem module and are currently mounted *must* be unmounted before this module can be unloaded, or an error will be returned.
 
 On success, this function will return 0, otherwise an error code will be returned.
 
 Note that any memory held by the filesystem module has to be released by it when unloading, as the kernel does not keep track of the memory allocated by the module. If not released, it will linger around forever as 'zombie' memory blocks that cannot be re-allocated.
+
+### `create_super` function pointer
+`create_super` is a function pointer to a function in the filesystem module that will read the required filesystem information from the partition specified in the second argument, then create a superblock from this information and place it into the memory pointed by the first argument. 
+
+If there is an error while creating the superblock, the function shall return `NULL`, otherwise the original superblock pointer.
