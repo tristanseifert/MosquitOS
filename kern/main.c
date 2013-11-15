@@ -7,6 +7,8 @@
 #include "vga/svga.h"
 #include "vga/gui.h"
 #include "device/rs232.h"
+#include "io/disk.h"
+#include "device/ata_pio.h"
 #include "runtime/error_handler.h"
  
 extern uint32_t __kern_size, __kern_bss_start;
@@ -28,7 +30,7 @@ void kernel_main() {
 	if(edx & CPUID_FEAT_EDX_SSE) {
 		kprintf("CPU supports SSE\n");
 	}	
-	
+
 	if(ps2_init() != 0) {
 		kprintf("ERROR: Could not initialise PS2 driver\n");
 	}
@@ -87,7 +89,18 @@ void kernel_main() {
 	kprintf("Mode 0x101 framebuffer: 0x%X\n", svga_mode_info->physbase);
 	gui_set_screen_mode(svga_mode_info);
 
-	window_t *window = malloc(sizeof(window_t));
+	// Disk test
+	disk_t *hda0 = disk_allocate();
+	ata_driver_init(hda0);
+	DISK_ERROR ret = disk_init(hda0);
+
+	if(ret == kDiskErrorNone) {
+		kprintf("hda0 initialised successfully\n");
+	} else {
+		kprintf("hda0 initialisation error: 0x%X\n", ret);
+	}
+
+/*	window_t *window = malloc(sizeof(window_t));
 
 	window->position.pt.x = 32;
 	window->position.pt.y = 32;
@@ -101,7 +114,7 @@ void kernel_main() {
 	fb->size.width = 1024;
 	fb->size.height = 768;
 
-	gui_draw_window_frame(fb, window);
+	gui_draw_window_frame(fb, window); */
 
 /*	uint32_t *doomen = 0x1800DEAD;
 	uint32_t test = *doomen;

@@ -35,28 +35,28 @@ void error_dump_regs(err_registers_t regs) {
 		"Machine Check Exception"
 	};
 
-	kprintf("\n\n%s\nError code: %X\n\n", &err_names[regs.int_no], regs.err_code);
+	kprintf("\n\n\x01\x11%s\x01\x10\nError code: 0x%X\n\n", &err_names[regs.int_no], regs.err_code);
 
 	// Dump the registers now.
-	static char reg_names[18][8] = {
-		" DS: 0x",
-		"EDI: 0x",
-		"ESI: 0x",
-		"EBP: 0x",
-		"ESP: 0x",
-		"EBX: 0x",
-		"EDX: 0x",
-		"ECX: 0x",
-		"EAX: 0x",
-		"EIP: 0x",
-		" CS: 0x",
-		"EFG: 0x",
-		"USP: 0x",
-		" SS: 0x",
-		"CR0: 0x",
-		"CR1: 0x",
-		"CR2: 0x",
-		"CR3: 0x",
+	static char reg_names[18][4] = {
+		" DS",
+		"EDI",
+		"ESI",
+		"EBP",
+		"ESP",
+		"EBX",
+		"EDX",
+		"ECX",
+		"EAX",
+		"EIP",
+		" CS",
+		"EFG",
+		"USP",
+		" SS",
+		"CR0",
+		"CR1",
+		"CR2",
+		"CR3",
 	};
 
 	uint32_t registers[18] = {

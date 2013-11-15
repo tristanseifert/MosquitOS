@@ -3,6 +3,21 @@
 
 #include "disk.h"
 
+/*
+ * Allocates memory for a disk.
+ */
+disk_t* disk_allocate() {
+	disk_t *disk = (disk_t *) kmalloc(sizeof(disk_t));
+	disk->driver_calls = (void *) kmalloc(sizeof(driver_functions_t));
+
+	kprintf("Allocated disk struct at 0x%X (driver calls at 0x%X)\n", disk, disk->driver_calls);
+
+	return disk;
+}
+
+/*
+ * Various wrappers that call the driver's functions for the disk.
+ */
 DISK_ERROR disk_reset(disk_t* disk) {
 	driver_functions_t* functions = disk->driver_calls;
 	return functions->disk_reset(disk);

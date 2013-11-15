@@ -19,7 +19,7 @@ typedef enum {
 typedef struct disk_info_struct {
 	uint8_t disk_id;
 	uint8_t bus;
-	bool masterOrServant;
+	uint8_t drive_id;
 
 	// Tells the disk driver what physical device driver to use
 	disk_interface_t connection;
@@ -38,8 +38,10 @@ typedef struct driver_functions_struct {
 	DISK_ERROR (*disk_read)(disk_t*, uint64_t, uint32_t, void*);
 	DISK_ERROR (*disk_write)(disk_t*, uint64_t, uint32_t, void*);
 	DISK_ERROR (*disk_flush_cache)(disk_t*);
-	DISK_ERROR (*disk_erase)(disk_t*, uint64_t, uint8_t);
+	DISK_ERROR (*disk_erase)(disk_t*, uint64_t, uint32_t);
 } driver_functions_t;
+
+disk_t* disk_allocate();
 
 DISK_ERROR disk_reset(disk_t* disk);
 DISK_ERROR disk_init(disk_t* disk);
