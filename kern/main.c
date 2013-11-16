@@ -100,6 +100,15 @@ void kernel_main() {
 		kprintf("hda0 initialisation error: 0x%X\n", ret);
 	}
 
+	void *outBuff = (void *) kmalloc(0x1000);
+	ret = disk_read(hda0, 0, 2, outBuff);
+
+	if(ret == kDiskErrorNone) {
+		kprintf("hda0 read successfully\n");
+	} else {
+		kprintf("hda0 read error: 0x%X\n", ret);
+	}
+
 /*	window_t *window = malloc(sizeof(window_t));
 
 	window->position.pt.x = 32;

@@ -2,7 +2,8 @@
 #include "io/io.h"
 #include "ata_pio.h"
 
-void ata_do_pio_read(void* dest, uint32_t num_words, uint8_t bus);
+static void ata_do_pio_read(void* dest, uint32_t num_words, uint8_t bus);
+static char* ata_convert_string(void* in, size_t length);
 
 // Maps a bus to IO addresses
 static uint16_t ata_bus_to_ioaddr[4] = {ATA_BUS_0_IOADDR, ATA_BUS_1_IOADDR, 0x0000, 0x0000};
@@ -120,7 +121,7 @@ DISK_ERROR ata_init(disk_t* disk) {
 		}
 	}
 
-	kprintf("Drive ready.\n");
+	kprintf("OK.\nDrive ready.\n");
 
 	// Allocate memory for IDENTIFY response and read
 	info->ata_identify_info = (void *) kmalloc(0x200);
@@ -128,7 +129,7 @@ DISK_ERROR ata_init(disk_t* disk) {
 
 	kprintf("IDENTIFY response at 0x%X\n", info->ata_identify_info);
 
-	kprintf("HDD Model: %s\n", info->ata_identify_info+(27*2));
+	kprintf("HDD Model: %s\n", ata_convert_string(info->ata_identify_info+(27*2), 40));
 
 	return ATA_NO_ERR;
 }
@@ -137,6 +138,86 @@ DISK_ERROR ata_init(disk_t* disk) {
  * Reads num_sectors starting at lba from the disk to destination.
  */
 DISK_ERROR ata_read(disk_t* disk, uint64_t lba, uint32_t num_sectors, void* destination) {
+	kprintf("Reading %i sectors starting at LBA %i\n", num_sectors, lba);
+	ata_info_t* info = disk->driver_specific_data;
+	uint8_t bus = disk->bus;
+
+	// Wait for device to stop being busy
+	while((io_inb(ata_bus_to_ioaddr[bus] + 7) & 0x80));
+
+	// Select correct drive
+	io_outb(ata_bus_to_ioaddr[bus] + 6, (disk->drive_id == 0x01) ? 0x50 : 0x40);
+
+	// Set magic bits
+	io_outb(ata_bus_to_ioaddr[bus] + 6, 0x40);
+
+	// Write sector and LBA high
+	io_outb(ata_bus_to_ioaddr[bus] + 2, (num_sectors >> 8));
+	io_outb(ata_bus_to_ioaddr[bus] + 3, (lba >> 0x18)); // LBA4
+	io_outb(ata_bus_to_ioaddr[bus] + 4, (lba >> 0x20)); // LBA5
+	io_outb(ata_bus_to_ioaddr[bus] + 5, (lba >> 0x28)); // LBA6
+
+	// Write sector and LBA low
+	io_outb(ata_bus_to_ioaddr[bus] + 2, (num_sectors & 0xFF));
+	io_outb(ata_bus_to_ioaddr[bus] + 3, (lba && 0xFF)); // LBA1
+	io_outb(ata_bus_to_ioaddr[bus] + 4, (lba >> 0x08)); // LBA2
+	io_outb(ata_bus_to_ioaddr[bus] + 5, (lba >> 0x10)); // LBA3
+
+	// Send READ EXTENDED command
+	io_outb(ata_bus_to_ioaddr[bus] + 7, 0x24);
+
+	// Wait for BSY bit to become clear
+	kprintf("Waiting for BSY... ");
+	while((io_inb(ata_bus_to_ioaddr[bus] + 7) & 0x80));
+
+	// Wait for DRQ or ERR to set
+	kprintf("OK.\nWaiting for DRQ... ");
+	uint8_t ata_status = io_inb(ata_bus_to_ioaddr[bus] + 7);
+
+	while(true) {
+		ata_status = io_inb(ata_bus_to_ioaddr[bus] + 7);
+
+		// Is DRQ set?
+		if(ata_status & 0x08) {
+			break;
+		} else if(ata_status & 0x01) { // ERR is set
+			kprintf("Failed.\nDrive reports error or DREQ not asserted (0x%X)\n", ata_status);
+			return ATA_ERR_READ_ERR;
+		}
+	}
+
+	kprintf("OK.\nDrive ready. Beginning read\n");
+
+	uint16_t *outPtr = (uint16_t *) destination;
+
+	// Read 256-word blocks from the drive
+	for(int i = 0; i < num_sectors; i++) {
+		ata_do_pio_read(outPtr, 0x100, bus);
+		//destination += 0x100;
+
+		// Wait for BSY
+		kprintf("Waiting for BSY... ");
+		while((io_inb(ata_bus_to_ioaddr[bus] + 7) & 0x80));
+
+		// Wait for DRQ or ERR to set
+		kprintf("OK.\nWaiting for DRQ... ");
+		uint8_t ata_status = io_inb(ata_bus_to_ioaddr[bus] + 7);
+
+		while(true) {
+			ata_status = io_inb(ata_bus_to_ioaddr[bus] + 7);
+
+			// Is DRQ set?
+			if(ata_status & 0x08) {
+				break;
+			} else if(ata_status & 0x01) { // ERR is set
+				kprintf("Failed.\nDrive reports error or DREQ not asserted (0x%X)\n", ata_status);
+				return ATA_ERR_READ_ERR;
+			}
+		}
+
+		kprintf("OK.\n\nDrive ready. Reading block %i\n", i+1);
+	}
+
 	return ATA_NO_ERR;
 }
 
@@ -144,6 +225,8 @@ DISK_ERROR ata_read(disk_t* disk, uint64_t lba, uint32_t num_sectors, void* dest
  * Writes num_sectors to lba on the disk, reading from the memory at source.
  */
 DISK_ERROR ata_write(disk_t* disk, uint64_t lba, uint32_t num_sectors, void* source) {
+	ata_flush_cache(disk);
+
 	return ATA_NO_ERR;
 }
 
@@ -151,6 +234,15 @@ DISK_ERROR ata_write(disk_t* disk, uint64_t lba, uint32_t num_sectors, void* sou
  * Flushes the disk's cache
  */
 DISK_ERROR ata_flush_cache(disk_t* disk) {
+	ata_info_t* info = disk->driver_specific_data;
+	uint8_t bus = disk->bus;
+
+	// Wait for device to stop being busy
+	while((io_inb(ata_bus_to_ioaddr[bus] + 7) & 0x80));
+
+	// Send FLUSH CACHES command
+	io_outb(ata_bus_to_ioaddr[bus] + 7, 0xE7);
+
 	return ATA_NO_ERR;
 }
 
@@ -172,11 +264,35 @@ DISK_ERROR ata_get_status(disk_t* disk, int* destination) {
 /*
  * Performs a PIO read.
  */
-void ata_do_pio_read(void* dest, uint32_t num_words, uint8_t bus) {
+static void ata_do_pio_read(void* dest, uint32_t num_words, uint8_t bus) {
 	uint16_t *dest_array = (uint16_t *) dest;
 
 	// Read from PIO data port
 	for(int i = 0; i < num_words; i++) {
 		dest_array[i] = io_inw(ata_bus_to_ioaddr[bus]);
 	}
+}
+
+/*
+ * Performs the required byteswapping and endianness-changes on an ASCII string returned
+ * by a drive, as per the ATA specs, then converts it to a null-terminated C string.
+ */
+static char* ata_convert_string(void* in, size_t length) {
+	size_t str_len = length+2;
+	char *out = (char *) kmalloc(str_len);
+
+	uint16_t* str_ptr = (uint16_t *) in;
+	uint16_t* str_out_ptr = (uint16_t *) out;
+
+	uint16_t temp;
+
+	// Swap words
+	for(int i = 0; i < length/2; i++) {
+		temp = str_ptr[i];
+		str_out_ptr[i] = ((temp & 0xFF00) >> 0x08) | ((temp & 0x00FF) << 0x08);
+	}
+
+	out[str_len-1] = 0x00;
+
+	return out;
 }

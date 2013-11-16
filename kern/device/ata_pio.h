@@ -11,6 +11,8 @@
 #define ATA_ERR_NO_DRIVE 0xFF
 #define ATA_ERR_INIT_ERR 0xFE
 #define ATA_ERR_ATAPI_DRIVE 0xFD
+#define ATA_ERR_READ_ERR 0xFD
+#define ATA_ERR_READ_TIMEOUT 0xFC
 
 void ata_driver_init(disk_t* disk);
 
