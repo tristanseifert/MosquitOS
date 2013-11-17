@@ -10,6 +10,8 @@
 #include "io/disk.h"
 #include "device/ata_pio.h"
 #include "fs/mbr.h"
+#include "fs/vfs.h"
+#include "fs/fat.h"
 #include "runtime/error_handler.h"
  
 extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
@@ -28,6 +30,7 @@ void kernel_main() {
 	console_init();
 
 	system_init();
+	vfs_init();
 
 	kprintf("\x01\x11MosquitOS\x01\x10 Kernel v0.1 build %u compiled %s on %s with %s\n", (unsigned long) &KERN_BNUM, KERN_BDATE, KERN_BTIME, KERN_COMPILER);
 	kprintf("Kernel size: %i bytes (BSS at 0x%X, %i bytes)\n", &__kern_size, bss, bss_size);
@@ -97,16 +100,10 @@ void kernel_main() {
 		kprintf("hda0 initialisation error: 0x%X\n", ret);
 	}
 
+	fat_init();
+
 	ptable_t* mbr = mbr_load(hda0);
-	ptable_entry_t* partInfo = mbr->first;
-
-	for(int i = 0; i < 4; i++) {
-		kprintf("Partition %2i: Type 0x%4X, start 0x%X, length 0x%X sectors\n", partInfo->part_num, partInfo->type, partInfo->lba_start, partInfo->lba_length);
-
-		// go to next struct
-		partInfo = partInfo->next;
-		if(!partInfo) break;
-	}
+	vfs_mount_all(mbr);
 
 /*	
 	svga_mode_info_t *svga_mode_info = svga_mode_get_info(0x101);

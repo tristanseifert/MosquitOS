@@ -5,27 +5,29 @@ Therefore, the MosquitOS kernel exposes an interface that filesystem modules can
 # Kernel Functions
 In order to allow modules to register and interract with the kernel, it exposes the following functions:
 
-## `fs_register`
+## `vfs_register`
 Registers a filesystem with the kernel. The only argument is a pointer to a struct of type `fs_type_t`, which identifies the fileystem type to the kernel. This struct is defined as follows:
 
 	typedef struct fs_type {
 		const char *name;
 		uint32_t flags;
 		uint32_t handle; // set by kernel, should be 0
-	
-		kern_module_t *owner;
+		uint32_t type; // parition table ID
 
-		fs_superblock_t* (*create_super) (fs_superblock_t*, partition_t*);
+		void *owner;
 
-		struct fs_type *next; // held internally as linked list
+		fs_superblock_t* (*create_super) (fs_superblock_t*, ptable_entry_t*);
+
+		struct fs_type *next; // held internally as doubly linked list
+		struct fs_type *prev;
 	} fs_type_t;
 
 
-This kernel function will return an identifier logical `OR`ed with `0x80000000`, or an error code between `0x00000000` to `0x7FFFFFFF`. Later calls to the kernel filesystem API should use this handle to identify the filesystem to the kernel.
+This kernel function will return an error code or 0 if success.
 
 Note that the pointer to the `fs_type_t` struct must remain valid for the entire time the filesystem is loaded into the kernel. Deallocate the memory only when it has been successfully unloaded.
 
-## `fs_deregister`
+## `vfs_deregister`
 Takes a previously-registered filesystem (pointer to the `fs_type_t` struct used to register the filesystem) and removes it from the kernel's list of supported filesystems.
 
 Note that any partitions that utilise this filesystem module and are currently mounted *must* be unmounted before this module can be unloaded, or an error will be returned.
