@@ -9,6 +9,7 @@
 #include "device/rs232.h"
 #include "io/disk.h"
 #include "device/ata_pio.h"
+#include "fs/mbr.h"
 #include "runtime/error_handler.h"
  
 extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
@@ -96,31 +97,15 @@ void kernel_main() {
 		kprintf("hda0 initialisation error: 0x%X\n", ret);
 	}
 
-	uint8_t *outBuff = (uint8_t *) kmalloc(0x1000);
-	ret = disk_read(hda0, 0, 2, outBuff);
+	ptable_t* mbr = mbr_load(hda0);
+	ptable_entry_t* partInfo = mbr->first;
 
-	if(ret == kDiskErrorNone) {
-		kprintf("hda0 read successfully\n");
-	} else {
-		kprintf("hda0 read error: 0x%X\n", ret);
-	}
+	for(int i = 0; i < 4; i++) {
+		kprintf("Partition %2i: Type 0x%4X, start 0x%X, length 0x%X sectors\n", partInfo->part_num, partInfo->type, partInfo->lba_start, partInfo->lba_length);
 
-	if(outBuff[0x1FE] == 0x55 && outBuff[0x1FF] == 0xAA) {
-		kprintf(CONSOLE_BOLD "\nBoot Sector (valid):\n" CONSOLE_REG);
-	} else {
-		kprintf(CONSOLE_BOLD "\nBoot Sector (invalid, sig 0x%2X%2X):\n" CONSOLE_REG, outBuff[0x1FE], outBuff[0x1FF]);
-	}
-
-	static uint32_t temp;
-	uint32_t *readPtr = (uint32_t *) outBuff;
- 	for(int i = 1; i < 129; i++) {
- 		temp = readPtr[i-1];
-
- 		kprintf("%8X ", ENDIAN_DWORD_SWAP(temp));
-
- 		if((i % 8) == 0) {
- 			kprintf("\n");
- 		}
+		// go to next struct
+		partInfo = partInfo->next;
+		if(!partInfo) break;
 	}
 
 /*	

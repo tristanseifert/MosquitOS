@@ -10,9 +10,17 @@
 #include <io/disk.h>
 
 // Entry in a partition table (i.e. a partition)
- typedef struct {
- 	uint64_t lba_start;
- 	uint64_t lba_length;
+ typedef struct ptable_entry {
+ 	uint32_t lba_start;
+ 	uint32_t lba_length;
+
+ 	// Identifier of filesystem that a kernel extension registered for
+ 	uint16_t type;
+
+ 	// Logical partition number
+ 	uint8_t part_num;
+
+	struct ptable_entry *next;
  } ptable_entry_t;
 
 // Kinds of partition tables
