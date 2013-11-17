@@ -14,7 +14,7 @@ static void putcp(void* p, char c) {
 /*
  * Prints an unsigned long in the base specified by base to *bf.
  */
-static void kprintf_ulong2ascii(unsigned long int num, unsigned int base, int uc, char *bf) {
+static void kprintf_ulong2ascii(unsigned long int num, unsigned int base, bool uc, char* bf) {
 	int n = 0;
 	unsigned int d = 1;
 	while (num/d >= base)
@@ -36,7 +36,7 @@ static void kprintf_ulong2ascii(unsigned long int num, unsigned int base, int uc
 /*
  * Prints a signed long in the base specified by base to *bf.
  */
-static void kprintf_long2ascii(long num, char * bf) {
+static void kprintf_long2ascii(long num, char* bf) {
 	if (num < 0) {
 		num =- num;
 		*bf++ = '-';
@@ -48,7 +48,7 @@ static void kprintf_long2ascii(long num, char * bf) {
 /*
  * Prints an unsigned integer in the base specified by base to *bf.
  */
-static void kprintf_uint2ascii(unsigned int num, unsigned int base, int uc, char* bf) {
+static void kprintf_uint2ascii(unsigned int num, unsigned int base, bool uc, char* bf) {
 	int n=0;
 	unsigned int d=1;
 	while (num/d >= base)
@@ -68,7 +68,7 @@ static void kprintf_uint2ascii(unsigned int num, unsigned int base, int uc, char
 /*
  * Prints a signed integer in the base specified by base to *bf.
  */
-static void kprintf_int2ascii(int num, char * bf) {
+static void kprintf_int2ascii(int num, char* bf) {
 	if (num < 0) {
 		num =- num;
 		*bf++ = '-';
@@ -165,9 +165,9 @@ void kprintf_format(void* putp, putcf putf, char *fmt, va_list va) {
 
 				case 'u': case 'i': // unsigned int/long
 					if (lng) {
-						kprintf_ulong2ascii(va_arg(va, unsigned long int), 10, 0, bf);
+						kprintf_ulong2ascii(va_arg(va, unsigned long int), 10, false, bf);
 					} else {
-						kprintf_uint2ascii(va_arg(va, unsigned int), 10, 0, bf);
+						kprintf_uint2ascii(va_arg(va, unsigned int), 10, false, bf);
 					}
 
 					kprintf_putchw(putp, putf, w, lz, bf);
@@ -185,9 +185,9 @@ void kprintf_format(void* putp, putcf putf, char *fmt, va_list va) {
 
 				case 'x': case 'X': // print as hexadecimal
 					if (lng) {
-						kprintf_ulong2ascii(va_arg(va, unsigned long int), 16, (ch == 'X'), bf);
+						kprintf_ulong2ascii(va_arg(va, unsigned long int), 16, (ch == 'X') ? true : false, bf);
 					} else {
-						kprintf_uint2ascii(va_arg(va, unsigned int), 16, (ch == 'X'), bf);
+						kprintf_uint2ascii(va_arg(va, unsigned int), 16, (ch == 'X') ? true : false, bf);
 					}
 
 					kprintf_putchw(putp, putf, w, lz, bf);

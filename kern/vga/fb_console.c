@@ -7,6 +7,8 @@
 #include "rsrc/ter-i16b.h"
 #include "rsrc/ter-i16n.h"
 
+static void fb_console_scroll_up(unsigned int num_rows);
+
 // Pointers to fonts
 static uint8_t *font_reg, *font_bold;
 // Video mode info
@@ -42,10 +44,16 @@ void fb_console_init() {
 
 	fb_console_set_font(&ter_i16n_raw, &ter_i16b_raw);
 
-	uint16_t *videoMem = (uint16_t *) video_base;
+	// Clear screen
+	uint32_t *videoMem = (uint32_t *) video_base;
+	uint32_t pixel = (fb_console_col_map[0x00] << 0x10) | fb_console_col_map[0x00];
+	for(int i = 0; i < ((bytesPerLine / depth) * height)/8; i++) {
+		videoMem[0] = pixel;
+		videoMem[1] = pixel;
+		videoMem[2] = pixel;
+		videoMem[3] = pixel;
 
-	for(int i = 0; i < ((bytesPerLine / depth) * height); i++) {
-		videoMem[i] = fb_console_col_map[0x00];
+		videoMem += 4;
 	}
 
 	is_bold = false;
@@ -132,6 +140,22 @@ void fb_console_control(unsigned char c) {
 		case '\n':
 			row++;
 			col = 0;
+
+			if(row > (height / CHAR_HEIGHT)) {
+				uint32_t *videoMem = (uint32_t *) video_base;
+				uint32_t pixel = (fb_console_col_map[0x00] << 0x10) | fb_console_col_map[0x00];
+				for(int i = 0; i < ((bytesPerLine / depth) * height)/8; i++) {
+					videoMem[0] = pixel;
+					videoMem[1] = pixel;
+					videoMem[2] = pixel;
+					videoMem[3] = pixel;
+
+					videoMem += 4;
+				}
+
+				row = 0;
+			}
+
 			break;
 
 		default:
@@ -145,4 +169,23 @@ void fb_console_control(unsigned char c) {
 void fb_console_set_font(void* reg, void* bold) {
 	if(reg) font_reg = reg;
 	if(bold) font_bold = bold;
+}
+
+/*
+ * Scrolls the display up number of rows
+ */
+static void fb_console_scroll_up(unsigned int num_rows) {
+	uint32_t *read_ptr = (uint32_t *) video_base + ((num_rows * CHAR_HEIGHT) * (bytesPerLine / depth) / 2);
+	uint32_t *write_ptr = (uint32_t *) video_base;
+
+	int num_pixels = ((height - (num_rows * CHAR_HEIGHT)) * (bytesPerLine / depth)) / 2;
+
+	for(int i = 0; i < num_pixels/4; i++) {
+		*write_ptr++ = *read_ptr++;
+		*write_ptr++ = *read_ptr++;
+		*write_ptr++ = *read_ptr++;
+		*write_ptr++ = *read_ptr++;
+	}
+
+	row -= num_rows;
 }

@@ -11,25 +11,25 @@
 #include "device/ata_pio.h"
 #include "runtime/error_handler.h"
  
-extern uint32_t __kern_size, __kern_bss_start;
+extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
+extern uint32_t KERN_BNUM;
+extern page_directory_t *kernel_directory;
+extern heap_t *kheap;
 
 #if defined(__cplusplus)
 extern "C" /* Use C linkage for kernel_main. */
 #endif
 void kernel_main() {
+	uint32_t *bss = (uint32_t *) (&__kern_bss_start);
+	uint32_t bss_size = (uint32_t) &__kern_bss_size;
+
+	// kernel stuff
 	console_init();
 
 	system_init();
 
-	uint32_t eax, ebx, ecx, edx;
-	cpuid(1, eax, ebx, ecx, edx);
-
-	kprintf("\x01\x11MosquitOS\x01\x10 Kernel v0.1 compiled %s on %s with %s\n", KERN_BDATE, KERN_BTIME, KERN_COMPILER);
-	kprintf("Kernel size: 0x%X\n", __kern_size);
-
-	if(edx & CPUID_FEAT_EDX_SSE) {
-		kprintf("CPU supports SSE\n");
-	}	
+	kprintf("\x01\x11MosquitOS\x01\x10 Kernel v0.1 build %u compiled %s on %s with %s\n", (unsigned long) &KERN_BNUM, KERN_BDATE, KERN_BTIME, KERN_COMPILER);
+	kprintf("Kernel size: %i bytes (BSS at 0x%X, %i bytes)\n", &__kern_size, bss, bss_size);
 
 	if(ps2_init() != 0) {
 		kprintf("ERROR: Could not initialise PS2 driver\n");
@@ -84,10 +84,6 @@ void kernel_main() {
 	}
 
 	kprintf(CONSOLE_BOLD "\nTotal usable memory (bytes): 0x%X\n" CONSOLE_REG, total_usable_RAM);
-	
-	svga_mode_info_t *svga_mode_info = svga_mode_get_info(0x101);
-	kprintf("Mode 0x101 framebuffer: 0x%X\n", svga_mode_info->physbase);
-	gui_set_screen_mode(svga_mode_info);
 
 	// Disk test
 	disk_t *hda0 = disk_allocate();
@@ -100,7 +96,7 @@ void kernel_main() {
 		kprintf("hda0 initialisation error: 0x%X\n", ret);
 	}
 
-	void *outBuff = (void *) kmalloc(0x1000);
+	uint8_t *outBuff = (uint8_t *) kmalloc(0x1000);
 	ret = disk_read(hda0, 0, 2, outBuff);
 
 	if(ret == kDiskErrorNone) {
@@ -109,7 +105,29 @@ void kernel_main() {
 		kprintf("hda0 read error: 0x%X\n", ret);
 	}
 
-/*	window_t *window = malloc(sizeof(window_t));
+	if(outBuff[0x1FE] == 0x55 && outBuff[0x1FF] == 0xAA) {
+		kprintf(CONSOLE_BOLD "\nBoot Sector (valid):\n" CONSOLE_REG);
+	} else {
+		kprintf(CONSOLE_BOLD "\nBoot Sector (invalid, sig 0x%2X%2X):\n" CONSOLE_REG, outBuff[0x1FE], outBuff[0x1FF]);
+	}
+
+	static uint32_t temp;
+	uint32_t *readPtr = (uint32_t *) outBuff;
+ 	for(int i = 1; i < 129; i++) {
+ 		temp = readPtr[i-1];
+
+ 		kprintf("%8X ", ENDIAN_DWORD_SWAP(temp));
+
+ 		if((i % 8) == 0) {
+ 			kprintf("\n");
+ 		}
+	}
+
+/*	
+	svga_mode_info_t *svga_mode_info = svga_mode_get_info(0x101);
+	gui_set_screen_mode(svga_mode_info);
+
+	window_t *window = malloc(sizeof(window_t));
 
 	window->position.pt.x = 32;
 	window->position.pt.y = 32;
@@ -145,6 +163,10 @@ void kernel_main() {
  * Called BEFORE kernel_main, so kernel structures may NOT be accessed!
  */
 void kernel_init() {
-	extern heap_t *kheap;
-	kheap = 0;
+	uint32_t *bss = (uint32_t *) (&__kern_bss_start);
+	uint32_t bss_size = (uint32_t) &__kern_bss_size;
+	
+	for(int i = 0; i < 32; i++) {
+		bss[i] = 0;
+	}
 }

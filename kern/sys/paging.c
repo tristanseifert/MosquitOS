@@ -135,12 +135,19 @@ void paging_init() {
 	memclr(kernel_directory, sizeof(page_directory_t));
 	current_directory = kernel_directory;
 
+	// Allocate memory for pagetables.
+	// XXX: This is really bad and should be fixed because it really is just an ugly
+	// hack around the fact that we for some reason cannot allocate pagetables later.
+	unsigned int i = 0;
+	for(i = 0x00000000; i < 0xFFFFF000; i += 0x1000) {
+		page_t* page = paging_get_page(i, true, kernel_directory);
+	}
+
 	// Map some pages in the kernel heap area.
 	// Here we call get_page but not alloc_frame. This causes page_table_t's 
 	// to be created where necessary. We can't allocate frames yet because they
 	// they need to be identity mapped first below, and yet we can't increase
 	// placement_address between identity mapping and enabling the heap
-	uint32_t i = 0;
 	for(i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000) {
 		paging_get_page(i, true, kernel_directory);
 	}
@@ -153,24 +160,6 @@ void paging_init() {
 		page->rw = 1;
 		page->user = 0;
 		page->frame = (((i & 0x0FFFF000) + 0x100000) >> 12);
-	}
-
-	// Map selected VESA mode's framebuffer to 0xD0000000 (2MB of framebuffer)
-	svga_mode_info_t *svga_mode_info = svga_mode_get_info(SVGA_DEFAULT_MODE);
-
-	uint32_t fb_addr;
-	uint32_t fb_real_addr = svga_mode_info->physbase;
-	for(i = 0xD0000000; i < 0xD01FF000; i += 0x1000) {
-		page_t* page = paging_get_page(i, true, kernel_directory);
-
-		fb_addr = (i & 0x0FFFF000) + fb_real_addr;
-
-		page->present = 1;
-		page->rw = 1;
-		page->user = 0;
-		page->frame = fb_addr >> 12;
-		
-		//kprintf("Allocated 0x%X -> 0x%X\n", i, fb_addr);
 	}
 
 	// We need to identity map (phys addr = virt addr) from
@@ -198,18 +187,6 @@ void paging_init() {
 	// Set page fault handler
 	// sys_set_idt_gate(14, (uint32_t) isr14, 0x08, 0x8E);
 
-	// Convert logical addresses to physical
-	for(i = 0; i < 1024; i++) {
-		uint32_t physAddr = kernel_directory->tablesPhysical[i];
-
-		if((physAddr & 0xC0000000) == 0xC0000000) {
-			physAddr &= 0x0FFFFFFF; // get rid of high nybble
-			physAddr += 0x00100000; // Add 1M offset
-
-			kernel_directory->tablesPhysical[i] = physAddr;
-		}
-	}
-
 	// Convert kernel directory address to physical and save it
 	kern_dir_phys = (uint32_t) &kernel_directory->tablesPhysical;
 	kern_dir_phys &= 0x0FFFFFFF;
@@ -231,11 +208,11 @@ void paging_switch_directory(page_directory_t* new) {
 	tables_phys_ptr += 0x00100000;
 
 	current_directory = new;
-	__asm__ volatile("mov %0, %%cr3":: "r"(tables_phys_ptr));
+	__asm__ volatile("mov %0, %%cr3" : : "r"(tables_phys_ptr));
 	uint32_t cr0;
 	__asm__ volatile("mov %%cr0, %0": "=r"(cr0));
 	cr0 |= 0x80000000; // Enable paging!
-	__asm__ volatile("mov %0, %%cr0":: "r"(cr0));
+	__asm__ volatile("mov %0, %%cr0" : : "r"(cr0));
 }
 
 /*
@@ -255,7 +232,13 @@ page_t* paging_get_page(uint32_t address, bool make, page_directory_t* dir) {
 	} else if(make == true) {
 		uint32_t tmp;
 		dir->tables[table_idx] = (page_table_t *) kmalloc_ap(sizeof(page_table_t), &tmp);
-		dir->tablesPhysical[table_idx] = tmp | 0x7; // PRESENT, RW, US.
+
+		// update physical address
+		uint32_t phys_ptr = tmp | 0x7;
+		phys_ptr &= 0x0FFFFFFF; // get rid of high nybble
+		phys_ptr += 0x00100000; // Add 1M offset
+		dir->tablesPhysical[table_idx] = phys_ptr;
+
 		return &dir->tables[table_idx]->pages[address % 0x400];
 	} else {
 		return 0;

@@ -8,6 +8,9 @@ make_obj_archive= \
 	$(LD) -r *.o -o $@.$(obj_arc_ext); \
 	rm -f *.o \
 
+BUILD_NUMBER_FILE=build.num
+BUILD_NUMBER_LDFLAGS += -Xlinker --defsym -Xlinker KERN_BNUM=$$(cat $(BUILD_NUMBER_FILE))
+
 # Freestanding binary, strip extra shits
 CFLAGS= -c -finline-functions -g -Wall -fno-builtin -static\
 		-mno-sse2 -Os\
@@ -28,8 +31,11 @@ clean:
 
 # Compile main.c into flat binary
 kernel: main.c
+	@if ! test -f $(BUILD_NUMBER_FILE); then echo 0 > $(BUILD_NUMBER_FILE); fi
+	@echo $$(($$(cat $(BUILD_NUMBER_FILE)) + 1)) > $(BUILD_NUMBER_FILE)
+
 	$(CC) $(CFLAGS) -ffreestanding *.c -o kern_main.$(obj_arc_ext)
-	i686-pc-elf-gcc -Wl,-T,kern.ld -o kernel.elf -ffreestanding -Os -nostdlib tmp/entry.o *.$(obj_arc_ext)
+	i686-pc-elf-gcc -Wl,-T,kern.ld -o kernel.elf -ffreestanding -Os -nostdlib $(BUILD_NUMBER_LDFLAGS) tmp/entry.o *.$(obj_arc_ext)
 	gobjcopy -I elf32-i386 -O binary kernel.elf kernel.bin
 	gobjdump -b elf32-i386 -d kernel.elf > symbols.txt
 
