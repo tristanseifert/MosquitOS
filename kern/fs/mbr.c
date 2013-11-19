@@ -56,6 +56,8 @@ valid_entry: ;
 
 		partition->part_num = (i & 0x03);
 
+		partition->ptable = table;
+
 invalid_entry: ;
 	}
 

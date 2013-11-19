@@ -8,7 +8,11 @@
 #define VFS_NUM_ARRAY 8
 
 typedef struct {
+	const char *vol_label;
+	const char *vol_mount_point;
 
+	// pointer to fs-specific struct
+	void* fs_info;
 } fs_superblock_t;
 
 typedef struct fs_type {
@@ -20,7 +24,7 @@ typedef struct fs_type {
 	void *owner;
 
 	fs_superblock_t* (*create_super) (fs_superblock_t*, ptable_entry_t*);
-	
+
 	// kernel stores the VFS table as doubly-linked list
 	struct fs_type *next;
 	struct fs_type *prev;

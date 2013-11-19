@@ -148,7 +148,7 @@ DISK_ERROR ata_read(disk_t* disk, uint64_t lba, uint32_t num_sectors, void* dest
 
 	// Write sector and LBA low
 	io_outb(ata_bus_to_ioaddr[bus] + 2, (num_sectors & 0xFF));
-	io_outb(ata_bus_to_ioaddr[bus] + 3, (lba && 0xFF)); // LBA1
+	io_outb(ata_bus_to_ioaddr[bus] + 3, (lba & 0xFF)); // LBA1
 	io_outb(ata_bus_to_ioaddr[bus] + 4, (lba >> 0x08)); // LBA2
 	io_outb(ata_bus_to_ioaddr[bus] + 5, (lba >> 0x10)); // LBA3
 

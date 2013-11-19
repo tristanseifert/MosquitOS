@@ -85,6 +85,14 @@ int vfs_mount_filesystem(ptable_entry_t* fs) {
 
 	if(fdrv) {
 		kprintf("Mounting partition %i: Type 0x%X (%s), start 0x%X, length 0x%X sectors\n", fs->part_num, fs->type, fdrv->name, fs->lba_start, fs->lba_length);
+
+		// allocate memory for the superblock
+		fs_superblock_t *superblock = (fs_superblock_t*) kmalloc(sizeof(fs_superblock_t));
+		memclr(superblock, sizeof(fs_superblock_t));
+
+		ASSERT(superblock != NULL);
+
+		fs_superblock_t *ret = fdrv->create_super(superblock, fs);
 	} else {
 		kprintf("Unknown filesystem type 0x%X\n", fs->type);
 		return -1;

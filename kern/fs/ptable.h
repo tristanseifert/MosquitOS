@@ -9,8 +9,10 @@
 #include <types.h>
 #include <io/disk.h>
 
+#define PARTITION_LBA_REL2ABS(lba, pt) lba+pt->lba_start
+
 // Entry in a partition table (i.e. a partition)
- typedef struct ptable_entry {
+typedef struct ptable_entry {
  	uint32_t lba_start;
  	uint32_t lba_length;
 
@@ -21,6 +23,9 @@
  	uint8_t part_num;
 
 	struct ptable_entry *next;
+
+	// Partition table pointer
+	void* ptable;
  } ptable_entry_t;
 
 // Kinds of partition tables
