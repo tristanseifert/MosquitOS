@@ -92,6 +92,9 @@ int vfs_mount_filesystem(ptable_entry_t* fs) {
 
 		ASSERT(superblock != NULL);
 
+		superblock->disk = ((ptable_t *)fs->ptable)->disk;
+		superblock->pt = fs;
+
 		fs_superblock_t *ret = fdrv->create_super(superblock, fs);
 	} else {
 		kprintf("Unknown filesystem type 0x%X\n", fs->type);

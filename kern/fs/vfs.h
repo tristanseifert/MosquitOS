@@ -11,6 +11,9 @@ typedef struct {
 	const char *vol_label;
 	const char *vol_mount_point;
 
+	disk_t *disk;
+	ptable_entry_t *pt;
+
 	// pointer to fs-specific struct
 	void* fs_info;
 } fs_superblock_t;
