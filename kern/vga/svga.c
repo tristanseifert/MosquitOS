@@ -32,7 +32,7 @@ uint32_t svga_map_fb(uint32_t real_addr) {
 	int i = 0;
 	uint32_t fb_addr;
 
-	// Map 8MB of framebuffer
+	// Map 16MB of framebuffer
 	for(i = 0xD0000000; i < 0xD0FFF000; i += 0x1000) {
 		page_t* page = paging_get_page(i, true, kernel_directory);
 

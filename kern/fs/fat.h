@@ -14,6 +14,14 @@
 #define FAT16_BAD_CLUSTER 0xFFF7
 #define FAT16_END_CHAIN 0xFFF8
 
+#define FAT_ATTR_READ_ONLY 0x01
+#define FAT_ATTR_HIDDEN 0x02
+#define FAT_ATTR_SYSTEM 0x04
+#define FAT_ATTR_VOLUME_ID 0x08
+#define FAT_ATTR_DIRECTORY 0x10
+#define FAT_ATTR_ARCHIVE 0x20
+#define FAT_ATTR_LFN FAT_ATTR_READ_ONLY | FAT_ATTR_HIDDEN | FAT_ATTR_SYSTEM | FAT_ATTR_VOLUME_ID
+
 // We can cast the sector buffer to one of these
 typedef struct fat_extBS_32 {
 	uint8_t bootjmp[3];
@@ -106,6 +114,29 @@ typedef struct {
 	void* root_directory;
 	uint32_t root_dir_length;
 } fat_fs_info_t;
+
+typedef struct {
+	char name[8];
+	char ext[3];
+	
+	uint8_t attributes;
+	
+	uint8_t reserved_0;
+
+	uint8_t time_created_seconds;
+	uint16_t created_time;
+	
+	uint16_t created_date;
+	uint16_t accessed_date;
+
+	uint16_t cluster_high;
+	uint16_t write_time;
+	uint16_t write_date;
+
+	uint16_t cluster_low;
+
+	uint32_t filesize; // in bytes
+} __attribute__((packed)) fat_dirent_t;
 
 void fat_init();
 

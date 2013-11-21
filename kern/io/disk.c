@@ -10,8 +10,6 @@ disk_t* disk_allocate() {
 	disk_t *disk = (disk_t *) kmalloc(sizeof(disk_t));
 	disk->driver_calls = (void *) kmalloc(sizeof(driver_functions_t));
 
-	kprintf("Allocated disk struct at 0x%X (driver calls at 0x%X)\n", disk, disk->driver_calls);
-
 	return disk;
 }
 

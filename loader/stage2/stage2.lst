@@ -7,7 +7,7 @@
      7                                  kern_start:				EQU 6
      8                                  kern_len:				EQU 32									; Length in sectors
      9                                  
-    10                                  SVGA_Mode:				EQU $117
+    10                                  SVGA_Mode:				EQU $118
     11                                  
     12                                  ; Location to store various BIOS info at
     13                                  Kern_Info_Struct:		EQU $0160								; $001600 phys (len = $400 max)
@@ -75,7 +75,7 @@
     75 0000004B 8EC0                    	mov		es, ax
     76 0000004D 31FF                    	xor		di, di												; Offset 0 into buffer
     77 0000004F B8014F                  	mov		ax, $4F01											; Get VESA mode info function
-    78 00000052 B91701                  	mov		cx, SVGA_Mode										; Mode to get info for
+    78 00000052 B91801                  	mov		cx, SVGA_Mode										; Mode to get info for
     79 00000055 CD10                    	int		$10
     80                                  
     81                                  
@@ -152,7 +152,7 @@
    152 000000C6 CD10                    	int		$10													; Set cursor
    153                                  
    154                                  	; Go into SVGA mode specified, linear framebuffer, clear memory
-   155 000000C8 BB1741                  	mov		bx, ($4000 | SVGA_Mode)								; SVGA mode
+   155 000000C8 BB1841                  	mov		bx, ($4000 | SVGA_Mode)								; SVGA mode
    156 000000CB B8024F                  	mov		ax, $4F02											; SVGA routine calls
    157 000000CE CD10                    	int		$10													; Call video BIOS
    158                                  

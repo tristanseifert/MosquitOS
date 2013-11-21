@@ -23,9 +23,13 @@ hdiutil attach disk_image.img
 rm -f /Volumes/MOSQUITOS/KERNEL.BIN
 cp kern/kernel.bin /Volumes/MOSQUITOS/KERNEL.BIN
 
+# Clean up OS X's crap
+rm -rv /Volumes/MOSQUITOS/.fseventsd
+rm -rv /Volumes/MOSQUITOS/.Trashes
+
 # Unmount disk image
 diskutil unmount /Volumes/MOSQUITOS/
 
 clear
 
-qemu-1.60/qemu-system-i386 -hda /Users/tristanseifert/SquelchenOS/disk_image.img -boot c -m 64M -soundhw adlib -vga std -s
+qemu-1.60/qemu-system-i386 -hda /Users/tristanseifert/SquelchenOS/disk_image.img -boot c -m 64M -soundhw ac97 -vga std -s

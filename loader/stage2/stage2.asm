@@ -7,7 +7,7 @@ kern_loc_phys:			EQU kern_loc<<4
 kern_start:				EQU 6
 kern_len:				EQU 32									; Length in sectors
 
-SVGA_Mode:				EQU $117
+SVGA_Mode:				EQU $118
 
 ; Location to store various BIOS info at
 Kern_Info_Struct:		EQU $0160								; $001600 phys (len = $400 max)

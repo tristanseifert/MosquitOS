@@ -3,8 +3,8 @@
 #include "vfs.h"
 
 static uint32_t fat_get_next_cluster(fs_superblock_t* superblock, uint32_t cluster_value);
-
 static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_entry_t* pt);
+static char* fat_83_to_str(fat_dirent_t* dirent);
 
 static fs_type_t* fat_init_struct;
 static void* sector_buffer;
@@ -109,10 +109,16 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 	kprintf("\nContents of /:\n");
 	for(int i = 0; i < (fs_info->root_dir_length / 0x20); i++) {
 		ptr = fs_info->root_directory+(i * 0x20);
+		fat_dirent_t *dirent = (fat_dirent_t *) ptr;
 
 		if(ptr[0] != 0xE5 && ptr[0] != 0x00) {
-			size = (ptr[0x1F] << 0x18) | (ptr[0x1E] << 0x10) | (ptr[0x1D] << 0x8) | ptr[0x1C];
-			kprintf("%s (%i bytes)\n", ptr, size);
+			if(dirent->attributes != (FAT_ATTR_LFN) && !(dirent->attributes & FAT_ATTR_DIRECTORY)) {
+				size = (ptr[0x1F] << 0x18) | (ptr[0x1E] << 0x10) | (ptr[0x1D] << 0x8) | ptr[0x1C];
+
+				kprintf("%s (%i bytes)\n", fat_83_to_str(dirent), size);
+			} else if(dirent->attributes & FAT_ATTR_DIRECTORY) {
+				kprintf("%s (directory)\n", fat_83_to_str(dirent));
+			}
 		}
 	}
 
@@ -213,4 +219,34 @@ static uint32_t fat_get_next_cluster(fs_superblock_t* superblock, uint32_t clust
 	}
 
 	return 0xFFFFFFFF;
+}
+
+/*
+ * Reads the 8.3 filename from a directory entry struct and converts it into a standard
+ * 0-terminated string.
+ */
+static char* fat_83_to_str(fat_dirent_t* dirent) {
+	char* buf = (char *) kmalloc(14);
+	memclr(buf, 14);
+
+	int buf_offset = 0;
+
+	// filename
+	for(int i = 0; i < 8; i++) {
+		if(dirent->name[i] != ' ') {
+			buf[buf_offset++] = dirent->name[i];
+		}
+	}
+
+	// dot
+	buf[buf_offset++] = '.';
+
+	// extension
+	for(int i = 0; i < 3; i++) {
+		if(dirent->ext[i] != ' ') {
+			buf[buf_offset++] = dirent->ext[i];
+		}
+	}
+
+	return buf;
 }
