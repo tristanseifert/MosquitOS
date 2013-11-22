@@ -93,7 +93,7 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 		fs_info->root_cluster = fs_info->first_data_sector;
 	}
 
-	kprintf("Root directory = 0x%X (size = 0x%X), first FAT sector = 0x%X\n0x%X data sectors (first = 0x%X), total clusters = 0x%X\n\n", fs_info->root_cluster, fs_info->root_dir_sectors,
+	kprintf("Root directory = 0x%X (size = 0x%X), first FAT sector = 0x%X\n0x%X data sectors (first = 0x%X), total clusters = 0x%X\n", fs_info->root_cluster, fs_info->root_dir_sectors,
 		fs_info->first_fat_sector, fs_info->data_sectors, fs_info->first_data_sector, fs_info->total_clusters);
 
 	// Compute the number of bytes the root directory takes up by following cluster chain
@@ -121,6 +121,8 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 			}
 		}
 	}
+
+	fat_read_directory(superblock, "/osama/cares/and/fuck/obama");
 
 	return superblock;
 }
@@ -249,4 +251,24 @@ static char* fat_83_to_str(fat_dirent_t* dirent) {
 	}
 
 	return buf;
+}
+
+/*
+ * Reads the directory table for the specified directory. Traverses all parent
+ * directories, and returns NULL on error, or a pointer to the directory data if
+ * successful.
+ */
+char* fat_read_directory(fs_superblock_t *superblock, char* path) {
+	kprintf("\n\nSearching for directory %s\n", path);
+
+	char* pch;
+	pch = strtok(path, "/");
+
+	// Iterate through all paths
+	while(pch != NULL) {
+		kprintf("%s\n", pch);
+		pch = strtok(NULL, "/");
+	}
+
+	return NULL;
 }

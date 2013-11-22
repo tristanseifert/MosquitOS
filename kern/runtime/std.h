@@ -3,6 +3,9 @@
 
 // string functions: strings
 size_t strlen(char* str);
+char* strtok(char *s, const char *delim);
+char *strchr(const char *s, int c);
+char* strsep(char **stringp, const char *delim);
 
 // string functions: memory
 void* memchr(void* ptr, uint8_t value, size_t num);
