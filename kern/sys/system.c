@@ -11,6 +11,7 @@
 
 void sys_set_idt(void* base, uint16_t size);
 uint64_t sys_timer_ticks;
+uint64_t sys_tsc_boot_ticks;
 cpu_info_t* sys_current_cpu_info;
 sys_kern_info_t* sys_kern_params;
 
@@ -58,6 +59,9 @@ void system_init() {
 	sys_build_gdt();
 	sys_build_idt();
 	sys_setup_ints();
+
+	// Read x86 TSC
+	sys_tsc_boot_ticks = sys_rdtsc();
 
 	// Set up the TSS and their stacks
 	sys_init_tss();
@@ -306,8 +310,12 @@ bool sys_irq_enabled() {
 /*
  * Reads TSC (CPU timestamp counter)
  */
-void sys_rdtsc(uint32_t* upper, uint32_t* lower) {
-	__asm__ volatile("rdtsc" : "=a"(*lower), "=d"(*upper) );
+uint64_t sys_rdtsc() {
+	unsigned int lo, hi;
+	// RDTSC copies contents of 64-bit TSC into EDX:EAX
+	asm volatile("rdtsc" : "=a" (lo), "=d" (hi));
+
+	return (lo & 0xFFFFFFFF) | (hi << 0x20);
 }
 
 /*

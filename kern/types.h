@@ -11,8 +11,12 @@
 #include <runtime/std.h>
 #include <sys/kheap.h>
 #include <io/console.h>
+
 // Include panic functions
 #include <runtime/panic.h>
+
+// X86 intrinsic macros (SSE)
+#include <x86intrin.h>
 
 // These tell gcc how to optimise branches since it's stupid
 #define likely(x)    __builtin_expect(!!(x), 1)

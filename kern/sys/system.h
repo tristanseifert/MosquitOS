@@ -145,7 +145,7 @@ cpu_info_t* sys_get_cpu_info();
 
 uint64_t sys_get_ticks();
 
-void sys_rdtsc(uint32_t* upper, uint32_t* lower);
+uint64_t sys_rdtsc();
 void sys_flush_tlb(uint32_t m);
 void sys_write_MSR(uint32_t msr, uint32_t lo, uint32_t hi);
 void sys_read_MSR(uint32_t msr, uint32_t *lo, uint32_t *hi);
