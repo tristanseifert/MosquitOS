@@ -2,6 +2,7 @@
 #include "fat.h"
 #include "vfs.h"
 
+static void fat_read_cluster(fs_superblock_t* superblock, uint32_t cluster, void* buffer, uint32_t buffer_size);
 static uint32_t fat_get_next_cluster(fs_superblock_t* superblock, uint32_t cluster_value);
 static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_entry_t* pt);
 static char* fat_83_to_str(fat_dirent_t* dirent);
@@ -122,7 +123,29 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 		}
 	}
 
-	fat_read_directory(superblock, "/osama/cares/and/fuck/obama");
+	// Test to read a directory
+	void *guiTable = fat_read_directory(superblock, "/gui");
+
+	ptr = guiTable;
+
+	kprintf("\nContents of /gui:\n");
+	while(true) {
+		fat_dirent_t *dirent = (fat_dirent_t *) ptr;
+
+		if(dirent->name[0] == 0x00) break;
+
+		if(ptr[0] != 0xE5 && ptr[0] != 0x00) {
+			if(dirent->attributes != (FAT_ATTR_LFN) && !(dirent->attributes & FAT_ATTR_DIRECTORY)) {
+				size = (ptr[0x1F] << 0x18) | (ptr[0x1E] << 0x10) | (ptr[0x1D] << 0x8) | ptr[0x1C];
+
+				kprintf("%s (%i bytes)\n", fat_83_to_str(dirent), size);
+			} else if(dirent->attributes & FAT_ATTR_DIRECTORY) {
+				kprintf("%s (directory)\n", fat_83_to_str(dirent));
+			}
+		}
+
+		ptr += 0x20;
+	}
 
 	return superblock;
 }
@@ -137,45 +160,58 @@ void fat_read_get_root_dir(fs_superblock_t* superblock, void* buffer, uint32_t b
 	if(fs_info->fat_type == 32) {
 		fat_fs_bpb32_t *bpb = (fat_fs_bpb32_t *) fs_info->bpb;
 
-		uint32_t sector;
 		uint32_t cluster_to_read = fs_info->root_cluster-2;
-		DISK_ERROR derr;
 
-		uint8_t *write_ptr = buffer;
-		int bytes_written = 0;
-
-		// Read the entire directory
-		while(true) {
-			sector = PARTITION_LBA_REL2ABS(cluster_to_read+fs_info->first_data_sector, superblock->pt);
-			derr = disk_read(superblock->disk, sector, 1, sector_buffer);
-
-			// Handle disk read errors
-			if(derr != kDiskErrorNone) {
-				kprintf("Error reading root directory: 0x%X\n", derr);
-				break;
-			}
-
-			// Copy into buffer
-			if(buffer_size > 512) {
-				memcpy(write_ptr, sector_buffer, 512);
-
-				buffer_size -= 512;
-				write_ptr += 512;
-				bytes_written += 512;
-			} else { // do only partial copy
-				memcpy(write_ptr, sector_buffer, (512 - buffer_size));
-				bytes_written += (512 - buffer_size);
-			}
-
-			// See if there's another cluster in the chain
-			cluster_to_read = fat_get_next_cluster(superblock, cluster_to_read);
-
-			// no additional cluster to read
-			if(cluster_to_read == 0xFFFFFFFF) break;
-		}
+		// Read root directory
+		fat_read_cluster(superblock, cluster_to_read, buffer, buffer_size);
 	} else if(fs_info->fat_type == 16) {
 		fat_fs_bpb16_t *bpb = (fat_fs_bpb16_t *) fs_info->bpb;
 
+	}
+}
+
+/*
+ * Reads data starting at a specified sector until either all data has been
+ * read into the buffer, or the buffer is filled up to buffer_size bytes.
+ */
+void fat_read_cluster(fs_superblock_t* superblock, uint32_t cluster, void* buffer, uint32_t buffer_size) {
+	fat_fs_info_t *fs_info = (fat_fs_info_t *) superblock->fs_info;
+
+	uint32_t sector;
+	uint32_t cluster_to_read = cluster & FAT32_MASK;
+	DISK_ERROR derr;
+
+	uint8_t *write_ptr = buffer;
+	int bytes_written = 0;
+
+	// Read the entire directory
+	while(true) {
+		sector = PARTITION_LBA_REL2ABS(cluster_to_read+fs_info->first_data_sector, superblock->pt);
+		derr = disk_read(superblock->disk, sector, 1, sector_buffer);
+
+		// Handle disk read errors
+		if(derr != kDiskErrorNone) {
+			kprintf("Error reading file: 0x%X\n", derr);
+			break;
+		}
+
+		// Copy into buffer
+		if(buffer_size > 512) {
+			memcpy(write_ptr, sector_buffer, 512);
+
+			buffer_size -= 512;
+			write_ptr += 512;
+			bytes_written += 512;
+		} else { // do only partial copy
+			memcpy(write_ptr, sector_buffer, (512 - buffer_size));
+			bytes_written += (512 - buffer_size);
+		}
+
+		// See if there's another cluster in the chain
+		cluster_to_read = fat_get_next_cluster(superblock, cluster_to_read);
+
+		// no additional cluster to read
+		if(cluster_to_read == 0xFFFFFFFF) break;
 	}
 }
 
@@ -228,17 +264,21 @@ static uint32_t fat_get_next_cluster(fs_superblock_t* superblock, uint32_t clust
  * 0-terminated string.
  */
 static char* fat_83_to_str(fat_dirent_t* dirent) {
-	char* buf = (char *) kmalloc(14);
-	memclr(buf, 14);
+	char* buf = (char *) kmalloc(16);
+	memclr(buf, 16);
 
 	int buf_offset = 0;
 
 	// filename
 	for(int i = 0; i < 8; i++) {
-		if(dirent->name[i] != ' ') {
+		// FAT pads filenames with spaces
+		if(dirent->name[i] != ' ' && dirent->name[i] != 0x00) {
 			buf[buf_offset++] = dirent->name[i];
 		}
 	}
+
+	// Directories don't get extensions
+	if(dirent->attributes & FAT_ATTR_DIRECTORY) return buf;
 
 	// dot
 	buf[buf_offset++] = '.';
@@ -257,18 +297,71 @@ static char* fat_83_to_str(fat_dirent_t* dirent) {
  * Reads the directory table for the specified directory. Traverses all parent
  * directories, and returns NULL on error, or a pointer to the directory data if
  * successful.
+ *
+ * The VFS layer uses the forward slash ("/") to delimit different levels of
+ * folders and files. These locations are relative to the root of the
+ * filesystem, and any non-existent directory will cause an error to be raised.
  */
-char* fat_read_directory(fs_superblock_t *superblock, char* path) {
-	kprintf("\n\nSearching for directory %s\n", path);
+void* fat_read_directory(fs_superblock_t *superblock, char* path) {
+	// Get first component of the path
+	char* pch = strtok(path, "/");
 
-	char* pch;
-	pch = strtok(path, "/");
+	// Get pointer to FS info
+	fat_fs_info_t *fs_info = (fat_fs_info_t *) superblock->fs_info;
+
+	// Pointer to directory table (root dir to start with)
+	void *directoryTable = fs_info->root_directory;
+	void *dirTableRead;
+	fat_dirent_t *dirent;
+	uint32_t cluster;
+
+	// Allocate some temporary memory for directory tables
+	void *readMem = (void *) kmalloc(0x8000);
 
 	// Iterate through all paths
 	while(pch != NULL) {
-		kprintf("%s\n", pch);
+		dirTableRead = directoryTable;
+
+		// Iterate through directory's contents
+		while(true) {
+			dirent = (fat_dirent_t *) dirTableRead;
+
+			// Is this the last entry?
+			if(dirent->name[0] == 0x00) {
+				kprintf("Could not find directory %s\n", pch);
+				goto error;
+			} else { // We have more entries to process
+				if(dirent->attributes & FAT_ATTR_DIRECTORY) {
+					// It's a directory entry, so compare filename
+					if(strncasecmp(pch, (char *) &dirent->name, strlen(pch)) == 0) {
+						cluster = ((dirent->cluster_high << 0x10) | (dirent->cluster_low))-2;
+						fat_read_cluster(superblock, cluster, readMem, 0x8000);
+
+						break;
+					}
+				}
+			}
+
+			// Go to next directory entry
+			dirTableRead += 0x20;
+		}
+
 		pch = strtok(NULL, "/");
+
+		// Make sure we don't release the root directory's memory
+		if(directoryTable != fs_info->root_directory) {
+			kfree(directoryTable);
+		}
+
+		// Parse the directory we just read on the next iteration
+		directoryTable = readMem;
 	}
 
+	// We drop down here if the above loop exits
+	return readMem;
+
+	// If there's an error (or a directory doesn't exist) we get here
+error: ;
+	kfree(readMem);
 	return NULL;
 }

@@ -6,6 +6,8 @@ size_t strlen(char* str);
 char* strtok(char *s, const char *delim);
 char *strchr(const char *s, int c);
 char* strsep(char **stringp, const char *delim);
+int strcasecmp(const char *s1, const char *s2);
+int strncasecmp(const char *s1, const char *s2, size_t n);
 
 // string functions: memory
 void* memchr(void* ptr, uint8_t value, size_t num);

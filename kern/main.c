@@ -32,7 +32,7 @@ void kernel_main() {
 	system_init();
 	vfs_init();
 
-	kprintf("\x01\x11MosquitOS\x01\x10 Kernel v0.1 build %u compiled %s on %s with %s\n", (unsigned long) &KERN_BNUM, KERN_BDATE, KERN_BTIME, KERN_COMPILER);
+	kprintf("\x01\x11\x01\x0EMosquitOS\x01\x0F\x01\x10 Kernel v0.1 build %u compiled %s on %s with %s\n", (unsigned long) &KERN_BNUM, KERN_BDATE, KERN_BTIME, KERN_COMPILER);
 	kprintf("Kernel size: %i bytes (BSS at 0x%X, %i bytes)\n", &__kern_size, bss, bss_size);
 
 	if(ps2_init() != 0) {

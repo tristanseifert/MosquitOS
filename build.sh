@@ -27,6 +27,9 @@ cp kern/kernel.bin /Volumes/MOSQUITOS/KERNEL.BIN
 rm -rv /Volumes/MOSQUITOS/.fseventsd
 rm -rv /Volumes/MOSQUITOS/.Trashes
 
+# Remove "dot underbar" resource forks
+dot_clean -m /Volumes/MOSQUITOS/
+
 # Unmount disk image
 diskutil unmount /Volumes/MOSQUITOS/
 

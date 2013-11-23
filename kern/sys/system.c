@@ -311,9 +311,9 @@ bool sys_irq_enabled() {
  * Reads TSC (CPU timestamp counter)
  */
 uint64_t sys_rdtsc() {
-	unsigned int lo, hi;
+	uint32_t lo, hi;
 	// RDTSC copies contents of 64-bit TSC into EDX:EAX
-	asm volatile("rdtsc" : "=a" (lo), "=d" (hi));
+	__asm__ volatile("rdtsc" : "=a" (lo), "=d" (hi));
 
 	return (lo & 0xFFFFFFFF) | (hi << 0x20);
 }
