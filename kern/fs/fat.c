@@ -82,6 +82,8 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 		fs_info->total_clusters = fs_info->data_sectors / bpb->sectors_per_cluster;
 
 		fs_info->root_cluster = bpb->root_cluster;
+
+		superblock->vol_label = (char *) &bpb->volume_label;
 	} else if(fs_info->fat_type == 16) {
 		fat_fs_bpb16_t *bpb = (fat_fs_bpb16_t *) fs_info->bpb;
 
@@ -91,6 +93,8 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 		fs_info->total_clusters = fs_info->data_sectors / bpb->sectors_per_cluster;
 
 		fs_info->root_cluster = fs_info->first_data_sector;
+
+		superblock->vol_label = (char *) &bpb->volume_label;
 	}
 
 	// Compute the number of bytes the root directory takes up by following cluster chain
@@ -99,6 +103,10 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 
 	// Read the root directory of the filesystem
 	fat_read_get_root_dir(superblock, fs_info->root_directory, fs_info->root_dir_length);
+
+	// Set up the interface functions to access filesystems
+	superblock->read_file = fat_read_file;
+	superblock->read_directory = fat_read_directory;
 
 	return superblock;
 }
@@ -255,7 +263,7 @@ static char* fat_83_to_str(fat_dirent_t* dirent) {
  * folders and files. These locations are relative to the root of the
  * filesystem, and any non-existent directory will cause an error to be raised.
  */
-void* fat_read_directory(fs_superblock_t *superblock, char* path) {
+void* fat_read_directory(fs_superblock_t* superblock, char* path) {
 	// Get first component of the path
 	char* pch = strtok(path, "/");
 
@@ -322,7 +330,7 @@ error: ;
 /*
  * Reads a file from the filesystem, allocating a memory buffer for it.
  */
-void* fat_read_file(fs_superblock_t *superblock, char* file, void* buffer, uint32_t buffer_size) {
+void* fat_read_file(fs_superblock_t* superblock, char* file, void* buffer, uint32_t buffer_size) {
 	// Get first component of the path
 	char* pch = strtok(file, "/");
 	char* pch2 = pch;

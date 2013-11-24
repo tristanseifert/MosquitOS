@@ -70,7 +70,7 @@ void vfs_mount_all(ptable_t* pt) {
 
 	// Process each filesystem
 	while(true) {
-		vfs_mount_filesystem(partInfo);
+		vfs_mount_filesystem(partInfo, "/");
 
 		partInfo = partInfo->next;
 		if(!partInfo) break;
@@ -80,7 +80,7 @@ void vfs_mount_all(ptable_t* pt) {
 /*
  * Mounts a specific filesystem.
  */
-int vfs_mount_filesystem(ptable_entry_t* fs) {
+int vfs_mount_filesystem(ptable_entry_t* fs, char* mountPoint) {
 	fs_type_t* fdrv = vfs_find_fs(fs->type);
 
 	if(fdrv) {
@@ -96,6 +96,8 @@ int vfs_mount_filesystem(ptable_entry_t* fs) {
 		superblock->pt = fs;
 
 		fs_superblock_t *ret = fdrv->create_super(superblock, fs);
+
+		ret->vol_mount_point = mountPoint;
 	} else {
 		kprintf("Unknown filesystem type 0x%X\n", fs->type);
 		return -1;

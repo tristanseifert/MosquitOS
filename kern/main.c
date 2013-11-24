@@ -101,7 +101,10 @@ void kernel_main() {
 	fat_init();
 
 	ptable_t* mbr = mbr_load(hda0);
-	vfs_mount_all(mbr);
+
+	// Mount the root filesystem
+	ptable_entry_t* partInfo = mbr->first;
+	vfs_mount_filesystem(partInfo, "/");
 
 /*	
 	svga_mode_info_t *svga_mode_info = svga_mode_get_info(0x101);

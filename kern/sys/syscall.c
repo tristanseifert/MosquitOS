@@ -16,9 +16,9 @@ int syscall_return_value;
  * fetch the address of the function, place it in the array, and then we can jump to it
  * from our syscall handler.
  */
-syscall_routine syscall_table[SYSCALL_TABLE_SIZE] = {
-		syscall_stub
-	};
+static syscall_routine syscall_table[SYSCALL_TABLE_SIZE] = {
+	syscall_stub
+};
 
 /*
  * Initialises the syscall environment by configuring MSRs.

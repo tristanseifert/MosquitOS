@@ -50,7 +50,7 @@ typedef struct fat_extBS_32 {
 	uint8_t reserved_1;
 	uint8_t boot_signature;
 	uint32_t volume_id;
-	uint8_t  q[11];
+	uint8_t  volume_label[11];
 	uint8_t fat_type_label[8];
  
 } __attribute__((packed)) fat_fs_bpb32_t;
@@ -130,7 +130,7 @@ typedef struct {
 	uint16_t accessed_date;
 
 	uint16_t cluster_high;
-	
+
 	uint16_t write_time;
 	uint16_t write_date;
 
@@ -142,7 +142,7 @@ typedef struct {
 void fat_init();
 
 void fat_read_get_root_dir(fs_superblock_t* superblock, void* buffer, uint32_t buffer_size);
-void* fat_read_directory(fs_superblock_t *superblock, char* path);
-void* fat_read_file(fs_superblock_t *superblock, char* file, void* buffer, uint32_t buffer_size);
+void* fat_read_directory(fs_superblock_t* superblock, char* path);
+void* fat_read_file(fs_superblock_t* superblock, char* file, void* buffer, uint32_t buffer_size);
 
 #endif
