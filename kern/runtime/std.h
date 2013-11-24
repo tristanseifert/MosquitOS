@@ -9,6 +9,10 @@ char* strsep(char **stringp, const char *delim);
 int strcasecmp(const char *s1, const char *s2);
 int strncasecmp(const char *s1, const char *s2, size_t n);
 
+long strtol(const char *nptr, char **endptr, int base);
+unsigned long strtoul(const char *nptr, char **endptr, int base);
+int atoi(const char *str);
+
 // string functions: memory
 void* memchr(void* ptr, uint8_t value, size_t num);
 int memcmp(void* ptr1, void* ptr2, size_t num);

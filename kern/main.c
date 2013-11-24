@@ -94,9 +94,7 @@ void kernel_main() {
 	ata_driver_init(hda0);
 	DISK_ERROR ret = disk_init(hda0);
 
-	if(ret == kDiskErrorNone) {
-		kprintf("hda0 initialised successfully\n");
-	} else {
+	if(ret != kDiskErrorNone) {
 		kprintf("hda0 initialisation error: 0x%X\n", ret);
 	}
 
@@ -135,7 +133,6 @@ void kernel_main() {
 
 	// Explanation of the 7: The MOV opcode is 5 bytes, SYSENTER is 2.
 	// __asm__("mov %esp, %ecx; mov $0x0, %ebx; mov $.+7, %edx; sysenter;");
-
 
 	while(1);
 }

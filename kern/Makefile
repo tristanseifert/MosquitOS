@@ -15,7 +15,7 @@ BUILD_NUMBER_LDFLAGS += -Xlinker --defsym -Xlinker KERN_BNUM=$$(cat $(BUILD_NUMB
 CFLAGS= -c -finline-functions -g -Wall -fno-builtin -static\
 		-mno-sse2 -Os\
 		-nostartfiles -nodefaultlibs -std=c99 -Wno-unused-variable \
-		-mfpmath=387 -fno-stack-protector -I/Users/tristanseifert/SquelchenOS/kern/\
+		-mfpmath=387 -fno-stack-protector -I. -I./includes/\
 		-Wno-unused-function
 
 CFLAGSNOOPT = $(filter-out -Os,$(CFLAGS))

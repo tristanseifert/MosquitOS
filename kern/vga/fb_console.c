@@ -107,8 +107,7 @@ void fb_console_putchar(unsigned char c) {
 		col++;
 
 		if(col > (width / CHAR_WIDTH)) {
-			row++;
-			col = 0;
+			fb_console_control('\n');
 		}
 	}
 }

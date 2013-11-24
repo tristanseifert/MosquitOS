@@ -119,8 +119,8 @@ void paging_init() {
 	kheap = NULL;
 
 	// The size of physical memory. For the moment we 
-	// assume it is 32MB big.
-	uint32_t mem_end_page = 0x02000000;
+	// assume it is 64MB big.
+	uint32_t mem_end_page = 0x04000000;
 	
 	nframes = mem_end_page / 0x1000;
 

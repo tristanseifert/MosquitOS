@@ -1,6 +1,7 @@
 #include <types.h>
 #include "fat.h"
 #include "vfs.h"
+#include "vga/svga.h"
 
 static void fat_read_cluster(fs_superblock_t* superblock, uint32_t cluster, void* buffer, uint32_t buffer_size);
 static uint32_t fat_get_next_cluster(fs_superblock_t* superblock, uint32_t cluster_value);
@@ -36,8 +37,6 @@ void fat_init() {
 static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_entry_t* pt) {
 	ASSERT(superblock != NULL);
 	ptable_t *ptable = (ptable_t *) pt->ptable;
-
-	kprintf("\nInitialising FAT superblock...\n");
 
 	// Clear memory
 	memclr(sector_buffer, FAT_SECTOR_BUFFER_SIZE);
@@ -94,58 +93,12 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 		fs_info->root_cluster = fs_info->first_data_sector;
 	}
 
-	kprintf("Root directory = 0x%X (size = 0x%X), first FAT sector = 0x%X\n0x%X data sectors (first = 0x%X), total clusters = 0x%X\n", fs_info->root_cluster, fs_info->root_dir_sectors,
-		fs_info->first_fat_sector, fs_info->data_sectors, fs_info->first_data_sector, fs_info->total_clusters);
-
 	// Compute the number of bytes the root directory takes up by following cluster chain
 	fs_info->root_dir_length = 0x200 * 0x20;
 	fs_info->root_directory = (void *) kmalloc(fs_info->root_dir_length);
 
 	// Read the root directory of the filesystem
 	fat_read_get_root_dir(superblock, fs_info->root_directory, fs_info->root_dir_length);
-
-	uint8_t *ptr;
-	uint32_t size;
-
-	kprintf("\nContents of /:\n");
-	for(int i = 0; i < (fs_info->root_dir_length / 0x20); i++) {
-		ptr = fs_info->root_directory+(i * 0x20);
-		fat_dirent_t *dirent = (fat_dirent_t *) ptr;
-
-		if(ptr[0] != 0xE5 && ptr[0] != 0x00) {
-			if(dirent->attributes != (FAT_ATTR_LFN) && !(dirent->attributes & FAT_ATTR_DIRECTORY)) {
-				size = (ptr[0x1F] << 0x18) | (ptr[0x1E] << 0x10) | (ptr[0x1D] << 0x8) | ptr[0x1C];
-
-				kprintf("%s (%i bytes)\n", fat_83_to_str(dirent), size);
-			} else if(dirent->attributes & FAT_ATTR_DIRECTORY) {
-				kprintf("%s (directory)\n", fat_83_to_str(dirent));
-			}
-		}
-	}
-
-	// Test to read a directory
-	void *guiTable = fat_read_directory(superblock, "/gui");
-
-	ptr = guiTable;
-
-	kprintf("\nContents of /gui:\n");
-	while(true) {
-		fat_dirent_t *dirent = (fat_dirent_t *) ptr;
-
-		if(dirent->name[0] == 0x00) break;
-
-		if(ptr[0] != 0xE5 && ptr[0] != 0x00) {
-			if(dirent->attributes != (FAT_ATTR_LFN) && !(dirent->attributes & FAT_ATTR_DIRECTORY)) {
-				size = (ptr[0x1F] << 0x18) | (ptr[0x1E] << 0x10) | (ptr[0x1D] << 0x8) | ptr[0x1C];
-
-				kprintf("%s (%i bytes)\n", fat_83_to_str(dirent), size);
-			} else if(dirent->attributes & FAT_ATTR_DIRECTORY) {
-				kprintf("%s (directory)\n", fat_83_to_str(dirent));
-			}
-		}
-
-		ptr += 0x20;
-	}
 
 	return superblock;
 }
@@ -208,7 +161,7 @@ void fat_read_cluster(fs_superblock_t* superblock, uint32_t cluster, void* buffe
 		}
 
 		// See if there's another cluster in the chain
-		cluster_to_read = fat_get_next_cluster(superblock, cluster_to_read);
+		cluster_to_read = fat_get_next_cluster(superblock, cluster_to_read+2);
 
 		// no additional cluster to read
 		if(cluster_to_read == 0xFFFFFFFF) break;
@@ -364,4 +317,90 @@ void* fat_read_directory(fs_superblock_t *superblock, char* path) {
 error: ;
 	kfree(readMem);
 	return NULL;
+}
+
+/*
+ * Reads a file from the filesystem, allocating a memory buffer for it.
+ */
+void* fat_read_file(fs_superblock_t *superblock, char* file, void* buffer, uint32_t buffer_size) {
+	// Get first component of the path
+	char* pch = strtok(file, "/");
+	char* pch2 = pch;
+
+	// Variables
+	char *filename = 0x00;
+	char *path = file;
+	char *pretty_filename;
+
+	uint32_t cluster = 0;
+
+	// Split filename and path
+	while(pch != NULL) {
+		pch = strtok(NULL, "/");
+
+		if(pch == NULL) {
+			filename = pch2;
+			pch2--;
+			*pch2 = 0x00;
+			break;
+		}
+
+		pch2 = pch;
+	}
+
+	// Read the directory
+	void *dirTable = fat_read_directory(superblock, path);
+
+	// Search through the directory for the file
+	uint8_t* ptr = dirTable;
+
+	while(true) {
+		fat_dirent_t *dirent = (fat_dirent_t *) ptr;
+
+		// Have we reached the end of the directory?
+		if(unlikely(dirent->name[0] == 0x00)) break;
+
+		// Is this entry containing something?
+		if(ptr[0] != 0xE5 && ptr[0] != 0x00) {
+			// Is it a file?
+			if(dirent->attributes != (FAT_ATTR_LFN) && !(dirent->attributes & FAT_ATTR_DIRECTORY)) {
+				uint32_t size = (ptr[0x1F] << 0x18) | (ptr[0x1E] << 0x10) | (ptr[0x1D] << 0x8) | ptr[0x1C];
+				
+				pretty_filename = fat_83_to_str(dirent);
+
+				// Is it the file we're looking for?
+				if(unlikely(strncasecmp(filename, (char *) pretty_filename, strlen(pretty_filename)) == 0)) {
+					if(!buffer) {
+						buffer = (void *) kmalloc(size);
+						buffer_size = size;
+					}
+
+					cluster = ((dirent->cluster_high << 0x10) | (dirent->cluster_low))-2;
+
+					// Clean up memory
+					kfree(pretty_filename);
+
+					// Read the file
+					goto readFile;
+				}
+
+				// Clean up memory
+				kfree(pretty_filename);
+			}
+		}
+
+		ptr += 0x20;
+	}
+
+	// File could not be found !!!
+	return NULL;
+
+readFile: ;
+	kprintf("Reading %s from cluster 0x%X\n", filename, cluster);
+	fat_read_cluster(superblock, cluster, buffer, buffer_size);
+
+	// Free memory
+	kfree(dirTable);
+
+	return buffer;
 }

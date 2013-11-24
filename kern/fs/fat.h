@@ -130,6 +130,7 @@ typedef struct {
 	uint16_t accessed_date;
 
 	uint16_t cluster_high;
+	
 	uint16_t write_time;
 	uint16_t write_date;
 
@@ -142,5 +143,6 @@ void fat_init();
 
 void fat_read_get_root_dir(fs_superblock_t* superblock, void* buffer, uint32_t buffer_size);
 void* fat_read_directory(fs_superblock_t *superblock, char* path);
+void* fat_read_file(fs_superblock_t *superblock, char* file, void* buffer, uint32_t buffer_size);
 
 #endif

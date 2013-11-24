@@ -17,6 +17,7 @@ loader_start:
 	mov 	ax, $07C0											; Set data segment to where we're loaded
 	mov 	ds, ax
 
+	mov		dl, $80
 	mov		BYTE [BootDevice], dl								; Save boot device number
 
 	xor		ah, ah												; Change video mode (AH = $00)
@@ -47,6 +48,7 @@ loader_start:
 
 .A20GateEnabled:
 	xor		ah, ah												; Reset drive controller
+
 	mov		dl, BYTE [BootDevice]								; Device number
 	int		$13													; Reset drive
 
@@ -124,20 +126,6 @@ print_string:
 	inc		dh													; Increment row
 	push	dx													; Push it back to stack
 	jmp		.repeat
-
-
-;========================================================================================
-; Disk timestamp
-;========================================================================================
-	times	0xDA-($-$$) db 0									; Align at 0xDA
-
-	dw		0
-	db		$80													; Original physical drive
-	db		$00													; Secs
-	db		$00													; Mins
-	db		$00													; Hours
-
-	times	0xE0-($-$$) db 0									; Align at 0xE0
 
 ;========================================================================================
 ; Checks if the A20 gate is enabled.

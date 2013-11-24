@@ -88,11 +88,6 @@ stage2_start:
 	xor 	dx, dx
 	mov 	ax, $0E801
 	int 	$15													; Request upper memory size
-	jc 		error_memoryDetect
-	cmp 	ah, $86												; Unsupported function
-	je		error_memoryDetect
-	cmp		ah, $80												; Invalid command
-	je		error_memoryDetect
 	jcxz 	.useax												; Was the CX result invalid?
  
 	mov		ax, cx												; Number of continuous 1K blocks (1M-16M)
@@ -115,6 +110,7 @@ stage2_start:
 	call	fetch_mem_map										; Fetch a memory map
 	jc 		SHORT error_memoryDetect							; Branch if error
 
+error_memoryDetectRet:
 	mov		WORD [Kern_Info_StructPhys+$0E], bp					; ""
 	mov		DWORD [Kern_Info_StructPhys+$0A], (BIOS_MemMapSeg<<4); Physical location of table
 
@@ -136,9 +132,10 @@ stage2_start:
 ; Memory detection error handler
 ;========================================================================================
 error_memoryDetect:
+	mov		dx, $0E01
 	mov 	si, str_errorDetectMem								; Put string position into SI
 	call 	print_error											; Call string printing routine
-	jmp		$
+	jmp		error_memoryDetectRet								; Return to above meeper
 
 ;========================================================================================
 ; Code to boot the kernel
@@ -219,7 +216,6 @@ copy_kernel:
 	mov		DWORD [MMU_PageDir+0xC04], (MMU_PageTable3 | $3)
 	mov		DWORD [MMU_PageDir+0xC08], (MMU_PageTable4 | $3)
 	mov		DWORD [MMU_PageDir+0xC0C], (MMU_PageTable5 | $3)
-
 
 	; Run a loop 1024 times to fill the first page table
 	mov		ecx, $400
@@ -907,7 +903,7 @@ str_stage2loaded:
 	db 	'Stage 2 Bootloader (boot2)', 0
 
 str_errorDetectMem:
-	db 	"Error detecting available memory, cannot continue", 0
+	db 	"Error retrieving BIOS memory map!", 0
 
 str_floppyError:
 	db 	"Floppy Error, press any key to retry", $0A, 0
