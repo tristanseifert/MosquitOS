@@ -1,9 +1,7 @@
 #include <types.h>
+#include <errno.h>
 
 #include "hashmap.h"
-
-#define hashsize(n) (((uint32_t) 1) << (n))
-#define hashmask(n) (hashsize(n) - 1)
 
 /*
  * The default hash function used by the hash table implementation. Based on the
@@ -29,19 +27,27 @@ static uint32_t default_hash(char *key, size_t len) {
  */
 hashmap_t *hashmap_allocate() {
 	hashmap_t *hashmap = (hashmap_t *) malloc(sizeof(hashmap_t));
+	if(!hashmap) {
+		return NULL;
+	}
+
 	memclr(hashmap, sizeof(hashmap_t));
 	hashmap->num_buckets = 256;
 
+	// Ugly method to get mask
+	hashmap->mask = hashmap->num_buckets - 1;
+
 	// Allocate bucket structures
-	hashmap_bucket_t* bucket, prev_bucket;
+	hashmap_bucket_t* bucket;
+	hashmap_bucket_t* prev_bucket = NULL;
 
 	for(int i = 0; i < hashmap->num_buckets; i++) {
-		bucket = kmalloc(sizeof(hashmap_bucket_t));
+		bucket = (hashmap_bucket_t *) kmalloc(sizeof(hashmap_bucket_t));
 		memclr(bucket, sizeof(hashmap_bucket_t));
 
 		// Set the bucket's next structure
 		if(prev_bucket) {
-			bucket->next = prev_bucket;
+			prev_bucket->next = bucket;
 		}
 
 		// If it's the 0th bucket, set it in the hashmap
@@ -52,6 +58,8 @@ hashmap_t *hashmap_allocate() {
 		// Store a pointer to this bucket so we can set its next pointer
 		prev_bucket = bucket;
 	}
+
+	return hashmap;
 }
 
 /*
@@ -67,37 +75,14 @@ void hashmap_release(hashmap_t* map) {
 
 		// Deallocate the data in the bucket.
 		while(data != NULL) {
-			free(data->key);
-			free(data);
+			kfree(data->key);
+			kfree(data);
 			data = data->next;
 		}
 	}
 
 	// Clear remaining memory
-	free(map);
-}
-
-/*
- * Searches a bucket for a specified key. Returns NULL if the key could not be
- * found, or a pointer to the data structure if found.
- */
-static void* hashmap_search_bucket(hashmap_bucket_t* bucket, void* key) {
-	size_t keyLength = strlen(key);
-
-	hashmap_data_t *data = bucket->data;
-
-	// Iterate through all data associated with this bucket.
-	while(data != NULL) {
-		// Compare keys
-		if(memcmp(key, data->key, keyLength) == 0) {
-			return data;
-		}
-
-		// Check next item in the linked list.
-		data = data->next;
-	}
-
-	return NULL;
+	kfree(map);
 }
 
 /*
@@ -109,9 +94,12 @@ void hashmap_insert(hashmap_t* hashmap, void* key, void* value) {
 	size_t keyLength = strlen(key);
 	void* keyCopy = (void *) kmalloc(keyLength+1);
 
+	memclr(keyCopy, keyLength+1);
+	memcpy(keyCopy, key, keyLength);
+
 	// Calculate hash
-	uint32_t hash = default_hash(keyCopy);
-	hash &= hashmask(hashmap->num_buckets);
+	uint32_t hash = default_hash(keyCopy, keyLength);
+	hash &= hashmap->mask;
 
 	// Locate the bucket in the hashmap.
 	hashmap_bucket_t *bucket = hashmap->buckets;
@@ -119,10 +107,13 @@ void hashmap_insert(hashmap_t* hashmap, void* key, void* value) {
 	for(int i = 0; i < hash; i++) {
 		// Go to the next bucket.
 		bucket = bucket->next;
+
+		if(bucket == NULL) return;
 	}
 
 	// Search through all data in the bucket to see if the key exists
-	hashmap_data_t* data, emptyData;
+	hashmap_data_t* data;
+	hashmap_data_t* emptyData;
 
 	data = bucket->data;
 
@@ -136,6 +127,7 @@ void hashmap_insert(hashmap_t* hashmap, void* key, void* value) {
 
 		// Set the bucket's data structure
 		bucket->data = newData;
+
 		return;
 	} else {
 		// Search through the data structures instead.
@@ -147,7 +139,7 @@ void hashmap_insert(hashmap_t* hashmap, void* key, void* value) {
 			// Do the keys match?
 			if(memcmp(keyCopy, data->key, keyLength) == 0) {
 				// Release old data.
-				free(data->data);
+				kfree(data->data);
 
 				// Set data.
 				data->data = value;
@@ -182,8 +174,8 @@ void hashmap_insert(hashmap_t* hashmap, void* key, void* value) {
 void* hashmap_get(hashmap_t* hashmap, void* key) {
 	// Calculate hash
 	size_t keyLength = strlen(key);
-	uint32_t hash = default_hash(key);
-	hash &= hashmask(hashmap->num_buckets);
+	uint32_t hash = default_hash(key, keyLength);
+	hash &= hashmap->mask;
 
 	// Locate the bucket in the hashmap.
 	hashmap_bucket_t *bucket = hashmap->buckets;
@@ -198,7 +190,7 @@ void* hashmap_get(hashmap_t* hashmap, void* key) {
 
 	while(data != NULL) {
 		// We've found the key.
-		if(memcmp(keyCopy, data->key, keyLength) == 0) {
+		if(memcmp(key, data->key, keyLength) == 0) {
 			return data->data;
 		}
 
@@ -215,8 +207,8 @@ void* hashmap_get(hashmap_t* hashmap, void* key) {
 int hashmap_delete(hashmap_t* hashmap, void* key) {
 	// Calculate hash
 	size_t keyLength = strlen(key);
-	uint32_t hash = default_hash(key);
-	hash &= hashmask(hashmap->num_buckets);
+	uint32_t hash = default_hash(key, keyLength);
+	hash &= hashmap->mask;
 
 	// Locate the bucket in the hashmap.
 	hashmap_bucket_t *bucket = hashmap->buckets;
@@ -231,8 +223,8 @@ int hashmap_delete(hashmap_t* hashmap, void* key) {
 
 	while(data != NULL) {
 		// We've found the key, so delete it.
-		if(memcmp(keyCopy, data->key, keyLength) == 0) {
-			free(data->key);
+		if(memcmp(key, data->key, keyLength) == 0) {
+			kfree(data->key);
 			data->data = NULL;
 			return 0;
 		}

@@ -1,16 +1,21 @@
 #include <types.h>
 #include "vfs.h"
+#include <runtime/hashmap.h>
 
 static fs_type_t* vfs_find_fs(uint16_t type);
 
 static fs_type_t* fs_map;
 static fs_type_t* fs_last;
 
+static hashmap_t* mountPointMap;
+
 /*
  * Initialises the VFS subsystem
  */
 void vfs_init() {
+	mountPointMap = hashmap_allocate();
 
+	ASSERT(mountPointMap != NULL);
 }
 
 /*
@@ -81,13 +86,23 @@ void vfs_mount_all(ptable_t* pt) {
  * Mounts a specific filesystem.
  */
 int vfs_mount_filesystem(ptable_entry_t* fs, char* mountPoint) {
+	// Is something already mounted here?
+	fs_superblock_t *superblock;
+
+	if((superblock = hashmap_get(mountPointMap, mountPoint)) != NULL) {
+		kprintf("A filesystem is already mounted at %s!\n", mountPoint);
+		return -1;
+	}
+
+	// Get the appropriate filesystem
 	fs_type_t* fdrv = vfs_find_fs(fs->type);
 
+	// If we have one, mount it
 	if(fdrv) {
 		kprintf("Mounting partition %i: Type 0x%X (%s), start 0x%X, length 0x%X sectors\n", fs->part_num, fs->type, fdrv->name, fs->lba_start, fs->lba_length);
 
-		// allocate memory for the superblock
-		fs_superblock_t *superblock = (fs_superblock_t*) kmalloc(sizeof(fs_superblock_t));
+		// Allocate memory for the superblock
+		superblock = (fs_superblock_t*) kmalloc(sizeof(fs_superblock_t));
 		memclr(superblock, sizeof(fs_superblock_t));
 
 		ASSERT(superblock != NULL);
@@ -98,6 +113,9 @@ int vfs_mount_filesystem(ptable_entry_t* fs, char* mountPoint) {
 		fs_superblock_t *ret = fdrv->create_super(superblock, fs);
 
 		ret->vol_mount_point = mountPoint;
+
+		// Add to mountpoint hashmap
+		hashmap_insert(mountPointMap, mountPoint, superblock);
 	} else {
 		kprintf("Unknown filesystem type 0x%X\n", fs->type);
 		return -1;

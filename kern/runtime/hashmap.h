@@ -28,7 +28,7 @@ typedef struct hashmap_data {
 typedef struct hashmap_bucket {
 	hashmap_data_t *data;
 
-	struct hashmap_bucket* next_bucket;
+	struct hashmap_bucket* next;
 } hashmap_bucket_t;
 
 /*
@@ -40,6 +40,8 @@ typedef struct hashmap {
 
 	int seed;
 	int num_buckets;
+
+	uint32_t mask;
 } hashmap_t;
 
 // Initialisation and deallocation
