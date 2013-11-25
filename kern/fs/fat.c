@@ -105,8 +105,9 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 	fat_read_get_root_dir(superblock, fs_info->root_directory, fs_info->root_dir_length);
 
 	// Set up the interface functions to access filesystems
-	superblock->read_file = fat_read_file;
-	superblock->read_directory = fat_read_directory;
+	superblock->fp_read_file = fat_read_file;
+	superblock->fp_read_directory = fat_read_directory;
+	superblock->fp_unmount = fat_unmount;
 
 	return superblock;
 }
@@ -411,4 +412,11 @@ readFile: ;
 	kfree(dirTable);
 
 	return buffer;
+}
+
+/*
+ * Unmounts the filesystem.
+ */
+int fat_unmount(fs_superblock_t* superblock) {
+	return EBUSY;
 }

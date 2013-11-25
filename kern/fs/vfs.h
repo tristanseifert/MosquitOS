@@ -5,7 +5,7 @@
 #include <io/disk.h>
 #include "ptable.h"
 
-#define VFS_NUM_ARRAY 8
+#define VFS_FLAG_READONLY 0x80000000
 
 typedef struct fs_superblock {
 	const char *vol_label;
@@ -15,12 +15,16 @@ typedef struct fs_superblock {
 	ptable_entry_t *pt;
 
 	// Functions to interact with the filesytem
-	void* (*read_file) (struct fs_superblock*, char*, void*, uint32_t);
-	void* (*write_file) (struct fs_superblock*, char*, void*, uint32_t);
-	void* (*read_directory) (struct fs_superblock*, char*);
+	void* (*fp_read_file) (struct fs_superblock*, char*, void*, uint32_t);
+	void* (*fp_write_file) (struct fs_superblock*, char*, void*, uint32_t);
+	void* (*fp_read_directory) (struct fs_superblock*, char*);
+
+	int (*fp_unmount) (struct fs_superblock*);
 
 	// pointer to fs-specific struct
 	void* fs_info;
+
+	uint32_t flags;
 } fs_superblock_t;
 
 typedef struct fs_type {
@@ -45,5 +49,7 @@ void vfs_deregister(fs_type_t* fs);
 
 void vfs_mount_all(ptable_t* pt);
 int vfs_mount_filesystem(ptable_entry_t* fs, char* mountPoint);
+
+int vfs_unmount(char* mountPoint);
 
 #endif

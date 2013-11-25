@@ -6,6 +6,7 @@
 #endif
 #include <stddef.h>
 #include <stdint.h>
+#include <errno.h>
 
 // This gives us all the runtime functions
 #include <runtime/std.h>

@@ -46,12 +46,12 @@ hashmap_t *hashmap_allocate() {
 		memclr(bucket, sizeof(hashmap_bucket_t));
 
 		// Set the bucket's next structure
-		if(prev_bucket) {
+		if(likely(prev_bucket)) {
 			prev_bucket->next = bucket;
 		}
 
 		// If it's the 0th bucket, set it in the hashmap
-		if(i == 0) {
+		if(unlikely(i == 0)) {
 			hashmap->buckets = bucket;
 		}
 
@@ -63,18 +63,19 @@ hashmap_t *hashmap_allocate() {
 }
 
 /*
- * Releases the memory associated with a a hashmap.
+ * Releases the memory associated with a a hashmap, including all bucket and
+ * data structures.
  */
 void hashmap_release(hashmap_t* map) {
 	hashmap_bucket_t* bucket = map->buckets;
 	hashmap_data_t* data;
 
 	// Deallocate buckets
-	while(bucket != NULL) {
+	while(likely(bucket != NULL)) {
 		data = bucket->data;
 
 		// Deallocate the data in the bucket.
-		while(data != NULL) {
+		while(likely(data != NULL)) {
 			kfree(data->key);
 			kfree(data);
 			data = data->next;
@@ -118,7 +119,7 @@ void hashmap_insert(hashmap_t* hashmap, void* key, void* value) {
 	data = bucket->data;
 
 	// If there's no data structure in this bucket, create some.
-	if(data == NULL) {
+	if(unlikely(data == NULL)) {
 		hashmap_data_t* newData = (hashmap_data_t *) kmalloc(sizeof(hashmap_data_t));
 		memclr(newData, sizeof(hashmap_data_t));
 
@@ -131,13 +132,13 @@ void hashmap_insert(hashmap_t* hashmap, void* key, void* value) {
 		return;
 	} else {
 		// Search through the data structures instead.
-		while(data != NULL) {
+		while(likely(data != NULL)) {
 			if(data->key == NULL) {
 				emptyData = value;
 			}
 
 			// Do the keys match?
-			if(memcmp(keyCopy, data->key, keyLength) == 0) {
+			if(unlikely(memcmp(keyCopy, data->key, keyLength) == 0)) {
 				// Release old data.
 				kfree(data->data);
 
@@ -188,9 +189,9 @@ void* hashmap_get(hashmap_t* hashmap, void* key) {
 	// Loop through the data structures in the bucket
 	hashmap_data_t* data = bucket->data;
 
-	while(data != NULL) {
+	while(likely(data != NULL)) {
 		// We've found the key.
-		if(memcmp(key, data->key, keyLength) == 0) {
+		if(unlikely(memcmp(key, data->key, keyLength) == 0)) {
 			return data->data;
 		}
 
@@ -202,7 +203,8 @@ void* hashmap_get(hashmap_t* hashmap, void* key) {
 }
 
 /*
- * Removes an entry from the hashmap.
+ * Removes an entry from the hashmap, releasing the memory associated with the
+ * key as well.
  */
 int hashmap_delete(hashmap_t* hashmap, void* key) {
 	// Calculate hash
@@ -221,9 +223,9 @@ int hashmap_delete(hashmap_t* hashmap, void* key) {
 	// Loop through the data structures in the bucket
 	hashmap_data_t* data = bucket->data;
 
-	while(data != NULL) {
+	while(likely(data != NULL)) {
 		// We've found the key, so delete it.
-		if(memcmp(key, data->key, keyLength) == 0) {
+		if(unlikely(memcmp(key, data->key, keyLength) == 0)) {
 			kfree(data->key);
 			data->data = NULL;
 			return 0;

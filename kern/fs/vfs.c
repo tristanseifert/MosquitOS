@@ -98,7 +98,7 @@ int vfs_mount_filesystem(ptable_entry_t* fs, char* mountPoint) {
 	fs_type_t* fdrv = vfs_find_fs(fs->type);
 
 	// If we have one, mount it
-	if(fdrv) {
+	if(likely(fdrv != NULL)) {
 		kprintf("Mounting partition %i: Type 0x%X (%s), start 0x%X, length 0x%X sectors\n", fs->part_num, fs->type, fdrv->name, fs->lba_start, fs->lba_length);
 
 		// Allocate memory for the superblock
@@ -140,4 +140,32 @@ static fs_type_t* vfs_find_fs(uint16_t type) {
 	}
 
 	return NULL;
+}
+
+/*
+ * Tries to unmount the filesystem that is mounted at the specified place.
+ */
+int vfs_unmount(char* mountPoint) {
+	fs_superblock_t* superblock = hashmap_get(mountPointMap, mountPoint);
+
+	// Error out if there's no superblock
+	if(unlikely(!superblock)) {
+		errno = ENOTFOUND;
+		goto done;
+	}
+
+	int unmountStatus = (superblock->fp_unmount)(superblock);
+
+	// If filesystem encountered an error, jump
+	if(unlikely(unmountStatus != 0)) {
+		errno = unmountStatus;
+		goto done;
+	}
+
+	// Remove from hashmap anmd clean up
+	hashmap_delete(mountPointMap, mountPoint);
+	kfree(superblock);
+
+done:;
+	return errno;
 }
