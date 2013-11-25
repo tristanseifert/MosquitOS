@@ -2,6 +2,9 @@
 
 #include "hashmap.h"
 
+#define hashsize(n) (((uint32_t) 1) << (n))
+#define hashmask(n) (hashsize(n) - 1)
+
 /*
  * The default hash function used by the hash table implementation. Based on the
  * Jenkins Hash Function (http://en.wikipedia.org/wiki/Jenkins_hash_function)
@@ -52,7 +55,7 @@ hashmap_t *hashmap_allocate() {
 }
 
 /*
- * Releases the memory for a hashmap.
+ * Releases the memory associated with a a hashmap.
  */
 void hashmap_release(hashmap_t* map) {
 	hashmap_bucket_t* bucket = map->buckets;
@@ -75,30 +78,168 @@ void hashmap_release(hashmap_t* map) {
 }
 
 /*
- * Searches a bucket for a specified key.
+ * Searches a bucket for a specified key. Returns NULL if the key could not be
+ * found, or a pointer to the data structure if found.
  */
 static void* hashmap_search_bucket(hashmap_bucket_t* bucket, void* key) {
+	size_t keyLength = strlen(key);
 
+	hashmap_data_t *data = bucket->data;
+
+	// Iterate through all data associated with this bucket.
+	while(data != NULL) {
+		// Compare keys
+		if(memcmp(key, data->key, keyLength) == 0) {
+			return data;
+		}
+
+		// Check next item in the linked list.
+		data = data->next;
+	}
+
+	return NULL;
 }
 
 /*
  * Inserts an item into the hashmap. If the key already exists, its data is
  * overwritten.
  */
-void hashmap_insert(hashmap_t*, void* key, void* data) {
+void hashmap_insert(hashmap_t* hashmap, void* key, void* value) {
+	// Create a copy of the key.
+	size_t keyLength = strlen(key);
+	void* keyCopy = (void *) kmalloc(keyLength+1);
 
+	// Calculate hash
+	uint32_t hash = default_hash(keyCopy);
+	hash &= hashmask(hashmap->num_buckets);
+
+	// Locate the bucket in the hashmap.
+	hashmap_bucket_t *bucket = hashmap->buckets;
+
+	for(int i = 0; i < hash; i++) {
+		// Go to the next bucket.
+		bucket = bucket->next;
+	}
+
+	// Search through all data in the bucket to see if the key exists
+	hashmap_data_t* data, emptyData;
+
+	data = bucket->data;
+
+	// If there's no data structure in this bucket, create some.
+	if(data == NULL) {
+		hashmap_data_t* newData = (hashmap_data_t *) kmalloc(sizeof(hashmap_data_t));
+		memclr(newData, sizeof(hashmap_data_t));
+
+		newData->data = value;
+		newData->key = keyCopy;
+
+		// Set the bucket's data structure
+		bucket->data = newData;
+		return;
+	} else {
+		// Search through the data structures instead.
+		while(data != NULL) {
+			if(data->key == NULL) {
+				emptyData = value;
+			}
+
+			// Do the keys match?
+			if(memcmp(keyCopy, data->key, keyLength) == 0) {
+				// Release old data.
+				free(data->data);
+
+				// Set data.
+				data->data = value;
+
+				// We're done here.
+				return;
+			}
+		}
+
+		// If we have an empty data structure, stuff our data into it.
+		if(emptyData) {
+			emptyData->key = keyCopy;
+			emptyData->data = value;
+			return;
+		} else { // We need to allocate a data structure
+			hashmap_data_t* newData = (hashmap_data_t *) kmalloc(sizeof(hashmap_data_t));
+			memclr(newData, sizeof(hashmap_data_t));
+
+			newData->data = value;
+			newData->key = keyCopy;
+
+			// Set it as the next data structure.
+			data->next = newData;
+			return;
+		}
+	}
 }
 
 /*
  * Retrieves an item from the hashmap, or returns NULL if not found.
  */
-void* hashmap_get(hashmap_t*, void* key) {
+void* hashmap_get(hashmap_t* hashmap, void* key) {
+	// Calculate hash
+	size_t keyLength = strlen(key);
+	uint32_t hash = default_hash(key);
+	hash &= hashmask(hashmap->num_buckets);
 
+	// Locate the bucket in the hashmap.
+	hashmap_bucket_t *bucket = hashmap->buckets;
+
+	for(int i = 0; i < hash; i++) {
+		// Go to the next bucket.
+		bucket = bucket->next;
+	}
+
+	// Loop through the data structures in the bucket
+	hashmap_data_t* data = bucket->data;
+
+	while(data != NULL) {
+		// We've found the key.
+		if(memcmp(keyCopy, data->key, keyLength) == 0) {
+			return data->data;
+		}
+
+		data = data->next;
+	}
+
+	// We didn't find the key in the bucket.
+	return NULL;
 }
 
 /*
  * Removes an entry from the hashmap.
  */
-int hashmap_delete(hashmap_t*, void* key) {
+int hashmap_delete(hashmap_t* hashmap, void* key) {
+	// Calculate hash
+	size_t keyLength = strlen(key);
+	uint32_t hash = default_hash(key);
+	hash &= hashmask(hashmap->num_buckets);
 
+	// Locate the bucket in the hashmap.
+	hashmap_bucket_t *bucket = hashmap->buckets;
+
+	for(int i = 0; i < hash; i++) {
+		// Go to the next bucket.
+		bucket = bucket->next;
+	}
+
+	// Loop through the data structures in the bucket
+	hashmap_data_t* data = bucket->data;
+
+	while(data != NULL) {
+		// We've found the key, so delete it.
+		if(memcmp(keyCopy, data->key, keyLength) == 0) {
+			free(data->key);
+			data->data = NULL;
+			return 0;
+		}
+
+		data = data->next;
+	}
+
+	// The key couldn't be found in the hashmap
+	return ENOTFOUND;
 }

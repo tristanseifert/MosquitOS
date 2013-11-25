@@ -37,18 +37,18 @@ typedef struct hashmap_bucket {
  */
 typedef struct hashmap {
 	hashmap_bucket_t *buckets;
-	
+
 	int seed;
 	int num_buckets;
 } hashmap_t;
 
 // Initialisation and deallocation
-hashmap_t *hashmap_allocate(int);
+hashmap_t *hashmap_allocate();
 void hashmap_release(hashmap_t*);
 
 // Hashmap's content manipulation
-void hashmap_insert(hashmap_t*, void* key, void* data);
-void* hashmap_get(hashmap_t*, void* key);
-int hashmap_delete(hashmap_t*, void* key);
+void hashmap_insert(hashmap_t*, void*, void*);
+void* hashmap_get(hashmap_t*, void*);
+int hashmap_delete(hashmap_t*, void*);
 
 #endif
