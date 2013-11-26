@@ -145,4 +145,6 @@ void fat_read_get_root_dir(fs_superblock_t* superblock, void* buffer, uint32_t b
 void* fat_read_directory(fs_superblock_t* superblock, char* path);
 void* fat_read_file(fs_superblock_t* superblock, char* file, void* buffer, uint32_t buffer_size);
 
+int fat_unmount(fs_superblock_t* superblock);
+
 #endif

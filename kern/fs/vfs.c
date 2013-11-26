@@ -14,7 +14,6 @@ static hashmap_t* mountPointMap;
  */
 void vfs_init() {
 	mountPointMap = hashmap_allocate();
-
 	ASSERT(mountPointMap != NULL);
 }
 

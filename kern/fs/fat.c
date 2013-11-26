@@ -1,7 +1,7 @@
 #include <types.h>
 #include "fat.h"
 #include "vfs.h"
-#include "vga/svga.h"
+#include "sys/binfmt_elf.h"
 
 static void fat_read_cluster(fs_superblock_t* superblock, uint32_t cluster, void* buffer, uint32_t buffer_size);
 static uint32_t fat_get_next_cluster(fs_superblock_t* superblock, uint32_t cluster_value);
@@ -108,6 +108,13 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 	superblock->fp_read_file = fat_read_file;
 	superblock->fp_read_directory = fat_read_directory;
 	superblock->fp_unmount = fat_unmount;
+
+	// Obamacare
+	void* elfFile = fat_read_file(superblock, "/KERNEL.ELF", NULL, 0);
+	kprintf("ELF file at 0x%X\n\n", elfFile);
+
+	elf_file_t *meeper = elf_load_binary(elfFile);
+	kprintf("ELF at 0x%X\n", meeper);
 
 	return superblock;
 }
@@ -357,8 +364,16 @@ void* fat_read_file(fs_superblock_t* superblock, char* file, void* buffer, uint3
 		pch2 = pch;
 	}
 
+	void *dirTable = NULL;
+
 	// Read the directory
-	void *dirTable = fat_read_directory(superblock, path);
+	if(path[0] == 0x00) {
+		// Use the root directory table already in memory
+		fat_fs_info_t *fs_info = (fat_fs_info_t *) superblock->fs_info;
+		dirTable = fs_info->root_directory;
+	} else {
+		dirTable = fat_read_directory(superblock, path);	
+	}
 
 	// Search through the directory for the file
 	uint8_t* ptr = dirTable;
@@ -408,8 +423,10 @@ readFile: ;
 	kprintf("Reading %s from cluster 0x%X\n", filename, cluster);
 	fat_read_cluster(superblock, cluster, buffer, buffer_size);
 
-	// Free memory
-	kfree(dirTable);
+	// Release directory table memory if not root directory
+	if(path[0] != 0x00) {
+		kfree(dirTable);
+	}
 
 	return buffer;
 }
