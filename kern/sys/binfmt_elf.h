@@ -116,6 +116,7 @@ typedef struct elf_file {
 	elf_header_t* header;
 } elf_file_t;
 
+// 11000000 03000000 00000000 00000000 2C800200 5F000000 00000000 00000000 01000000 00000000
 typedef struct{
 	uint32_t sh_name;
 	uint32_t sh_type;

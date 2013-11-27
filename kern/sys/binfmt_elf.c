@@ -9,7 +9,8 @@
 	x[0] != 0x7F || x[1] != 0x45 || \
 	x[2] != 0x4C || x[3] != 0x46
 
-elf_file_t* elf_load_binary(void* buffer) {
+elf_file_t* elf_load_binary(void* elfIn) {
+	uint8_t *buffer = (uint8_t *) elfIn;
 	elf_header_t *header = (elf_header_t*) buffer;
 
 	if(elf_check_magic(header->ident.magic)) {
@@ -32,20 +33,28 @@ elf_file_t* elf_load_binary(void* buffer) {
 	file_struct->elf_file_memory = buffer;
 	file_struct->header = header;
 
-	// Parse program header table
-	void* program_header_table = buffer + header->ph_offset;
-	for(int i = 0; i < header->ph_entry_count; i++) {
+	ASSERT(header->ph_entry_size == sizeof(elf_program_entry_t));
+	ASSERT(header->sh_entry_size == sizeof(elf_section_entry_t));
 
-		// Go to next header table entry
-		program_header_table += header->ph_entry_size;
+	// Try to find the string table
+	unsigned char* stringTablePtr = NULL;
+	if(header->sh_str_index != SHN_UNDEF) {
+		kprintf("String table index: 0x%X 0x%X\n", header->sh_str_index, header->sh_offset);
+
+		elf_section_entry_t *entry = (elf_section_entry_t *) (buffer + header->sh_offset) + (sizeof(elf_section_entry_t) * header->sh_str_index);
+		stringTablePtr = buffer + entry->sh_offset;
+
+		kprintf("Found string table at offset 0x%X, size 0x%X (0x%X)\n", entry->sh_offset, entry->sh_size, header->sh_offset + (sizeof(elf_section_entry_t) * header->sh_str_index));
+	}
+
+	// Parse program header table
+	for(int i = 0; i < header->ph_entry_count; i++) {
+		elf_program_entry_t *entry = (elf_program_entry_t *) (buffer + header->ph_offset) + (sizeof(elf_program_entry_t) * i);
 	}
 
 	// Parse section header table
-	void* section_header_table = buffer + header->sh_offset;
 	for(int i = 0; i < header->sh_entry_count; i++) {
-
-		// Go to next header table entry
-		section_header_table += header->sh_entry_size;
+		elf_section_entry_t *entry = (elf_section_entry_t *) (buffer + header->sh_offset) + (sizeof(elf_section_entry_t) * i);
 	}
 
 	return file_struct;
