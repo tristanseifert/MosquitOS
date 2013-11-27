@@ -109,21 +109,25 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 	superblock->fp_read_directory = fat_read_directory;
 	superblock->fp_unmount = fat_unmount;
 
-	uint8_t* testFile = fat_read_file(superblock, "/TEST.BIN", NULL, 0);
+	/*uint8_t* testFile = fat_read_file(superblock, "/TEST.BIN", NULL, 0);
 	kprintf("Test file at 0x%X\n256 bytes: ", testFile);
 
 	for(int i = 0; i < 16; i++) {
 		kprintf("0x%X ", testFile[i*0x100]);
 	}
 
-	kprintf("\n");
+	kprintf("\n");*/
 
-	// Obamacare
-/*	void* elfFile = fat_read_file(superblock, "/KERNEL.ELF", NULL, 0);
+/*	// BMP loading test
+	void* bmpFile = fat_read_file(superblock, "/gui/test.bmp", NULL, 0);
+	gui_draw_bmp(bmpFile, 320, 0);*/
+
+	// ELF loading test
+	void* elfFile = fat_read_file(superblock, "/KERNEL.ELF", NULL, 0);
 	kprintf("ELF file at 0x%X\n\n", elfFile);
 
 	elf_file_t *meeper = elf_load_binary(elfFile);
-	kprintf("ELF at 0x%X\n", meeper);*/
+	kprintf("\n\nParsed ELF to 0x%X\n", meeper);
 
 	return superblock;
 }
@@ -332,7 +336,7 @@ void* fat_read_directory(fs_superblock_t* superblock, char* path) {
 				if(dirent->attributes & FAT_ATTR_DIRECTORY) {
 					// It's a directory entry, so compare filename
 					if(strncasecmp(pch, (char *) &dirent->name, strlen(pch)) == 0) {
-						cluster = ((dirent->cluster_high << 0x10) | (dirent->cluster_low))-2;
+						cluster = ((dirent->cluster_high << 0x10) | (dirent->cluster_low));
 						fat_read_cluster(superblock, cluster & FAT32_MASK, readMem, 0x8000);
 
 						break;
@@ -401,7 +405,7 @@ void* fat_read_file(fs_superblock_t* superblock, char* file, void* buffer, uint3
 		fat_fs_info_t *fs_info = (fat_fs_info_t *) superblock->fs_info;
 		dirTable = fs_info->root_directory;
 	} else {
-		dirTable = fat_read_directory(superblock, path);	
+		dirTable = fat_read_directory(superblock, path);
 	}
 
 	// Search through the directory for the file

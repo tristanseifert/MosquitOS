@@ -10,8 +10,8 @@
 	x[2] != 0x4C || x[3] != 0x46
 
 elf_file_t* elf_load_binary(void* elfIn) {
-	uint8_t *buffer = (uint8_t *) elfIn;
-	elf_header_t *header = (elf_header_t*) buffer;
+	uint8_t *fileBuffer = (uint8_t *) elfIn;
+	elf_header_t *header = (elf_header_t*) fileBuffer;
 
 	if(elf_check_magic(header->ident.magic)) {
 		kprintf("Invalid ELF file: Invalid magic 0x%X%X%X%X\n", header->ident.magic[0], header->ident.magic[1], header->ident.magic[2], header->ident.magic[3]);
@@ -30,32 +30,39 @@ elf_file_t* elf_load_binary(void* elfIn) {
 
 	memclr(file_struct, sizeof(elf_file_t));
 
-	file_struct->elf_file_memory = buffer;
+	file_struct->elf_file_memory = fileBuffer;
 	file_struct->header = header;
 
+	// If this ELF file doesn't match what we expect, we're screwed
 	ASSERT(header->ph_entry_size == sizeof(elf_program_entry_t));
 	ASSERT(header->sh_entry_size == sizeof(elf_section_entry_t));
 
-	// Try to find the string table
+	// Variables
+	uint32_t offset;
+
+	// Get pointer to the string table
 	unsigned char* stringTablePtr = NULL;
 	if(header->sh_str_index != SHN_UNDEF) {
-		kprintf("String table index: 0x%X 0x%X\n", header->sh_str_index, header->sh_offset);
-
-		elf_section_entry_t *entry = (elf_section_entry_t *) (buffer + header->sh_offset) + (sizeof(elf_section_entry_t) * header->sh_str_index);
-		stringTablePtr = buffer + entry->sh_offset;
-
-		uint8_t first_obama = *((buffer + header->sh_offset) + (sizeof(elf_section_entry_t) * header->sh_str_index));
-		kprintf("Found string table at offset 0x%X, size 0x%X (0x%X 0x%X)\n", entry->sh_offset, entry->sh_size, header->sh_offset + (sizeof(elf_section_entry_t) * header->sh_str_index, first_obama));
+		offset = header->sh_offset + (sizeof(elf_section_entry_t) * header->sh_str_index);
+		elf_section_entry_t *entry = (elf_section_entry_t *) ((uint32_t)fileBuffer+(uint32_t)offset);
+		stringTablePtr = (unsigned char*) ((uint32_t)fileBuffer+(uint32_t)entry->sh_offset);
 	}
 
 	// Parse program header table
 	for(int i = 0; i < header->ph_entry_count; i++) {
-		elf_program_entry_t *entry = (elf_program_entry_t *) (buffer + header->ph_offset) + (sizeof(elf_program_entry_t) * i);
+		offset = header->ph_offset + (sizeof(elf_program_entry_t) * i);
+		elf_program_entry_t *entry = (elf_program_entry_t *) ((uint32_t)fileBuffer+(uint32_t)offset);
 	}
 
 	// Parse section header table
 	for(int i = 0; i < header->sh_entry_count; i++) {
-		elf_section_entry_t *entry = (elf_section_entry_t *) (buffer + header->sh_offset) + (sizeof(elf_section_entry_t) * i);
+		offset = header->sh_offset + (sizeof(elf_section_entry_t) * i);
+		elf_section_entry_t *entry = (elf_section_entry_t *) ((uint32_t)fileBuffer+(uint32_t)offset);
+
+		// Ignore NULL sections
+		if(entry->sh_type != SHT_NULL) {
+			kprintf("Section %s: offset 0x%X, size 0x%X, addr 0x%X flags 0x%X type 0x%X\n", (stringTablePtr+entry->sh_name), entry->sh_offset, entry->sh_size, entry->sh_addr, entry->sh_flags, entry->sh_type);
+		}
 	}
 
 	return file_struct;

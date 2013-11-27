@@ -47,5 +47,6 @@ void gui_fill_rect(framebuffer_t* buffer, rect_t rect, uint16_t colour);
 
 void gui_draw_window_frame(framebuffer_t* buffer, window_t* info);
 void gui_set_screen_mode(svga_mode_info_t* mode);
+void gui_draw_bmp(void* bitmap, int x, int y);
 
 #endif
