@@ -330,7 +330,6 @@ void* fat_read_directory(fs_superblock_t* superblock, char* path) {
 
 			// Is this the last entry?
 			if(dirent->name[0] == 0x00) {
-				kprintf("Could not find directory %s\n", pch);
 				goto error;
 			} else { // We have more entries to process
 				if(dirent->attributes & FAT_ATTR_DIRECTORY) {

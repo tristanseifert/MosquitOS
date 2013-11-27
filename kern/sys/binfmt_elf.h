@@ -111,12 +111,6 @@ typedef struct {
 	uint16_t sh_str_index; // section header index for section names
 } __attribute__((packed)) elf_header_t;
 
-typedef struct elf_file {
-	void* elf_file_memory;
-	elf_header_t* header;
-} elf_file_t;
-
-// 11000000 03000000 00000000 00000000 2C800200 5F000000 00000000 00000000 01000000 00000000
 typedef struct{
 	uint32_t sh_name;
 	uint32_t sh_type;
@@ -160,6 +154,19 @@ typedef struct{
 	uint32_t p_flags;
 	uint32_t p_align;
 } __attribute__((packed)) elf_program_entry_t;
+
+
+typedef struct elf_file {
+	void* elf_file_memory;
+	elf_header_t* header;
+
+	unsigned char* stringTable;
+	unsigned char* symbolStringTable;
+
+	void *section_text;
+
+	elf_symbol_entry_t *symbolTable;
+} elf_file_t;
 
 elf_file_t* elf_load_binary(void* buffer);
 

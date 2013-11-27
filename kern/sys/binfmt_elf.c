@@ -41,11 +41,10 @@ elf_file_t* elf_load_binary(void* elfIn) {
 	uint32_t offset;
 
 	// Get pointer to the string table
-	unsigned char* stringTablePtr = NULL;
 	if(header->sh_str_index != SHN_UNDEF) {
 		offset = header->sh_offset + (sizeof(elf_section_entry_t) * header->sh_str_index);
 		elf_section_entry_t *entry = (elf_section_entry_t *) ((uint32_t)fileBuffer+(uint32_t)offset);
-		stringTablePtr = (unsigned char*) ((uint32_t)fileBuffer+(uint32_t)entry->sh_offset);
+		file_struct->stringTable = (unsigned char*) ((uint32_t)fileBuffer+(uint32_t)entry->sh_offset);
 	}
 
 	// Parse program header table
@@ -61,7 +60,28 @@ elf_file_t* elf_load_binary(void* elfIn) {
 
 		// Ignore NULL sections
 		if(entry->sh_type != SHT_NULL) {
-			kprintf("Section %s: offset 0x%X, size 0x%X, addr 0x%X flags 0x%X type 0x%X\n", (stringTablePtr+entry->sh_name), entry->sh_offset, entry->sh_size, entry->sh_addr, entry->sh_flags, entry->sh_type);
+			char *sectionName = (char *) file_struct->stringTable+entry->sh_name;
+
+			// Check if it's a section we are interested in
+			if(strncasecmp(sectionName, ".strtab", strlen(sectionName)) == 0) {
+				file_struct->symbolStringTable = (void *) ((uint32_t)fileBuffer+(uint32_t)entry->sh_offset);
+				kprintf("Located symbol string table at 0x%X\n", entry->sh_offset);
+			} 
+
+			else if(strncasecmp(sectionName, ".text", strlen(sectionName)) == 0)  {
+				file_struct->section_text = (void *) ((uint32_t)fileBuffer+(uint32_t)entry->sh_offset);
+				kprintf("Located executable code at 0x%X (Load to 0x%X)\n", entry->sh_offset, entry->sh_addr);
+			} 
+
+			else if(strncasecmp(sectionName, ".symtab", strlen(sectionName)) == 0) {
+				file_struct->symbolTable = (elf_symbol_entry_t *) ((uint32_t)fileBuffer+(uint32_t)entry->sh_offset);
+				kprintf("Located symbol table at 0x%X\n", entry->sh_offset);
+			} 
+
+			// If there's other sections, just print info about them
+			else {
+				kprintf("Section %s: offset 0x%X, size 0x%X, addr 0x%X flags 0x%X type 0x%X\n", sectionName, entry->sh_offset, entry->sh_size, entry->sh_addr, entry->sh_flags, entry->sh_type);
+			}
 		}
 	}
 
