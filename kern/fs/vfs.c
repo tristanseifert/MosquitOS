@@ -98,7 +98,7 @@ int vfs_mount_filesystem(ptable_entry_t* fs, char* mountPoint) {
 
 	// If we have one, mount it
 	if(likely(fdrv != NULL)) {
-		kprintf("Mounting partition %i: Type 0x%X (%s), start 0x%X, length 0x%X sectors\n", fs->part_num, fs->type, fdrv->name, fs->lba_start, fs->lba_length);
+		kprintf("Mounting partition %i: Type 0x%X (%s), start 0x%X, length 0x%X sectors at %s\n", fs->part_num, fs->type, fdrv->name, fs->lba_start, fs->lba_length, mountPoint);
 
 		// Allocate memory for the superblock
 		superblock = (fs_superblock_t*) kmalloc(sizeof(fs_superblock_t));

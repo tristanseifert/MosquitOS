@@ -109,12 +109,21 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 	superblock->fp_read_directory = fat_read_directory;
 	superblock->fp_unmount = fat_unmount;
 
+	uint8_t* testFile = fat_read_file(superblock, "/TEST.BIN", NULL, 0);
+	kprintf("Test file at 0x%X\n256 bytes: ", testFile);
+
+	for(int i = 0; i < 16; i++) {
+		kprintf("0x%X ", testFile[i*0x100]);
+	}
+
+	kprintf("\n");
+
 	// Obamacare
-	void* elfFile = fat_read_file(superblock, "/KERNEL.ELF", NULL, 0);
+/*	void* elfFile = fat_read_file(superblock, "/KERNEL.ELF", NULL, 0);
 	kprintf("ELF file at 0x%X\n\n", elfFile);
 
 	elf_file_t *meeper = elf_load_binary(elfFile);
-	kprintf("ELF at 0x%X\n", meeper);
+	kprintf("ELF at 0x%X\n", meeper);*/
 
 	return superblock;
 }
@@ -129,10 +138,10 @@ void fat_read_get_root_dir(fs_superblock_t* superblock, void* buffer, uint32_t b
 	if(fs_info->fat_type == 32) {
 		fat_fs_bpb32_t *bpb = (fat_fs_bpb32_t *) fs_info->bpb;
 
-		uint32_t cluster_to_read = fs_info->root_cluster-2;
+		uint32_t cluster_to_read = fs_info->root_cluster;
 
 		// Read root directory
-		fat_read_cluster(superblock, cluster_to_read, buffer, buffer_size);
+		fat_read_cluster(superblock, cluster_to_read & FAT32_MASK, buffer, buffer_size);
 	} else if(fs_info->fat_type == 16) {
 		fat_fs_bpb16_t *bpb = (fat_fs_bpb16_t *) fs_info->bpb;
 
@@ -142,6 +151,8 @@ void fat_read_get_root_dir(fs_superblock_t* superblock, void* buffer, uint32_t b
 /*
  * Reads data starting at a specified sector until either all data has been
  * read into the buffer, or the buffer is filled up to buffer_size bytes.
+ *
+ * Note:This follows cluster chains!
  */
 void fat_read_cluster(fs_superblock_t* superblock, uint32_t cluster, void* buffer, uint32_t buffer_size) {
 	fat_fs_info_t *fs_info = (fat_fs_info_t *) superblock->fs_info;
@@ -155,7 +166,18 @@ void fat_read_cluster(fs_superblock_t* superblock, uint32_t cluster, void* buffe
 
 	// Read the entire directory
 	while(true) {
-		sector = PARTITION_LBA_REL2ABS(cluster_to_read+fs_info->first_data_sector, superblock->pt);
+		/*
+		 * A quick note about Microsoft: They're a bunch of dumbarses and make
+		 * really shitty documentation. The example of this is that the first
+		 * two entries in the FAT are, apparently, reserved, thus causing all
+		 * FAT entries to be shifted 8 bits. This wouldn't be a problem at all
+		 * if they had bloody documented that crap, but obviously they didn't and
+		 * I had to drink a ton of coffee to get on a Ballmer's Peak to sort 
+		 * this shit out.
+		 *
+		 * gg Microsoft, gg.
+		 */
+		sector = PARTITION_LBA_REL2ABS(cluster_to_read-2+fs_info->first_data_sector, superblock->pt);
 		derr = disk_read(superblock->disk, sector, 1, sector_buffer);
 
 		// Handle disk read errors
@@ -177,7 +199,12 @@ void fat_read_cluster(fs_superblock_t* superblock, uint32_t cluster, void* buffe
 		}
 
 		// See if there's another cluster in the chain
-		cluster_to_read = fat_get_next_cluster(superblock, cluster_to_read+2);
+		cluster_to_read = fat_get_next_cluster(superblock, cluster_to_read);
+
+		// If the cluster is 0, something broke because this FAT is broken
+		if(cluster_to_read == 0x00000000) {
+			break;
+		}
 
 		// no additional cluster to read
 		if(cluster_to_read == 0xFFFFFFFF) break;
@@ -196,13 +223,18 @@ static uint32_t fat_get_next_cluster(fs_superblock_t* superblock, uint32_t clust
 	if(fs_info->fat_type == 32) {
 		fat_fs_bpb32_t *bpb = (fat_fs_bpb32_t *) fs_info->bpb;
 
-		cluster_value &= FAT32_MASK;
+		// Some FS implementations are idiots and put .. as cluster 0
+		if(cluster_value == 0) {
+			cluster_value = 2;
+		}
 
 		// Allocate sector read buffer
-		uint32_t *buffer = (uint32_t *) kmalloc(0x200);
+		uint32_t *buffer = (uint32_t *) sector_buffer + 0x200;
 
-		uint32_t fat_sector = bpb->reserved_sector_count + ((cluster_value * 4) / bpb->bytes_per_sector);
-		uint32_t fat_offset = (cluster_value * 4) % bpb->bytes_per_sector;
+		uint32_t fat_sector = bpb->reserved_sector_count + (cluster_value / 128);
+		uint32_t fat_offset = cluster_value & 0x7F;
+
+		// kprintf("FAT sector: 0x%X entry 0x%X (cluster = 0x%X)\n", PARTITION_LBA_REL2ABS(fat_sector, superblock->pt), fat_offset, cluster_value);
 
 		// Read FAT
 		DISK_ERROR derr;
@@ -214,10 +246,7 @@ static uint32_t fat_get_next_cluster(fs_superblock_t* superblock, uint32_t clust
 			return 0xFFFFFFFE;
 		}
 
-		uint32_t next_cluster = buffer[cluster_value & 0x7F];
-
-		// Release memory
-		kfree(buffer);
+		uint32_t next_cluster = buffer[fat_offset];
 
 		return (next_cluster >= FAT32_END_CHAIN) ? 0xFFFFFFFF : (next_cluster & FAT32_MASK);
 	} else if(fs_info->fat_type == 16) {
@@ -304,7 +333,7 @@ void* fat_read_directory(fs_superblock_t* superblock, char* path) {
 					// It's a directory entry, so compare filename
 					if(strncasecmp(pch, (char *) &dirent->name, strlen(pch)) == 0) {
 						cluster = ((dirent->cluster_high << 0x10) | (dirent->cluster_low))-2;
-						fat_read_cluster(superblock, cluster, readMem, 0x8000);
+						fat_read_cluster(superblock, cluster & FAT32_MASK, readMem, 0x8000);
 
 						break;
 					}
@@ -399,7 +428,8 @@ void* fat_read_file(fs_superblock_t* superblock, char* file, void* buffer, uint3
 						buffer_size = size;
 					}
 
-					cluster = ((dirent->cluster_high << 0x10) | (dirent->cluster_low))-2;
+					// Somehow we need to subtract 2 from all clusters ???
+					cluster = ((dirent->cluster_high << 0x10) | (dirent->cluster_low));
 
 					// Clean up memory
 					kfree(pretty_filename);
@@ -420,8 +450,7 @@ void* fat_read_file(fs_superblock_t* superblock, char* file, void* buffer, uint3
 	return NULL;
 
 readFile: ;
-	kprintf("Reading %s from cluster 0x%X\n", filename, cluster);
-	fat_read_cluster(superblock, cluster, buffer, buffer_size);
+	fat_read_cluster(superblock, cluster | 0x80000000, buffer, buffer_size);
 
 	// Release directory table memory if not root directory
 	if(path[0] != 0x00) {

@@ -35,4 +35,4 @@ diskutil unmount /Volumes/MOSQUITOS/
 
 clear
 
-qemu-1.60/qemu-system-i386 -hda /Users/tristanseifert/SquelchenOS/disk_image.img -boot c -m 128M -soundhw ac97 -vga std -s
+qemu-1.60/qemu-system-i386 -hda /Users/tristanseifert/SquelchenOS/disk_image.img -m 128M -soundhw ac97 -net nic,model=e1000 -net user -device sysbus-ohci -device usb-ehci -monitor stdio -device vmware-svga -s

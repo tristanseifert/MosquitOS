@@ -44,7 +44,8 @@ elf_file_t* elf_load_binary(void* elfIn) {
 		elf_section_entry_t *entry = (elf_section_entry_t *) (buffer + header->sh_offset) + (sizeof(elf_section_entry_t) * header->sh_str_index);
 		stringTablePtr = buffer + entry->sh_offset;
 
-		kprintf("Found string table at offset 0x%X, size 0x%X (0x%X)\n", entry->sh_offset, entry->sh_size, header->sh_offset + (sizeof(elf_section_entry_t) * header->sh_str_index));
+		uint8_t first_obama = *((buffer + header->sh_offset) + (sizeof(elf_section_entry_t) * header->sh_str_index));
+		kprintf("Found string table at offset 0x%X, size 0x%X (0x%X 0x%X)\n", entry->sh_offset, entry->sh_size, header->sh_offset + (sizeof(elf_section_entry_t) * header->sh_str_index, first_obama));
 	}
 
 	// Parse program header table

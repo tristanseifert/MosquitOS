@@ -87,7 +87,7 @@ void kernel_main() {
 		entry++;
 	}
 
-	kprintf(CONSOLE_BOLD "\nTotal usable memory (bytes): 0x%X\n" CONSOLE_REG, total_usable_RAM);
+	kprintf("\nTotal usable memory (bytes): 0x%X\n", total_usable_RAM);
 
 	// Disk test
 	disk_t *hda0 = disk_allocate();
