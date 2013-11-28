@@ -6,7 +6,7 @@ nasm -f bin -i./loader/stage2/ -o loader/stage2/stage2.bin -l loader/stage2/stag
 echo "Building kernel..."
 
 cd kern
-# export PATH=$PATH:/Users/tristanseifert/SquelchenOS/kern/toolchain/gcc/bin
+# export PATH=/Users/tristanseifert/SquelchenOS/kern/toolchain/gcc/bin:/Users/tristanseifert/SquelchenOS/kern/toolchain/gcc/i686-pc-elf/bin:$PATH
 make
 cd ..
 

@@ -24,8 +24,6 @@ void sched_chose_next();
 void sched_init() {
 	// Set up a trap gate in the IDT
 	sys_set_idt_gate(SCHED_TRAP_NUM, (uint32_t) sched_trap, 0x08, 0x8F);
-
-	currTask = task_allocate();
 }
 
 /*

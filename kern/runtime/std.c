@@ -192,6 +192,7 @@ char* strsep(char **stringp, const char *delim) {
 		} while (sc != 0);
 	}
 }
+
 /*
  * This array is designed for mapping upper and lower case letter
  * together for a case independent comparison.  The mappings are

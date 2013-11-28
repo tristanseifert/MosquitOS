@@ -1,0 +1,1 @@
+#define SYSCALL_WRITE 4

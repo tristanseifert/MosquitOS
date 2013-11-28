@@ -57,7 +57,11 @@ int syscall_handler(syscall_callstack_t regs) {
 	if(syscall_id > SYSCALL_TABLE_SIZE) {
 		kprintf("Got invalid syscall 0x%X\n", syscall_id);
 	} else {
-		syscall_return_value = (syscall_table[syscall_id](task, regs, syscall_struct));
+		if(syscall_table[syscall_id] != NULL) {
+			syscall_return_value = (syscall_table[syscall_id](task, regs, syscall_struct));
+		} else {
+			kprintf("Undefined syscall: 0x%X\n", syscall_id);
+		}
 	}
 
 	// Before we run the syscall, ensure the return address in EDX is valid

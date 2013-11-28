@@ -13,6 +13,8 @@
 #include "fs/vfs.h"
 #include "fs/fat.h"
 #include "runtime/error_handler.h"
+#include "sys/binfmt_elf.h"
+#include "sys/task.h"
  
 extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
 extern uint32_t KERN_BNUM;
@@ -104,7 +106,16 @@ void kernel_main() {
 
 	// Mount the root filesystem
 	ptable_entry_t* partInfo = mbr->first;
-	vfs_mount_filesystem(partInfo, "/");
+	fs_superblock_t *superblock = vfs_mount_filesystem(partInfo, "/");
+
+	// Try to make a new task from the ELF we loaded
+	void* elfFile = fat_read_file(superblock, "/KERNEL.ELF", NULL, 0);
+	kprintf("ELF file at 0x%X\n\n", elfFile);
+
+	elf_file_t *elf = elf_load_binary(elfFile);
+	kprintf("\n\nParsed ELF to 0x%X\n", elf);
+
+	i386_task_t* task = task_allocate(elf);
 
 /*	
 	svga_mode_info_t *svga_mode_info = svga_mode_get_info(0x101);

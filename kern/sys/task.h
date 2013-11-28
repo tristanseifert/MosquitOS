@@ -4,6 +4,8 @@
 #include <types.h>
 #include "sched.h"
 #include "paging.h"
+#include "vm.h"
+#include "binfmt_elf.h"
 
 // Task's context information
 typedef struct task_state {
@@ -14,7 +16,7 @@ typedef struct task_state {
 	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
 	uint32_t eip, cs, eflags, useresp, ss; // Pushed by the processor automatically.
 
-	// Page table address
+	// Page table address (physical)
 	uint32_t page_table;
 
 	// FPU/SSE state memory (must be aligned to 16 byte boundary)
@@ -60,13 +62,13 @@ typedef struct task_entry_info {
 } task_entry_info_t;
 
 // Saves the state of the task in an interrupt/syscall handler
-void task_save_state(i386_task_t* task, void *regPtr);
+void task_save_state(i386_task_t*, void*);
 // Switches to the specified task
-void task_switch(i386_task_t* task);
+void task_switch(i386_task_t*);
 
 // Creation/destruction of tasks
-i386_task_t* task_allocate();
-void task_deallocate(i386_task_t* task);
+i386_task_t* task_allocate(elf_file_t*);
+void task_deallocate(i386_task_t*);
 
 // Access to the linked list
 i386_task_t* task_get_first();

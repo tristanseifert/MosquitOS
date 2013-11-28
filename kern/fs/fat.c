@@ -122,13 +122,6 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 	void* bmpFile = fat_read_file(superblock, "/gui/test.bmp", NULL, 0);
 	gui_draw_bmp(bmpFile, 320, 0);*/
 
-	// ELF loading test
-	void* elfFile = fat_read_file(superblock, "/KERNEL.ELF", NULL, 0);
-	kprintf("ELF file at 0x%X\n\n", elfFile);
-
-	elf_file_t *meeper = elf_load_binary(elfFile);
-	kprintf("\n\nParsed ELF to 0x%X\n", meeper);
-
 	return superblock;
 }
 

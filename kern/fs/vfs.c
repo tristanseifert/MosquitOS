@@ -115,6 +115,8 @@ int vfs_mount_filesystem(ptable_entry_t* fs, char* mountPoint) {
 
 		// Add to mountpoint hashmap
 		hashmap_insert(mountPointMap, mountPoint, superblock);
+
+		return superblock;
 	} else {
 		kprintf("Unknown filesystem type 0x%X\n", fs->type);
 		return -1;

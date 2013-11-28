@@ -51,6 +51,11 @@ elf_file_t* elf_load_binary(void* elfIn) {
 	for(int i = 0; i < header->ph_entry_count; i++) {
 		offset = header->ph_offset + (sizeof(elf_program_entry_t) * i);
 		elf_program_entry_t *entry = (elf_program_entry_t *) ((uint32_t)fileBuffer+(uint32_t)offset);
+
+		// Is entry valid and not ignored?
+		if(entry->p_type != PT_NULL) {
+
+		}
 	}
 
 	// Parse section header table

@@ -17,7 +17,7 @@ uint8_t task_temp_fxsave_region[512] __attribute__((aligned(16)));
 /*
  * Saves the state of the task.
  */
-void task_save_state(i386_task_t* task, void *regPtr) {
+void task_save_state(i386_task_t* task, void* regPtr) {
 	// Back up the process' FPU/SSE state
 	i386_task_state_t *state = task->task_state;
 
@@ -63,15 +63,16 @@ void task_switch(i386_task_t* task) {
 }
 
 /*
- * Allocates a new task.
+ * Allocates a new task with the specified ELF to load the program's sections
+ * from.
  */
-i386_task_t* task_allocate() {
+i386_task_t* task_allocate(elf_file_t* binary) {
 	// Try to get some memory for the task
 	i386_task_t *task = (i386_task_t*) kmalloc(sizeof(i386_task_t));
 	ASSERT(task != NULL);
 
 	// Set up the task struct
-	memset(task, 0x00, sizeof(i386_task_t));
+	memclr(task, sizeof(i386_task_t));
 
 	task->prev = task_last;
 	task_last = task;
@@ -86,7 +87,21 @@ i386_task_t* task_allocate() {
 	// Set up the state struct
 	task->task_state->fpu_state = (void *) kmalloc(512);
 
-	// TODO: Set up paging for the task, allocating some memory for it
+	// Set up page table
+	uint32_t directory_phys;
+
+	page_directory_t *directory = (page_directory_t *) kmalloc_p(sizeof(page_directory_t), &directory_phys);
+	ASSERT(directory != NULL);
+	memclr(directory, sizeof(page_directory_t));
+
+	// Store page table pointers
+	state->page_directory = directory;
+	state->page_table = directory_phys;
+
+	kprintf("Process page table at 0x%X virt 0x%X phys\n", directory, directory_phys);
+
+	// Notify scheduler so task is added to the queue
+	sched_task_created(task);
 
 	return task;
 }
