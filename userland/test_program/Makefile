@@ -14,12 +14,12 @@ CFLAGS= -c -finline-functions -g -Wall -fno-builtin -static\
 LDFLAGS= -nostdlib -nostartfiles -static -Wl,-T,userspace.ld -O2
 
 STARTFILES = $(LIBCDIR)/lib/crt0.o $(LIBCDIR)/lib/crti.o
-ENDFILES = $(LIBCDIR)/lib/crtend.o $(LIBCDIR)/lib/crtn.o
+#ENDFILES = $(LIBCDIR)/lib/crtend.o $(LIBCDIR)/lib/crtn.o
 LIBGROUP = -Wl,--start-group $(LIBCDIR)/lib/libc.a -lgcc -Wl,--end-group
 
 all: test.c
 	$(CC) $(CFLAGS) test.c
-	i686-pc-elf-gcc $(LDFLAGS) -o test.elf $(STARTFILES) *.o $(LIBGROUP) $(ENDFILES) 
+	i686-pc-elf-gcc $(LDFLAGS) -o test.elf $(STARTFILES) *.o $(LIBGROUP)
 
 # Clean up from previous build
 clean:

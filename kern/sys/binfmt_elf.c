@@ -52,9 +52,9 @@ elf_file_t* elf_load_binary(void* elfIn) {
 		offset = header->ph_offset + (sizeof(elf_program_entry_t) * i);
 		elf_program_entry_t *entry = (elf_program_entry_t *) ((uint32_t)fileBuffer+(uint32_t)offset);
 
-		// Is entry valid and not ignored?
-		if(entry->p_type != PT_NULL) {
-
+		// We care only for LOAD headers
+		if(entry->p_type == PT_LOAD) {
+			kprintf("LOAD offset 0x%X to virtual 0x%X (0x%X bytes copy, 0x%X total)\n", entry->p_offset, entry->p_vaddr, entry->p_filesz, entry->p_memsz);
 		}
 	}
 
@@ -70,22 +70,10 @@ elf_file_t* elf_load_binary(void* elfIn) {
 			// Check if it's a section we are interested in
 			if(strncasecmp(sectionName, ".strtab", strlen(sectionName)) == 0) {
 				file_struct->symbolStringTable = (void *) ((uint32_t)fileBuffer+(uint32_t)entry->sh_offset);
-				kprintf("Located symbol string table at 0x%X\n", entry->sh_offset);
-			} 
-
-			else if(strncasecmp(sectionName, ".text", strlen(sectionName)) == 0)  {
+			} else if(strncasecmp(sectionName, ".text", strlen(sectionName)) == 0)  {
 				file_struct->section_text = (void *) ((uint32_t)fileBuffer+(uint32_t)entry->sh_offset);
-				kprintf("Located executable code at 0x%X (Load to 0x%X)\n", entry->sh_offset, entry->sh_addr);
-			} 
-
-			else if(strncasecmp(sectionName, ".symtab", strlen(sectionName)) == 0) {
+			} else if(strncasecmp(sectionName, ".symtab", strlen(sectionName)) == 0) {
 				file_struct->symbolTable = (elf_symbol_entry_t *) ((uint32_t)fileBuffer+(uint32_t)entry->sh_offset);
-				kprintf("Located symbol table at 0x%X\n", entry->sh_offset);
-			} 
-
-			// If there's other sections, just print info about them
-			else {
-				kprintf("Section %s: offset 0x%X, size 0x%X, addr 0x%X flags 0x%X type 0x%X\n", sectionName, entry->sh_offset, entry->sh_size, entry->sh_addr, entry->sh_flags, entry->sh_type);
 			}
 		}
 	}

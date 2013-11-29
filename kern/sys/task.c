@@ -9,6 +9,8 @@ static uint32_t next_pid;
 static i386_task_t* task_first;
 static i386_task_t* task_last;
 
+extern page_directory_t *kernel_directory;
+
 // External assembly routines
 void task_restore_context(i386_task_state_t*);
 
@@ -28,7 +30,7 @@ void task_save_state(i386_task_t* task, void* regPtr) {
 
 	ASSERT(state->fpu_state != NULL);
 
-	__asm__ volatile(" fxsave %0; " : "=m" (task_temp_fxsave_region));
+	__asm__ volatile("fxsave %0; " : "=m" (task_temp_fxsave_region));
 
 	// Copy FPU state into the thread context table
 	memcpy(state->fpu_state, &task_temp_fxsave_region, 512);
@@ -67,6 +69,8 @@ void task_switch(i386_task_t* task) {
  * from.
  */
 i386_task_t* task_allocate(elf_file_t* binary) {
+	ASSERT(binary != NULL);
+
 	// Try to get some memory for the task
 	i386_task_t *task = (i386_task_t*) kmalloc(sizeof(i386_task_t));
 	ASSERT(task != NULL);
@@ -88,17 +92,31 @@ i386_task_t* task_allocate(elf_file_t* binary) {
 	task->task_state->fpu_state = (void *) kmalloc(512);
 
 	// Set up page table
-	uint32_t directory_phys;
+	uint32_t directory_phys, directory_phys_phys;
 
 	page_directory_t *directory = (page_directory_t *) kmalloc_p(sizeof(page_directory_t), &directory_phys);
 	ASSERT(directory != NULL);
 	memclr(directory, sizeof(page_directory_t));
 
+	directory_phys_phys = directory_phys + (sizeof(page_table_t*) * 1024);
+
+	kprintf("Process page table at 0x%X virt 0x%X (0x%X) phys\n", directory, directory_phys, directory_phys_phys);
+
+	// Set up 0xC0000000 and above to point to the kernel page tables (copy 0x100)
+	for(int i = 0x300; i < 0x400; i++) {
+		directory->tables[i] = kernel_directory->tables[i];
+		directory->tablesPhysical[i] = kernel_directory->tablesPhysical[i];
+	}
+
+	// Switch to the process' pagetable so we can allocate frames
+	// __asm__ volatile("mov %0, %%cr3" : : "r"(directory_phys_phys));
+
+	// Switch back to kernel pagetable
+	paging_switch_directory(kernel_directory);
+
 	// Store page table pointers
 	state->page_directory = directory;
 	state->page_table = directory_phys;
-
-	kprintf("Process page table at 0x%X virt 0x%X phys\n", directory, directory_phys);
 
 	// Notify scheduler so task is added to the queue
 	sched_task_created(task);

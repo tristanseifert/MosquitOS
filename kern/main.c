@@ -109,11 +109,9 @@ void kernel_main() {
 	fs_superblock_t *superblock = vfs_mount_filesystem(partInfo, "/");
 
 	// Try to make a new task from the ELF we loaded
-	void* elfFile = fat_read_file(superblock, "/KERNEL.ELF", NULL, 0);
-	kprintf("ELF file at 0x%X\n\n", elfFile);
-
+	void* elfFile = fat_read_file(superblock, "/TEST.ELF", NULL, 0);
 	elf_file_t *elf = elf_load_binary(elfFile);
-	kprintf("\n\nParsed ELF to 0x%X\n", elf);
+	kprintf("\nParsed ELF to 0x%X\n", elf);
 
 	i386_task_t* task = task_allocate(elf);
 

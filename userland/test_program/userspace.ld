@@ -1,9 +1,16 @@
+/*
+ * C library entry point
+ */
 ENTRY(_start)
 
-/* Tell where the various sections of the object files will be put in the final
-   kernel image. */
 SECTIONS {
-	. = 0x08000000;
+	/*
+ 	 * Start mapping to 0x02000000: This gives us 32M of memory that's "free"
+ 	 * below the .text section, 16M of which we can allocate as a stack for the
+ 	 * program (that's why stack starts at 0x02000000!), and the low 16M are
+ 	 * reserved to catch NULL pointers. Clever, eh?
+	 */
+	. = 0x02000000;
 
 	.text : ALIGN(4K) {
 		*(.text);
