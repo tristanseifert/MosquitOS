@@ -45,9 +45,8 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 
 	kprintf("\x01\x11\x01\x0EMosquitOS\x01\x0F\x01\x10 Kernel v0.1 build %u compiled %s on %s with %s\n", (unsigned long) &KERN_BNUM, KERN_BDATE, KERN_BTIME, KERN_COMPILER);
 
-	if(ps2_init() != 0) {
-		kprintf("ERROR: Could not initialise PS2 driver\n");
-	}
+	// Initialise modules
+	modules_load();
 
 	while(1);
 

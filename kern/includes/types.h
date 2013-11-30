@@ -1,6 +1,8 @@
 #ifndef TYPES_H
 #define TYPES_H
 
+#include <modules/module.h>
+
 #if !defined(__cplusplus)
 #include <stdbool.h>
 #endif
@@ -22,6 +24,8 @@
 // These tell gcc how to optimise branches since it's stupid
 #define likely(x)    __builtin_expect(!!(x), 1)
 #define unlikely(x)  __builtin_expect(!!(x), 0)
+
+#define __used	__attribute__((__used__))
 
 #define PANIC(msg) panic(msg, __FILE__, __LINE__);
 #define ASSERT(b) ((b) ? (void)0 : panic_assert(__FILE__, __LINE__, #b))

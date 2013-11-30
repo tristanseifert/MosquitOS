@@ -33,6 +33,22 @@ __attribute__((always_inline)) uint16_t io_inw(uint16_t port) {
 }
 
 /*
+ * Write a dword to system IO port
+ */
+__attribute__((always_inline)) void io_outl(uint16_t port, uint32_t val) {
+	__asm__ volatile("outl %0, %1" : : "a"(val), "Nd"(port));
+}
+
+/*
+ * Read a dword from a system IO port
+ */
+__attribute__((always_inline)) uint32_t io_inl(uint16_t port) {
+	uint32_t ret;
+	__asm__ volatile("inl %1, %0" : "=a"(ret) : "Nd"(port));
+	return ret;
+}
+
+/*
  * Wait for a system IO operation to complete.
  */
 __attribute__((always_inline)) void io_wait(void) {

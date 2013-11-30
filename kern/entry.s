@@ -29,6 +29,8 @@
 .globl osentry
 
 _osentry:
+	cli
+
 	# Enter protected mode
 	mov		%cr0, %ecx
 	or		$0x00000001, %ecx
@@ -131,7 +133,7 @@ panic_halt_loop:
 flush_gdt_2:
 	pop		%eax
 	ret
-	
+
 # Reserve a stack of 16K
 .section .bss
 stack_bottom:

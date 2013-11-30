@@ -16,6 +16,18 @@ SECTIONS {
 		*(.rodata);
 		*(.rodata*);
 	}
+
+	.modules ALIGN(4K) : AT(ADDR(.modules) - 0xC0000000) {
+		__kern_initcalls = .;
+		*(.initcall*);
+		BYTE(0x00); BYTE(0x00); BYTE(0x00); BYTE(0x00);
+
+		__kern_exitcalls = .;
+		*(.exitcall*);
+		BYTE(0x00); BYTE(0x00); BYTE(0x00); BYTE(0x00);
+
+		__kern_callsend = .;
+	}
 }
 
 /*

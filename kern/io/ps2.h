@@ -7,8 +7,6 @@
 #define PS2_READ_TIMEOUT 0x2000
 #define PS2_BUF_SIZE 0x100
 
-int ps2_init();
-
 uint16_t ps2_id_device(bool secondPort);
 
 void ps2_irq_handler(bool secondPort);

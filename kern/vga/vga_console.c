@@ -1,4 +1,5 @@
 #include "vga_console.h"
+#include "io/io.h"
 #include <types.h>
 
 #define VGA_TEXT_MEMORY 0xB8000
@@ -49,6 +50,21 @@ static void terminal_putentryat(char c, uint8_t color, uint16_t x, uint16_t y) {
 }
 
 /*
+ * Updates the position of the VGA cursor.
+ */
+static void vga_update_cursor() {
+	unsigned short position = (terminal_row * 80) + terminal_column;
+
+	// cursor LOW port to vga INDEX register
+	io_outb(0x3D4, 0x0F);
+	io_outb(0x3D5, (unsigned char)(position & 0xFF));
+
+	// cursor HIGH port to vga INDEX register
+	io_outb(0x3D4, 0x0E);
+	io_outb(0x3D5, (unsigned char )((position >> 8) & 0xFF));
+}
+
+/*
  * Initializes VGA console. (Clear text mode memory)
  */
 void vga_console_init() {
@@ -94,6 +110,8 @@ void vga_console_putchar(unsigned char c) {
 				terminal_row = 0;
 			}
 		}
+
+		vga_update_cursor();
 	}
 }
 
@@ -104,5 +122,7 @@ void vga_console_control(unsigned char c) {
 	if(c == '\n') {
 		terminal_row++;
 		terminal_column = 0;
+
+		vga_update_cursor();
 	}
 }

@@ -39,7 +39,7 @@ static void ps2_wait_write_rdy() {
 /*
  * Initialises the driver and associated PS2 hardware
  */
-int ps2_init() {
+static int ps2_init(void) {
 	// Disable both channel's devices
 	io_outb(PS2_CMD, 0xAD);
 	ps2_wait_write_rdy();
@@ -142,6 +142,8 @@ int ps2_init() {
 
 	ps2_ch1_buffer = (uint8_t *) kmalloc(PS2_BUF_SIZE);
 	ps2_ch2_buffer = (uint8_t *) kmalloc(PS2_BUF_SIZE);
+
+	kprintf("PS2 initialized.\n");
 
 	return 0;
 }
@@ -282,3 +284,13 @@ void ps2_set_led(uint8_t ledState) {
 	ps2_write(false, false, true, false); // LED SET command
 	ps2_write(ledState, false, true, true); // LED state
 }
+
+/*
+ * Cleans up.
+ */
+static void ps2_exit(void) {
+
+}
+
+module_init(ps2_init);
+module_exit(ps2_exit);
