@@ -1,4 +1,9 @@
 #########################################################################################
+# External variable declarations
+#########################################################################################
+.extern sys_multiboot_info
+
+#########################################################################################
 # Multiboot header
 #########################################################################################
 .set ALIGN,    1 << 0					# align loaded modules on page boundaries
@@ -52,6 +57,9 @@ jmp_highhalf:
 	push 	%ebx
 	push	%eax
 
+	# Write multiboot info pointer to memory
+	mov		%ebx, sys_multiboot_info
+
 	# Check for SSE, and if it exists, enable it
 	mov		$0x1, %eax
 	cpuid
@@ -94,25 +102,6 @@ sse_init:
 	# set CR4.OSFXSR and CR4.OSXMMEXCPT at the same time
 	or		$(3 << 9), %ax
 	mov		%eax, %cr4
-	ret
-
-/*
- * Flush the GDT
- */
- .global flush_gdt
- flush_gdt:
- 	push	%eax
-	mov 	$0x10, %ax
-	mov 	%ax, %ds
-	mov 	%ax, %es
-	mov 	%ax, %fs
-	mov 	%ax, %gs
-	mov 	%ax, %ss
-
-	ljmp 	$0x08, $flush_gdt_2
-
-flush_gdt_2:
-	pop		%eax
 	ret
 
 .section .text

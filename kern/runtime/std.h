@@ -26,4 +26,7 @@ void* memclr(void* start, size_t count);
 // sprintf (defined in kprintf.c)
 void sprintf(char* s, char *fmt, ...);
 
+// MosquitOS extensions
+unsigned int mstd_popCnt(uint32_t x);
+
 #endif

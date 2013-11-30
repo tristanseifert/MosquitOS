@@ -15,7 +15,10 @@
 #include "runtime/error_handler.h"
 #include "sys/binfmt_elf.h"
 #include "sys/task.h"
+#include "sys/multiboot.h"
  
+extern multiboot_info_t* sys_multiboot_info;
+
 extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
 extern uint32_t KERN_BNUM;
 extern page_directory_t *kernel_directory;
@@ -24,9 +27,18 @@ extern heap_t *kheap;
 #if defined(__cplusplus)
 extern "C" /* Use C linkage for kernel_main. */
 #endif
-void kernel_main(uint32_t magic, void *multibootInfo) {
+void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 	uint32_t *bss = (uint32_t *) (&__kern_bss_start);
 	uint32_t bss_size = (uint32_t) &__kern_bss_size;
+
+	// Make sure we're booted by a multiboot loader
+	if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
+		PANIC("Not booted with multiboot-compliant bootloader!");
+	}
+
+	kprintf("Multiboot struct: 0x%X (0x%X)\n", multibootInfo, sys_multiboot_info);
+	kprintf("mem_lower = %uKB, mem_upper = %uKB\n", multibootInfo->mem_lower, multibootInfo->mem_upper);
+	kprintf("%i KB free\n", paging_get_free_pages() * 4);
 
 	// kernel stuff
 	system_init();
@@ -41,50 +53,8 @@ void kernel_main(uint32_t magic, void *multibootInfo) {
 
 	while(1);
 
-	sys_kern_info_t* info = sys_get_kern_info();
-
 	kprintf("\nBIOS Memory Map:\n");
-
-	sys_smap_entry_t *entry = info->memMap;
 	uint32_t total_usable_RAM = 0;
-
-	char *typeStr;
-
-	for(int i = 0; i < info->numMemMapEnt; i++) {
-		switch(entry->type) {
-			case 1:
-				typeStr = "Available";
-				total_usable_RAM += entry->lengthL;
-				break;
-
-			case 2:
-				typeStr = "Reserved";
-				break;
-
-			case 3: case 4:
-				typeStr = "ACPI";
-				break;
-
-			case 5:
-				typeStr = "Bad";
-				break;
-
-			default:
-				typeStr = (char*) kmalloc(32);
-				sprintf(typeStr, "Unknown (%X)", entry->type);
-				break;
-		}
-
-		kprintf("Base: 0x%X%X Size: 0x%X%X %s\n", entry->baseH, entry->baseL, 
-			entry->lengthH, entry->lengthL, typeStr);
-
-		if(entry->type > 5) {
-			kfree(typeStr);
-		}
-
-		entry++;
-	}
-
 	kprintf("\nTotal usable memory: %i kB\n", total_usable_RAM/1024);
 
 	// Disk test
@@ -151,7 +121,7 @@ void kernel_main(uint32_t magic, void *multibootInfo) {
 void kernel_init(void) {
 	sys_build_gdt();
 	sys_build_idt();
-	console_init();
 
-	kprintf("Balls.\n");
+	// Initialize console so we can display stuff
+	console_init();
 }

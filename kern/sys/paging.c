@@ -2,8 +2,10 @@
 
 #include "paging.h"
 #include "kheap.h"
+#include "sys/multiboot.h"
 #include "runtime/error_handler.h"
-#include "vga/svga.h"
+ 
+extern multiboot_info_t* sys_multiboot_info;
  
 extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
 
@@ -127,9 +129,10 @@ void paging_init() {
 	kheap = NULL;
 	unsigned int i = 0;
 
-	// The size of physical memory. For the moment we 
-	// assume it is 128MB big.
-	uint32_t mem_end_page = 0x08000000;
+	// Hopefully the bootloader got the correct memory page size.
+	uint32_t mem_end_page = sys_multiboot_info->mem_upper;
+
+	kprintf("%i KB available\n", mem_end_page);
 
 	nframes = mem_end_page / 0x1000;
 
@@ -200,6 +203,23 @@ void paging_switch_directory(page_directory_t* new) {
 	uint32_t tables_phys_ptr = (uint32_t) new->physicalAddr;
 	current_directory = new;
 	__asm__ volatile("mov %0, %%cr3" : : "r"(tables_phys_ptr));
+}
+
+/*
+ * Returns the number of free pages.
+ */
+unsigned int paging_get_free_pages() {
+	unsigned int frames_free = 0;
+
+	uint32_t i, j;
+	for (i = 0; i < INDEX_FROM_BIT(nframes); i++) {
+		// Count bits free
+		if (frames[i] != 0xFFFFFFFF) {
+			frames_free += mstd_popCnt(frames[i]);
+		}
+	}
+
+	return frames_free;
 }
 
 /*

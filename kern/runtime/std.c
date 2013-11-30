@@ -540,3 +540,21 @@ void* memclr(void* start, size_t count) {
 		return memclr_std(start, count);
 	}
 }
+
+/*
+ * Performs a population count calculation over input x. The population count
+ * is the total number of set bits in the 32-bit integer. Note that the input
+ * is modified.
+ */
+unsigned int mstd_popCnt(uint32_t x) {
+	// Count set bits in 2 bit chunk
+	x = x - ((x >> 1) & 0x55555555);
+	// Do 4 bit chunk
+	x = (x & 0x33333333) + ((x >> 2) & 0x33333333);
+	// Do 8 bit chunk
+	x = x + (x >> 4);
+
+	// Get rid of garbage and make a final value
+	x &= 0xF0F0F0F;
+	return (x * 0x01010101) >> 24;
+}

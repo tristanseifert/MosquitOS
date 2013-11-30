@@ -8,12 +8,14 @@
 #include "system.h"
 #include "sched.h"
 #include "syscall.h"
+#include "sys/multiboot.h"
 
 void sys_set_idt(void* base, uint16_t size);
 uint64_t sys_timer_ticks;
 uint64_t sys_tsc_boot_ticks;
 cpu_info_t* sys_current_cpu_info;
-sys_kern_info_t* sys_kern_params;
+ 
+multiboot_info_t* sys_multiboot_info;
 
 // Allocate memory in the BSS for IDT, GDT, and TSSes
 static idt_entry_t sys_idt[256];
@@ -23,8 +25,7 @@ static i386_thread_state_t sys_tss[SYS_NUM_TSS];
 // Sets location of GDT
 void sys_install_gdt(void* location);
 void flush_gdt(void);
-// Validates kernel info struct
-void sys_validate_kern_struct();
+void sys_copy_multiboot();
 
 extern void rs232_set_up_irq();
 
@@ -63,6 +64,9 @@ void system_init() {
 	// Read x86 TSC
 	sys_tsc_boot_ticks = sys_rdtsc();
 
+	// Copy multiboot
+	sys_copy_multiboot();
+
 	// Set up the TSS and their stacks
 	sys_init_tss();
 
@@ -74,44 +78,20 @@ void system_init() {
 
 	// Set up RS232
 	rs232_set_up_irq();
-
-	// Check out the kernel info struct
-	sys_validate_kern_struct();
 }
 
 /*
- * Ensures validity of the kernel info struct the bootloader passed to us, and
- * copies it to a safe place to move it out of lowmem.
+ * Copies the multiboot structure out of lowmem.
  */
-void sys_validate_kern_struct() {
-	sys_kern_info_t* kern_info = (sys_kern_info_t *) SYS_KERN_INFO_LOC;
+void sys_copy_multiboot() {
+	multiboot_info_t* lowmemStruct = sys_multiboot_info;
+	multiboot_info_t* himemStruct = kmalloc(sizeof(multiboot_info_t));
 
-	if(memcmp(&kern_info->munchieValue, "KERN", 4) != 0) {
-		PANIC("Invalid kernel info structure, check SYS_KERN_INFO_LOC");
-	}
+	memcpy(himemStruct, lowmemStruct, sizeof(multiboot_info_t));
 
-	if(((uint32_t) kern_info->memMap) > 0x20000 || !kern_info->memMap) {
-		PANIC("BIOS memory map at invalid location");
-	}
+	// Copy other stuff that's referencenced
 
-	// Copy it into kernel memory
-	sys_kern_params = (sys_kern_info_t *) kmalloc(sizeof(sys_kern_info_t));
-	memcpy(sys_kern_params, kern_info, sizeof(sys_kern_info_t));
-
-	// Copy BIOS memory struct
-	size_t bios_mem_map_size = sizeof(sys_smap_entry_t) * kern_info->numMemMapEnt;
-	sys_smap_entry_t* sys_bios_map = (sys_smap_entry_t *) kmalloc(bios_mem_map_size);
-
-	memcpy(sys_bios_map, kern_info->memMap, bios_mem_map_size);
-
-	sys_kern_params->memMap = sys_bios_map;
-}
-
-/*
- * Returns kernel pointer to the copy of the kernel argument struct.
- */
-sys_kern_info_t* sys_get_kern_info() {
-	return sys_kern_params;
+	sys_multiboot_info = himemStruct;
 }
 
 /*

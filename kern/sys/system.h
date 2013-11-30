@@ -42,31 +42,6 @@
 #define	IRQ_14			0x2E
 #define	IRQ_15			0x2F
 
-#define SYS_KERN_INFO_LOC 0x001600
-
-// Struct encapsulating the list the BIOS 0xE820 mode call gave us
-typedef struct sys_smap_entry {
-	uint32_t baseL; // base address QWORD
-	uint32_t baseH;
-	uint32_t lengthL; // length QWORD
-	uint32_t lengthH;
-	uint32_t type; // entry Ttpe
-	uint32_t ACPI; // exteded
-} __attribute__((packed)) sys_smap_entry_t;
-
-// Located at $1600 in physical memory by our bootloader
-typedef struct sys_kern_info {
-	uint32_t munchieValue; // Should be "KERN"
-	uint16_t supportBits;
-	uint16_t high16Mem; // 64K blocks above 16M
-	uint16_t low16Mem; // 1k blocks below 16M
-	sys_smap_entry_t* memMap; // 32-bit ptr to list
-	uint16_t numMemMapEnt; // Number of entries in above map
-	uint8_t vesaSupport;
-	uint8_t bootDrive;
-	uint32_t vesaMap;
-} __attribute__((packed)) sys_kern_info_t;
-
 typedef struct sys_idt_descriptor {
    uint16_t offset_1;	// offset bits 0..15
    uint16_t selector;	// a code segment selector in GDT or LDT
@@ -123,8 +98,6 @@ typedef struct sys_tss {
 } __attribute__((packed)) i386_thread_state_t;
 
 void system_init();
-
-sys_kern_info_t* sys_get_kern_info();
 
 void sys_set_idt_gate(uint8_t entry, uint32_t function, uint8_t segment, uint8_t flags);
 void sys_setup_ints();
