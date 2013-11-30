@@ -24,7 +24,7 @@ extern heap_t *kheap;
 #if defined(__cplusplus)
 extern "C" /* Use C linkage for kernel_main. */
 #endif
-void kernel_main() {
+void kernel_main(uint32_t magic, void *multibootInfo) {
 	uint32_t *bss = (uint32_t *) (&__kern_bss_start);
 	uint32_t bss_size = (uint32_t) &__kern_bss_size;
 
@@ -53,24 +53,20 @@ void kernel_main() {
 	for(int i = 0; i < info->numMemMapEnt; i++) {
 		switch(entry->type) {
 			case 1:
-				typeStr = "Free Memory (1)";
+				typeStr = "Available";
 				total_usable_RAM += entry->lengthL;
 				break;
 
 			case 2:
-				typeStr = "Reserved (2)";
+				typeStr = "Reserved";
 				break;
 
-			case 3:
-				typeStr = "ACPI Reclaimable (3)";
-				break;
-
-			case 4:
-				typeStr = "ACPI NVS (4)";
+			case 3: case 4:
+				typeStr = "ACPI";
 				break;
 
 			case 5:
-				typeStr = "Bad Memory (5)";
+				typeStr = "Bad";
 				break;
 
 			default:
@@ -89,7 +85,7 @@ void kernel_main() {
 		entry++;
 	}
 
-	kprintf("\nTotal usable memory (bytes): 0x%X\n", total_usable_RAM);
+	kprintf("\nTotal usable memory: %i kB\n", total_usable_RAM/1024);
 
 	// Disk test
 	disk_t *hda0 = disk_allocate();
@@ -97,23 +93,23 @@ void kernel_main() {
 	DISK_ERROR ret = disk_init(hda0);
 
 	if(ret != kDiskErrorNone) {
-		kprintf("hda0 initialisation error: 0x%X\n", ret);
+		kprintf("hd0 initialisation error: 0x%X\n", ret);
+	} else {
+		fat_init();
+
+		ptable_t* mbr = mbr_load(hda0);
+
+		// Mount the root filesystem
+		ptable_entry_t* partInfo = mbr->first;
+		fs_superblock_t *superblock = (fs_superblock_t *) vfs_mount_filesystem(partInfo, "/");
+
+		// Try to make a new task from the ELF we loaded
+		void* elfFile = fat_read_file(superblock, "/TEST.ELF", NULL, 0);
+		elf_file_t *elf = elf_load_binary(elfFile);
+		kprintf("\nParsed ELF to 0x%X\n", elf);
+
+		i386_task_t* task = task_allocate(elf);
 	}
-
-	fat_init();
-
-	ptable_t* mbr = mbr_load(hda0);
-
-	// Mount the root filesystem
-	ptable_entry_t* partInfo = mbr->first;
-	fs_superblock_t *superblock = vfs_mount_filesystem(partInfo, "/");
-
-	// Try to make a new task from the ELF we loaded
-	void* elfFile = fat_read_file(superblock, "/TEST.ELF", NULL, 0);
-	elf_file_t *elf = elf_load_binary(elfFile);
-	kprintf("\nParsed ELF to 0x%X\n", elf);
-
-	i386_task_t* task = task_allocate(elf);
 
 /*	
 	svga_mode_info_t *svga_mode_info = svga_mode_get_info(0x101);
@@ -147,17 +143,4 @@ void kernel_main() {
 	// __asm__("mov %esp, %ecx; mov $0x0, %ebx; mov $.+7, %edx; sysenter;");
 
 	while(1);
-}
-
-/*
- * Set up BSS and some other stuff needed to make the kernel not implode.
- * Called BEFORE kernel_main, so kernel structures may NOT be accessed!
- */
-void kernel_init() {
-	uint32_t *bss = (uint32_t *) (&__kern_bss_start);
-	uint32_t bss_size = (uint32_t) &__kern_bss_size;
-	
-	for(int i = 0; i < 32; i++) {
-		bss[i] = 0;
-	}
 }

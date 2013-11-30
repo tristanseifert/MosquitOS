@@ -15,12 +15,18 @@ uint64_t sys_tsc_boot_ticks;
 cpu_info_t* sys_current_cpu_info;
 sys_kern_info_t* sys_kern_params;
 
+// Allocate memory in the BSS for IDT, GDT, and TSSes
+static idt_entry_t sys_idt[256];
+static gdt_entry_t sys_gdt[16];
+static i386_thread_state_t sys_tss[SYS_NUM_TSS];
+
 // Builds IDT to system defaults
 void sys_build_idt();
 // Builds GDT to system defaults
 void sys_build_gdt();
 // Sets location of GDT
 void sys_install_gdt(void* location);
+void flush_gdt(void);
 // Validates kernel info struct
 void sys_validate_kern_struct();
 
@@ -56,7 +62,6 @@ extern void isr18(void);
  * Initialises the system into a known state.
  */ 
 void system_init() {
-	sys_build_gdt();
 	sys_build_idt();
 	sys_setup_ints();
 
@@ -118,7 +123,7 @@ sys_kern_info_t* sys_get_kern_info() {
  * Builds the Interrupt Descriptor Table at a fixed location in memory.
  */
 void sys_build_idt() {
-	idt_entry_t* idt = (idt_entry_t *) SYS_IDT_MEMLOC;
+	idt_entry_t* idt = (idt_entry_t *) &sys_idt;
 
 	// Clear IDT
 	memset(idt, 0, sizeof(idt_entry_t)*256);
@@ -176,7 +181,7 @@ void sys_setup_ints() {
 }
 
 void sys_set_idt_gate(uint8_t entry, uint32_t function, uint8_t segment, uint8_t flags) {
-	idt_entry_t *ptr = (idt_entry_t *) SYS_IDT_MEMLOC;
+	idt_entry_t *ptr = (idt_entry_t *) &sys_idt;
 
 	ptr[entry].offset_1 = function & 0xFFFF;
 	ptr[entry].offset_2 = (function >> 0x10) & 0xFFFF;
@@ -190,7 +195,7 @@ void sys_set_idt_gate(uint8_t entry, uint32_t function, uint8_t segment, uint8_t
  * space for some task state segment descriptors.
  */
 void sys_build_gdt() {
-	gdt_entry_t *gdt = (gdt_entry_t *) SYS_GDT_MEMLOC;
+	gdt_entry_t *gdt = (gdt_entry_t *) &sys_gdt;
 
 	// Set up null entry
 	memset(gdt, 0x00, sizeof(gdt_entry_t));
@@ -205,7 +210,7 @@ void sys_build_gdt() {
 
 	// Create the correct number of TSS descriptors
 	for(int i = 0; i < SYS_NUM_TSS; i++) {
-		sys_set_gdt_gate(i+5, SYS_TSS_MEMLOC+(i*SYS_TSS_LEN), SYS_TSS_LEN, 0x89, 0x4F);
+		sys_set_gdt_gate(i+5, ((uint32_t) &sys_tss)+(i*sizeof(i386_thread_state_t)), sizeof(i386_thread_state_t), 0x89, 0x4F);
 	}
 
 	sys_install_gdt(gdt);
@@ -219,7 +224,7 @@ void sys_init_tss() {
 	// Create the correct number of TSS descriptors
 	for(int i = 0; i < SYS_NUM_TSS; i++) {
 		// Initialise the TSS and zero it
-		i386_thread_state_t *tss = (i386_thread_state_t *) (SYS_TSS_MEMLOC + (i * SYS_TSS_LEN));
+		i386_thread_state_t *tss = (i386_thread_state_t *) (&sys_tss + (i * sizeof(i386_thread_state_t)));
 		memset(tss, 0x00, sizeof(i386_thread_state_t));
 
 		// Set up kernel stack meepen
@@ -235,7 +240,7 @@ void sys_init_tss() {
 }
 
 void sys_set_gdt_gate(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, uint8_t gran) {
-	gdt_entry_t *gdt = (gdt_entry_t *) SYS_GDT_MEMLOC;	
+	gdt_entry_t *gdt = (gdt_entry_t *) &sys_gdt;	
 	
 	gdt[num].base_low = (base & 0xFFFF);
 	gdt[num].base_middle = (base >> 16) & 0xFF;
@@ -260,6 +265,7 @@ void sys_install_gdt(void* location) {
 	IDTR.length = (0x18 + (SYS_NUM_TSS * 0x08)) - 1;
 	IDTR.base = (uint32_t) location;
 	__asm__ volatile("lgdt (%0)" : : "p"(&IDTR));
+	flush_gdt();
 }
 
 /*

@@ -5,6 +5,7 @@
 #include "syscalls.h"
 
 extern void syscall_handler_stub(void);
+static void* syscallStack;
 
 /* Stores the return value of the function to be placed in %eax on return by the assembly
  * syscall handler so we don't need to modify the stack image
@@ -16,7 +17,7 @@ int syscall_return_value;
  * fetch the address of the function, place it in the array, and then we can jump to it
  * from our syscall handler.
  */
-static syscall_routine syscall_table[SYSCALL_TABLE_SIZE] = {
+static const syscall_routine syscall_table[SYSCALL_TABLE_SIZE] = {
 	syscall_stub
 };
 
@@ -24,11 +25,15 @@ static syscall_routine syscall_table[SYSCALL_TABLE_SIZE] = {
  * Initialises the syscall environment by configuring MSRs.
  */
 void syscall_init() {
+	// Allocate a stack for syscalls
+	syscallStack = (void *) kmalloc(SYS_KERN_STACK_SIZE/2);
+	memclr(syscallStack, SYS_KERN_STACK_SIZE/2);
+
 	// Set GDT entry for system code segment
 	sys_write_MSR(SYS_MSR_IA32_SYSENTER_CS, SYS_KERN_CODE_SEG, 0);
 
 	// Set kernel stack and syscall entry point
-	sys_write_MSR(SYS_MSR_IA32_SYSENTER_ESP, SYS_KERN_SYSCALL_STACK, 0);
+	sys_write_MSR(SYS_MSR_IA32_SYSENTER_ESP, (uint32_t) syscallStack, 0);
 	sys_write_MSR(SYS_MSR_IA32_SYSENTER_EIP, (uint32_t) syscall_handler_stub, 0);
 }
 

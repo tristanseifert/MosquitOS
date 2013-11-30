@@ -4,6 +4,10 @@
 #include "kheap.h"
 #include "runtime/error_handler.h"
 #include "vga/svga.h"
+ 
+extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
+
+void sys_build_gdt();
 
 // The kernel's page directory
 page_directory_t *kernel_directory = 0;
@@ -14,6 +18,8 @@ page_directory_t *current_directory = 0;
 // A bitset of frames - used or free.
 uint32_t* frames;
 uint32_t nframes;
+
+static bool newGDTInstalled;
 
 // Defined in kheap.c
 extern uint32_t kheap_placement_address;
@@ -152,14 +158,14 @@ void paging_init() {
 		paging_get_page(i, true, kernel_directory);
 	}
 
-	// Map 0xC0000000 to 0xC7FFFFFF to 0x00100000 to 0x08000FFF
+	// Map 0xC0000000 to 0xC7FFFFFF to 0x00000000 to 0x07FFF000
 	for(i = 0xC0000000; i < 0xC7FFF000; i += 0x1000) {
 		page_t* page = paging_get_page(i, true, kernel_directory);
 
 		page->present = 1;
 		page->rw = 1;
 		page->user = 0;
-		page->frame = (((i & 0x0FFFF000) + 0x100000) >> 12);
+		page->frame = ((i & 0x0FFFF000) >> 12);
 	}
 
 	// We need to identity map (phys addr = virt addr) from
@@ -192,6 +198,9 @@ void paging_init() {
 	kern_dir_phys &= 0x0FFFFFFF;
 	kern_dir_phys += 0x00100000;
 
+	// Load the new GDT
+	sys_build_gdt();
+
 	// Enable paging
 	paging_switch_directory(kernel_directory);
 
@@ -203,6 +212,11 @@ void paging_init() {
  * Switches the currently-used page directory.
  */
 void paging_switch_directory(page_directory_t* new) {
+	// If the GDT is still the old one, load the new one...
+	if(!newGDTInstalled) {
+		newGDTInstalled = true;
+	}
+
 	uint32_t tables_phys_ptr = (uint32_t) &new->tablesPhysical;
 	tables_phys_ptr &= 0x0FFFFFFF;
 	tables_phys_ptr += 0x00100000;

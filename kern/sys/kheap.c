@@ -3,7 +3,8 @@
 #include "kheap.h"
 #include "paging.h"
 
-uint32_t kheap_placement_address = (uint32_t) 0xC0430000; // After kernel TSS/etc
+extern uint32_t __kern_end;
+uint32_t kheap_placement_address = (uint32_t) &__kern_end; // After end of BSS
 extern page_directory_t *kernel_directory;
 heap_t *kheap = 0;
 

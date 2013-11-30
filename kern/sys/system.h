@@ -10,7 +10,6 @@
  * In addition, it can call other drivers (for example, PCI, VGA, etc) and initialise
  * those as well.
  */
-
 #define SYS_KERN_CODE_SEG 0x08
 #define SYS_KERN_DATA_SEG 0x10
 #define SYS_USER_CODE_SEG 0x18
@@ -18,20 +17,13 @@
 
 #define SYS_KERN_STACK_SIZE 1024*32
 
-#define SYS_IDT_MEMLOC 0xC0400000
-#define SYS_GDT_MEMLOC 0xC0410000
-#define SYS_TSS_MEMLOC 0xC0420000
-
 #define SYS_MSR_IA32_SYSENTER_CS 0x174
 #define SYS_MSR_IA32_SYSENTER_ESP 0x175
 #define SYS_MSR_IA32_SYSENTER_EIP 0x176
 
-#define SYS_KERN_SYSCALL_STACK 0xC0400000
-
 // We need 2 TSS per privilege level
 #define SYS_NUM_TSS_PER_PRIV 2
 #define SYS_NUM_TSS SYS_NUM_TSS_PER_PRIV*4
-#define SYS_TSS_LEN	0x100
 
 #define	IRQ_0			0x20	// IRQ0 = PIT timer tick
 #define	IRQ_1			0x21	// IRQ1 = PS2 channel 1
