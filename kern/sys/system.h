@@ -117,3 +117,4 @@ void sys_read_MSR(uint32_t msr, uint32_t *lo, uint32_t *hi);
 
 void sys_build_idt();
 void sys_build_gdt();
+void sys_copy_multiboot();

@@ -64,9 +64,6 @@ void system_init() {
 	// Read x86 TSC
 	sys_tsc_boot_ticks = sys_rdtsc();
 
-	// Copy multiboot
-	sys_copy_multiboot();
-
 	// Set up the TSS and their stacks
 	sys_init_tss();
 
@@ -85,13 +82,33 @@ void system_init() {
  */
 void sys_copy_multiboot() {
 	multiboot_info_t* lowmemStruct = sys_multiboot_info;
-	multiboot_info_t* himemStruct = kmalloc(sizeof(multiboot_info_t));
+	multiboot_info_t* himemStruct = (multiboot_info_t *) kmalloc(sizeof(multiboot_info_t));
 
 	memcpy(himemStruct, lowmemStruct, sizeof(multiboot_info_t));
 
-	// Copy other stuff that's referencenced
-
 	sys_multiboot_info = himemStruct;
+
+	// Command line
+	if(MULTIBOOT_CHECK_FLAG(himemStruct->flags, 2)) {
+		size_t length = strlen((char *) himemStruct->cmdline);
+		char *cmdline = (char *) kmalloc(length+2);
+		memcpy(cmdline, (void *) himemStruct->cmdline, length);
+		himemStruct->cmdline = (uint32_t) cmdline;
+	}
+
+	// Copy ELF headers
+	if (MULTIBOOT_CHECK_FLAG(himemStruct->flags, 5)) {
+		multiboot_elf_section_header_table_t *multiboot_elf_sec = &(himemStruct->u.elf_sec);
+		memcpy(&himemStruct->u.elf_sec, multiboot_elf_sec, sizeof(multiboot_elf_section_header_table_t));
+	}
+
+	// Copy memory map
+	if (MULTIBOOT_CHECK_FLAG(himemStruct->flags, 6)) {
+		multiboot_memory_map_t *mmap = (multiboot_memory_map_t *) himemStruct->mmap_addr;
+		multiboot_memory_map_t *new = (multiboot_memory_map_t *) kmalloc(himemStruct->mmap_length);
+		memcpy(new, mmap, himemStruct->mmap_length);
+		himemStruct->mmap_addr = (uint32_t) new;
+	}
 }
 
 /*

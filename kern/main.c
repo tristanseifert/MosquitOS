@@ -28,34 +28,28 @@ extern heap_t *kheap;
 extern "C" /* Use C linkage for kernel_main. */
 #endif
 void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
-	uint32_t *bss = (uint32_t *) (&__kern_bss_start);
-	uint32_t bss_size = (uint32_t) &__kern_bss_size;
-
 	// Make sure we're booted by a multiboot loader
 	if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
 		PANIC("Not booted with multiboot-compliant bootloader!");
 	}
 
-	kprintf("Multiboot struct: 0x%X (0x%X)\n", multibootInfo, sys_multiboot_info);
-	kprintf("mem_lower = %uKB, mem_upper = %uKB\n", multibootInfo->mem_lower, multibootInfo->mem_upper);
-	kprintf("%i KB free\n", paging_get_free_pages() * 4);
+	paging_stats_t paging_info = paging_get_stats();
+
+	kprintf("%iKB low memory, %iKB high memory\n", sys_multiboot_info->mem_lower, sys_multiboot_info->mem_upper);
+	kprintf("%i/%i pages mapped (%i pages free, %i pages wired)\n", paging_info.pages_mapped, paging_info.total_pages, paging_info.pages_free, paging_info.pages_wired);
+	kprintf("%i/%i KB allocated (%i KB free, %i KB wired)\n", paging_info.pages_mapped*4, paging_info.total_pages*4, paging_info.pages_free*4, paging_info.pages_wired*4);
 
 	// kernel stuff
 	system_init();
 	vfs_init();
 
 	kprintf("\x01\x11\x01\x0EMosquitOS\x01\x0F\x01\x10 Kernel v0.1 build %u compiled %s on %s with %s\n", (unsigned long) &KERN_BNUM, KERN_BDATE, KERN_BTIME, KERN_COMPILER);
-	kprintf("Kernel size: %i bytes (BSS at 0x%X, %i bytes)\n", &__kern_size, bss, bss_size);
 
 	if(ps2_init() != 0) {
 		kprintf("ERROR: Could not initialise PS2 driver\n");
 	}
 
 	while(1);
-
-	kprintf("\nBIOS Memory Map:\n");
-	uint32_t total_usable_RAM = 0;
-	kprintf("\nTotal usable memory: %i kB\n", total_usable_RAM/1024);
 
 	// Disk test
 	disk_t *hda0 = disk_allocate();
@@ -123,5 +117,6 @@ void kernel_init(void) {
 	sys_build_idt();
 
 	// Initialize console so we can display stuff
+	//sys_copy_multiboot();
 	console_init();
 }

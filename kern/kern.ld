@@ -39,10 +39,10 @@ SECTIONS {
 		*(COMMON);
 	}
 
-	__kern_end = .;
-
 	__kern_bss_size = SIZEOF(.bss);
 	__kern_size = __kern_bss_start - __kern_code_start;
+
+	__kern_end = .;
 
 	/* Get rid of stuff we don't care for */
 	/DISCARD/ : {

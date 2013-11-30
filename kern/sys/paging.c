@@ -9,6 +9,8 @@ extern multiboot_info_t* sys_multiboot_info;
  
 extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
 
+static uint32_t pages_total, pages_wired;
+
 void sys_build_gdt();
 
 // The kernel's page directory
@@ -20,6 +22,8 @@ page_directory_t *current_directory = 0;
 // A bitset of frames - used or free.
 static uint32_t* frames;
 static uint32_t nframes;
+
+extern uint32_t __kern_end;
 
 // Defined in kheap.c
 extern uint32_t kheap_placement_address;
@@ -129,12 +133,11 @@ void paging_init() {
 	kheap = NULL;
 	unsigned int i = 0;
 
-	// Hopefully the bootloader got the correct memory page size.
-	uint32_t mem_end_page = sys_multiboot_info->mem_upper;
-
-	kprintf("%i KB available\n", mem_end_page);
-
+	// Hopefully the bootloader got the correct himem size
+	uint32_t mem_end_page = sys_multiboot_info->mem_upper * 1024;
 	nframes = mem_end_page / 0x1000;
+
+	pages_total = nframes;
 
 	frames = (uint32_t *) kmalloc(INDEX_FROM_BIT(nframes));
 	memclr(frames, INDEX_FROM_BIT(nframes));
@@ -157,7 +160,8 @@ void paging_init() {
 		page->user = 0;
 	}
 
-	// Map 0xC0000000 to 0xC7FFFFFF to 0x00000000 to 0x07FFF000
+	// This step serves to map the kernel itself
+	// We don't allocate frames here, as that's done below.
 	for(i = 0xC0000000; i < 0xC7FFF000; i += 0x1000) {
 		page_t* page = paging_get_page(i, true, kernel_directory);
 
@@ -170,9 +174,15 @@ void paging_init() {
 	}
 
 	// Allocate enough memory past the kernel heap so we can use the 'smart' allocator.
+	// Note that this actually performs identity mapping.
 	i = 0x00000000;
 	while(i < (kheap_placement_address & 0x0FFFFFFF) + 0x1000) {
 		alloc_frame(paging_get_page(i, true, kernel_directory), true, true);
+
+		if(i < (uint32_t) &__kern_size) {
+			pages_wired++;
+		}
+
 		i += 0x1000;
 	}
 
@@ -209,17 +219,45 @@ void paging_switch_directory(page_directory_t* new) {
  * Returns the number of free pages.
  */
 unsigned int paging_get_free_pages() {
-	unsigned int frames_free = 0;
+	unsigned int frames_allocated = 0;
 
-	uint32_t i, j;
+	uint32_t i;
+	volatile uint32_t x; // GCC likes optimising this away
+
 	for (i = 0; i < INDEX_FROM_BIT(nframes); i++) {
 		// Count bits free
-		if (frames[i] != 0xFFFFFFFF) {
-			frames_free += mstd_popCnt(frames[i]);
+		if ((x = frames[i]) != 0xFFFFFFFF) {
+			frames_allocated += mstd_popCnt(x);
 		}
 	}
 
-	return frames_free;
+	return pages_total - frames_allocated;
+}
+
+/*
+ * Gathers some info about paging.
+ */
+paging_stats_t paging_get_stats() {
+	unsigned int frames_allocated = 0;
+
+	uint32_t i;
+	volatile uint32_t x; // GCC likes optimising this away
+
+	for (i = 0; i < INDEX_FROM_BIT(nframes); i++) {
+		// Count bits free
+		if ((x = frames[i]) != 0xFFFFFFFF) {
+			frames_allocated += mstd_popCnt(x);
+		}
+	}
+
+	paging_stats_t stats;
+
+	stats.total_pages = pages_total;
+	stats.pages_mapped = frames_allocated;
+	stats.pages_free = pages_total - frames_allocated;
+	stats.pages_wired = pages_wired;
+
+	return stats;
 }
 
 /*

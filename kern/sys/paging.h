@@ -29,8 +29,17 @@ typedef struct page_directory {
 	uint32_t physicalAddr;
 } page_directory_t;
 
+typedef struct paging_stats {
+	uint32_t total_pages;
+	uint32_t pages_mapped;
+	uint32_t pages_free;
+	uint32_t pages_wired;
+} paging_stats_t;
+
 void alloc_frame(page_t* page, bool is_kernel, bool is_writeable);
 void free_frame(page_t* page);
+
+paging_stats_t paging_get_stats();
 
 void paging_init();
 void paging_switch_directory(page_directory_t* new);
