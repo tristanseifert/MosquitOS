@@ -113,10 +113,12 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
  * Initialises some kernel stuff so we don't fail as catastrophically.
  */
 void kernel_init(void) {
+	// We cannot rely on the bootloader's GDT because it may raise a GPF when
+	// an IRQ routine returns (if CS != 0x08)
 	sys_build_gdt();
 	sys_build_idt();
 
 	// Initialize console so we can display stuff
-	//sys_copy_multiboot();
+	sys_copy_multiboot();
 	console_init();
 }

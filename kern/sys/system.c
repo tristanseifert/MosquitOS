@@ -118,7 +118,7 @@ void sys_build_idt() {
 	idt_entry_t* idt = (idt_entry_t *) &sys_idt;
 
 	// Clear IDT
-	memset(idt, 0, sizeof(idt_entry_t)*256);
+	memclr(idt, sizeof(idt_entry_t)*256);
 
 	for(int i = 0; i < 256; i++) {
 		sys_set_idt_gate(i, (uint32_t) sys_dummy_irq, 0x08, 0x8E);
@@ -216,8 +216,8 @@ void sys_init_tss() {
 	// Create the correct number of TSS descriptors
 	for(int i = 0; i < SYS_NUM_TSS; i++) {
 		// Initialise the TSS and zero it
-		i386_thread_state_t *tss = (i386_thread_state_t *) (&sys_tss + (i * sizeof(i386_thread_state_t)));
-		memset(tss, 0x00, sizeof(i386_thread_state_t));
+		i386_thread_state_t *tss = &sys_tss[i];
+		memclr(tss, sizeof(i386_thread_state_t));
 
 		// Set up kernel stack meepen
 		tss->iomap = (uint16_t) sizeof(i386_thread_state_t);
@@ -232,7 +232,7 @@ void sys_init_tss() {
 }
 
 void sys_set_gdt_gate(uint16_t num, uint32_t base, uint32_t limit, uint8_t flags, uint8_t gran) {
-	gdt_entry_t *gdt = (gdt_entry_t *) &sys_gdt;	
+	gdt_entry_t *gdt = (gdt_entry_t *) &sys_gdt;
 	
 	gdt[num].base_low = (base & 0xFFFF);
 	gdt[num].base_middle = (base >> 16) & 0xFF;
@@ -258,7 +258,7 @@ void sys_install_gdt(void* location) {
 	IDTR.base = (uint32_t) location;
 	__asm__ volatile("lgdt (%0)" : : "p"(&IDTR));
 	
-	//flush_gdt();
+	flush_gdt();
 }
 
 /*

@@ -113,6 +113,25 @@ panic_halt_loop:
 	hlt
 	jmp		panic_halt_loop
 
+/*
+ * Flush the GDT
+ */
+ .global flush_gdt
+ flush_gdt:
+ 	push	%eax
+	mov 	$0x10, %ax
+	mov 	%ax, %ds
+	mov 	%ax, %es
+	mov 	%ax, %fs
+	mov 	%ax, %gs
+	mov 	%ax, %ss
+
+	ljmp 	$0x08, $flush_gdt_2
+
+flush_gdt_2:
+	pop		%eax
+	ret
+	
 # Reserve a stack of 16K
 .section .bss
 stack_bottom:
