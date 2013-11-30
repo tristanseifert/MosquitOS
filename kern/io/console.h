@@ -8,6 +8,7 @@
 
 // Initialises the console.
 void console_init();
+void console_init_fb();
 void kprintf(char *fmt, ...);
 
 #endif

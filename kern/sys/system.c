@@ -20,10 +20,6 @@ static idt_entry_t sys_idt[256];
 static gdt_entry_t sys_gdt[16];
 static i386_thread_state_t sys_tss[SYS_NUM_TSS];
 
-// Builds IDT to system defaults
-void sys_build_idt();
-// Builds GDT to system defaults
-void sys_build_gdt();
 // Sets location of GDT
 void sys_install_gdt(void* location);
 void flush_gdt(void);
@@ -62,8 +58,6 @@ extern void isr18(void);
  * Initialises the system into a known state.
  */ 
 void system_init() {
-	sys_build_gdt();
-	sys_build_idt();
 	sys_setup_ints();
 
 	// Read x86 TSC

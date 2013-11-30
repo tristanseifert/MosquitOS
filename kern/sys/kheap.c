@@ -15,7 +15,7 @@ uint32_t kmalloc_int(uint32_t sz, bool align, uint32_t *phys) {
 		if (phys != 0) {
 			page_t *page = paging_get_page((uint32_t) addr, false, kernel_directory);
 
-			// 0xC0000000 -> 0x00100000 phys
+			// 0xC0000000 -> 0x00000000 phys
 			uint32_t physAddr = ((page->frame * 0x1000) + ((uint32_t) addr & 0xFFF));
 			//physAddr &= 0x0FFFFFFF; // get rid of high nybble
 			//physAddr += 0x00100000; // Add 1M offset

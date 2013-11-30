@@ -61,13 +61,11 @@ jmp_highhalf:
 	call	sse_init
 
 .noSSE:
-	movw	$0xF030, 0xC00B8000
+	# Error handling and the like
+	call	kernel_init
 
 	# Initialise paging
 	call	paging_init
-
-	movw	$0xF132, 0xC00B8002
-	jmp		.
 
 	# Now jump into the kernel's main function
 	call	kernel_main
@@ -126,7 +124,6 @@ panic_halt_loop:
 	hlt
 	jmp		panic_halt_loop
 
-
 # Reserve a stack of 16K
 .section .bss
 stack_bottom:
@@ -139,9 +136,10 @@ stack_top:
 # Map 4MB of space.
 .align 0x1000
 boot_page_table:
-	.set addr, 1
+	.set addr, 0
+
 	.rept 1024
-	.long addr
+	.long addr + 0x03
 	.set addr, addr+0x1000
 	.endr
 
@@ -149,18 +147,5 @@ boot_page_table:
 .align 0x1000
 boot_page_directory:
 	.rept 1024
-	.long (boot_page_table - 0xC0000000) + 1
+	.long (boot_page_table - 0xC0000000) + 0x07
 	.endr
-
-# GDT
-.section .entry
-kern_gdt:
-	.word gdt_end - gdt - 1 # size of the GDT
-	.long (gdt - 0xC0000000) # linear address of GDT
-
-gdt:
-	.long 0, 0							# null gate
-	.byte 0xFF, 0xFF, 0, 0, 0, 0x9A, 0xCF, 0x40	# code selector 0x08: base 0x40000000, limit 0xFFFFFFFF, type 0x9A, granularity 0xCF
-	.byte 0xFF, 0xFF, 0, 0, 0, 0x92, 0xCF, 0x40	# data selector 0x10: base 0x40000000, limit 0xFFFFFFFF, type 0x92, granularity 0xCF
- 
-gdt_end:

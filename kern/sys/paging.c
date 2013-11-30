@@ -16,8 +16,8 @@ uint32_t kern_dir_phys;
 page_directory_t *current_directory = 0;
 
 // A bitset of frames - used or free.
-uint32_t* frames;
-uint32_t nframes;
+static uint32_t* frames;
+static uint32_t nframes;
 
 // Defined in kheap.c
 extern uint32_t kheap_placement_address;
@@ -90,11 +90,15 @@ void alloc_frame(page_t* page, bool is_kernel, bool is_writeable) {
 		return;
 	} else {
 		uint32_t idx = first_frame();
+
 		if (idx == (uint32_t) -1) {
 			PANIC("No Free Frames");
 		}
 
 		set_frame(idx * 0x1000);
+
+		// Clear the page's memory!
+		memclr(page, sizeof(page_t));
 
 		page->present = 1;
 		page->rw = (is_writeable) ? 1 : 0;
@@ -121,11 +125,12 @@ void free_frame(page_t* page) {
  */
 void paging_init() {
 	kheap = NULL;
+	unsigned int i = 0;
 
 	// The size of physical memory. For the moment we 
-	// assume it is 64MB big.
-	uint32_t mem_end_page = 0x04000000;
-	
+	// assume it is 128MB big.
+	uint32_t mem_end_page = 0x08000000;
+
 	nframes = mem_end_page / 0x1000;
 
 	frames = (uint32_t *) kmalloc(INDEX_FROM_BIT(nframes));
@@ -133,19 +138,9 @@ void paging_init() {
 
 	// Allocate mem for a page directory.
 	kernel_directory = (page_directory_t *) kmalloc_a(sizeof(page_directory_t));
-
 	ASSERT(kernel_directory != NULL);
-
 	memclr(kernel_directory, sizeof(page_directory_t));
 	current_directory = kernel_directory;
-
-	// Allocate memory for pagetables.
-	// XXX: This is really bad and should be fixed because it really is just an ugly
-	// hack around the fact that we for some reason cannot allocate pagetables later.
-	unsigned int i = 0;
-/*	for(i = 0x00000000; i < 0xFFFFF000; i += 0x1000) {
-		page_t* page = paging_get_page(i, true, kernel_directory);
-	}*/
 
 	// Map some pages in the kernel heap area.
 	// Here we call get_page but not alloc_frame. This causes page_table_t's 
@@ -153,12 +148,17 @@ void paging_init() {
 	// they need to be identity mapped first below, and yet we can't increase
 	// placement_address between identity mapping and enabling the heap
 	for(i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000) {
-		paging_get_page(i, true, kernel_directory);
+		page_t* page = paging_get_page(i, true, kernel_directory);
+		memclr(page, sizeof(page_t));
+		page->rw = 1;
+		page->user = 0;
 	}
 
 	// Map 0xC0000000 to 0xC7FFFFFF to 0x00000000 to 0x07FFF000
 	for(i = 0xC0000000; i < 0xC7FFF000; i += 0x1000) {
 		page_t* page = paging_get_page(i, true, kernel_directory);
+
+		memclr(page, sizeof(page_t));
 
 		page->present = 1;
 		page->rw = 1;
@@ -166,26 +166,16 @@ void paging_init() {
 		page->frame = ((i & 0x0FFFF000) >> 12);
 	}
 
-	// We need to identity map (phys addr = virt addr) from
-	// 0x0 to the end of used memory, so we can have access to the
-	// low memory.
-	//
-	// NOTE that we use a while loop here deliberately.
-	// inside the loop body we actually change placement_address
-	// by calling kmalloc(). A while loop causes this to be
-	// computed on-the-fly rather than once at the start.
-	// Also allocate a little bit extra so the kernel heap can be
-	// initialised properly.
+	// Allocate enough memory past the kernel heap so we can use the 'smart' allocator.
 	i = 0x00000000;
 	while(i < (kheap_placement_address & 0x0FFFFFFF) + 0x1000) {
-		// Kernel code is readable but not writeable from userspace.
-		alloc_frame(paging_get_page(i, true, kernel_directory), false, false);
+		alloc_frame(paging_get_page(i, true, kernel_directory), true, true);
 		i += 0x1000;
 	}
 
-	// Allocate pages mapped earlier.
+	// Allocate kernel heap pages.
 	for(i = KHEAP_START; i < KHEAP_START+KHEAP_INITIAL_SIZE; i += 0x1000) {
-		alloc_frame(paging_get_page(i, false, kernel_directory), false, false);
+		alloc_frame(paging_get_page(i, false, kernel_directory), true, true);
 	}
 
 	// Set page fault handler
@@ -194,17 +184,13 @@ void paging_init() {
 	// Convert kernel directory address to physical and save it
 	kern_dir_phys = (uint32_t) &kernel_directory->tablesPhysical;
 	kern_dir_phys -= 0xC0000000;
-
 	kernel_directory->physicalAddr = kern_dir_phys;
-	kprintf("Physical location of pagetables: 0x%X (virtual 0x%X)\n", kernel_directory->physicalAddr, kernel_directory);
-
-	while(1);
 
 	// Enable paging
 	paging_switch_directory(kernel_directory);
 
 	// Initialise a kernel heap
-	kheap = create_heap(KHEAP_START, KHEAP_START+KHEAP_INITIAL_SIZE, 0xCFFFF000, false, false);
+	kheap = create_heap(KHEAP_START, KHEAP_START+KHEAP_INITIAL_SIZE, 0xCFFFF000, true, true);
 }
 
 /*
@@ -213,7 +199,6 @@ void paging_init() {
 void paging_switch_directory(page_directory_t* new) {
 	uint32_t tables_phys_ptr = (uint32_t) new->physicalAddr;
 	current_directory = new;
-
 	__asm__ volatile("mov %0, %%cr3" : : "r"(tables_phys_ptr));
 }
 
@@ -238,7 +223,6 @@ page_t* paging_get_page(uint32_t address, bool make, page_directory_t* dir) {
 		// update physical address
 		uint32_t phys_ptr = tmp | 0x7;
 		phys_ptr &= 0x0FFFFFFF; // get rid of high nybble
-		phys_ptr += 0x00100000; // Add 1M offset
 		dir->tablesPhysical[table_idx] = phys_ptr;
 
 		return &dir->tables[table_idx]->pages[address % 0x400];

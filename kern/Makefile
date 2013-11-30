@@ -36,8 +36,10 @@ kernel: main.c
 	@echo $$(($$(cat $(BUILD_NUMBER_FILE)) + 1)) > $(BUILD_NUMBER_FILE)
 
 	$(CC) $(CFLAGS) -ffreestanding *.c -o kern_main.$(obj_arc_ext)
-	i686-pc-elf-gcc -Wl,-T,kern.ld -o kernel.elf -ffreestanding -Os -nostdlib $(BUILD_NUMBER_LDFLAGS) tmp/entry.o *.$(obj_arc_ext)
-#	gobjcopy -I elf32-i386 -O binary kernel.elf kernel.bin
+	i686-pc-elf-gcc -Wl,-T,kern.ld -o kernel.elf -ffreestanding -g -O2 -nostdlib $(BUILD_NUMBER_LDFLAGS) tmp/entry.o *.$(obj_arc_ext)
+	
+	gobjcopy -I elf32-i386 --only-keep-debug kernel.elf kernel.sym
+	gobjcopy -I elf32-i386 --strip-debug kernel.elf
 	gobjdump -b elf32-i386 -d kernel.elf > symbols.txt
 
 # Sets up directories and stuff.

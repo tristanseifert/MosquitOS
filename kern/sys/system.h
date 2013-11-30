@@ -141,3 +141,6 @@ uint64_t sys_rdtsc();
 void sys_flush_tlb(uint32_t m);
 void sys_write_MSR(uint32_t msr, uint32_t lo, uint32_t hi);
 void sys_read_MSR(uint32_t msr, uint32_t *lo, uint32_t *hi);
+
+void sys_build_idt();
+void sys_build_gdt();

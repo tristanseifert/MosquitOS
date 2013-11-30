@@ -29,8 +29,6 @@ void kernel_main(uint32_t magic, void *multibootInfo) {
 	uint32_t bss_size = (uint32_t) &__kern_bss_size;
 
 	// kernel stuff
-	console_init();
-
 	system_init();
 	vfs_init();
 
@@ -40,6 +38,8 @@ void kernel_main(uint32_t magic, void *multibootInfo) {
 	if(ps2_init() != 0) {
 		kprintf("ERROR: Could not initialise PS2 driver\n");
 	}
+
+	while(1);
 
 	sys_kern_info_t* info = sys_get_kern_info();
 
@@ -143,4 +143,15 @@ void kernel_main(uint32_t magic, void *multibootInfo) {
 	// __asm__("mov %esp, %ecx; mov $0x0, %ebx; mov $.+7, %edx; sysenter;");
 
 	while(1);
+}
+
+/*
+ * Initialises some kernel stuff so we don't fail as catastrophically.
+ */
+void kernel_init(void) {
+	sys_build_gdt();
+	sys_build_idt();
+	console_init();
+
+	kprintf("Balls.\n");
 }
