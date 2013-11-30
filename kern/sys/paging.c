@@ -19,8 +19,6 @@ page_directory_t *current_directory = 0;
 uint32_t* frames;
 uint32_t nframes;
 
-static bool newGDTInstalled;
-
 // Defined in kheap.c
 extern uint32_t kheap_placement_address;
 extern heap_t* kheap;
@@ -145,9 +143,9 @@ void paging_init() {
 	// XXX: This is really bad and should be fixed because it really is just an ugly
 	// hack around the fact that we for some reason cannot allocate pagetables later.
 	unsigned int i = 0;
-	for(i = 0x00000000; i < 0xFFFFF000; i += 0x1000) {
+/*	for(i = 0x00000000; i < 0xFFFFF000; i += 0x1000) {
 		page_t* page = paging_get_page(i, true, kernel_directory);
-	}
+	}*/
 
 	// Map some pages in the kernel heap area.
 	// Here we call get_page but not alloc_frame. This causes page_table_t's 
@@ -195,11 +193,12 @@ void paging_init() {
 
 	// Convert kernel directory address to physical and save it
 	kern_dir_phys = (uint32_t) &kernel_directory->tablesPhysical;
-	kern_dir_phys &= 0x0FFFFFFF;
-	kern_dir_phys += 0x00100000;
+	kern_dir_phys -= 0xC0000000;
 
-	// Load the new GDT
-	sys_build_gdt();
+	kernel_directory->physicalAddr = kern_dir_phys;
+	kprintf("Physical location of pagetables: 0x%X (virtual 0x%X)\n", kernel_directory->physicalAddr, kernel_directory);
+
+	while(1);
 
 	// Enable paging
 	paging_switch_directory(kernel_directory);
@@ -212,21 +211,10 @@ void paging_init() {
  * Switches the currently-used page directory.
  */
 void paging_switch_directory(page_directory_t* new) {
-	// If the GDT is still the old one, load the new one...
-	if(!newGDTInstalled) {
-		newGDTInstalled = true;
-	}
-
-	uint32_t tables_phys_ptr = (uint32_t) &new->tablesPhysical;
-	tables_phys_ptr &= 0x0FFFFFFF;
-	tables_phys_ptr += 0x00100000;
-
+	uint32_t tables_phys_ptr = (uint32_t) new->physicalAddr;
 	current_directory = new;
+
 	__asm__ volatile("mov %0, %%cr3" : : "r"(tables_phys_ptr));
-	uint32_t cr0;
-	__asm__ volatile("mov %%cr0, %0": "=r"(cr0));
-	cr0 |= 0x80000000; // Enable paging!
-	__asm__ volatile("mov %0, %%cr0" : : "r"(cr0));
 }
 
 /*

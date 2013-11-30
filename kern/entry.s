@@ -24,31 +24,33 @@
 .globl osentry
 
 _osentry:
-	# Install the GDT to push us to 0xC0000000 until we can set up paging proper
-	lgdt 	(kern_gdt - 0xC0000000)
-	mov 	$0x10, %cx
-	mov 	%cx, %ds
-	mov 	%cx, %es
-	mov 	%cx, %fs
-	mov 	%cx, %gs
-	mov 	%cx, %ss
- 
 	# Enter protected mode
-    mov		%cr0, %ecx
-    or		$0x00000001, %cx
-    mov		%ecx, %cr0
+	mov		%cr0, %ecx
+	or		$0x00000001, %ecx
+	mov		%ecx, %cr0
+
+	# Load page directory
+	mov		$(boot_page_directory - 0xC0000000), %ecx
+	mov		%ecx, %cr3
+
+	# Enable paging
+	mov		%cr0, %ecx
+	or		$0x80000000, %ecx
+	mov		%ecx, %cr0
 
 	# jump to the higher half kernel
-	ljmp 	$0x08, $jmp_highhalf
+	lea		jmp_highhalf, %ecx
+	jmp		*%ecx
  
-# The CPU will now add 0x40000000 to all addresses, translating them.
+
+# We have rudimentary paging down here.
 jmp_highhalf:
 	# Now, we're executing at 0xC0100000, so use the virtual address for stack.
 	mov		$stack_top, %esp
 
 	# Push multiboot info (EBX) and magic number (EAX)
-    push 	%ebx
-    push	%eax
+	push 	%ebx
+	push	%eax
 
 	# Check for SSE, and if it exists, enable it
 	mov		$0x1, %eax
@@ -61,10 +63,11 @@ jmp_highhalf:
 .noSSE:
 	movw	$0xF030, 0xC00B8000
 
-	jmp		.
-
 	# Initialise paging
 	call	paging_init
+
+	movw	$0xF132, 0xC00B8002
+	jmp		.
 
 	# Now jump into the kernel's main function
 	call	kernel_main
@@ -129,6 +132,25 @@ panic_halt_loop:
 stack_bottom:
 .skip 0x4000
 stack_top:
+
+# Bootup page tables
+.section .entry.data
+
+# Map 4MB of space.
+.align 0x1000
+boot_page_table:
+	.set addr, 1
+	.rept 1024
+	.long addr
+	.set addr, addr+0x1000
+	.endr
+
+# Mirror the first 4 MB throughout the address space.
+.align 0x1000
+boot_page_directory:
+	.rept 1024
+	.long (boot_page_table - 0xC0000000) + 1
+	.endr
 
 # GDT
 .section .entry

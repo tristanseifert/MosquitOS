@@ -62,6 +62,7 @@ extern void isr18(void);
  * Initialises the system into a known state.
  */ 
 void system_init() {
+	sys_build_gdt();
 	sys_build_idt();
 	sys_setup_ints();
 
@@ -265,7 +266,8 @@ void sys_install_gdt(void* location) {
 	IDTR.length = (0x18 + (SYS_NUM_TSS * 0x08)) - 1;
 	IDTR.base = (uint32_t) location;
 	__asm__ volatile("lgdt (%0)" : : "p"(&IDTR));
-	flush_gdt();
+	
+	//flush_gdt();
 }
 
 /*
