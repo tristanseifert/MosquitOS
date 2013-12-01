@@ -48,8 +48,6 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 	// Initialise modules
 	modules_load();
 
-	while(1);
-
 	// Disk test
 	disk_t *hda0 = disk_allocate();
 	ata_driver_init(hda0);

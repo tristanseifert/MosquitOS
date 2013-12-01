@@ -3,6 +3,8 @@
 #include "pci.h"
 #include "pci_tables.h"
 
+// We have initialised a faster way to do config reads rather than IO if this is set
+static bool pci_fast_config_avail;
 // A bus number is valid if it's number corresponds to a non-NULL pointer
 static pci_bus_t* pci_bus_info[256];
 
@@ -10,12 +12,28 @@ static pci_bus_t* pci_bus_info[256];
  * Reads from PCI config space with the specified address
  */
 static uint32_t pci_config_read(uint8_t bus, uint8_t device, uint8_t function, uint8_t reg) {
-	uint32_t address;
+	if(!pci_fast_config_avail) {
+		uint32_t address;
 
-	address = (uint32_t) ((bus << 16) | (device << 11) | (function << 8) | (reg & 0xFC) | 0x80000000);
+		address = (uint32_t) ((bus << 16) | (device << 11) | (function<< 8) | (reg & 0xFC) | 0x80000000);
 
-	io_outl(0xCF8, address);
-	return io_inl(0xCFC);
+		io_outl(0xCF8, address);
+		return io_inl(0xCFC);
+	} else {
+		return 0xFFFFFFFF;
+	}
+}
+
+/*
+ * Gets info about the device's function.
+ */
+static void pci_set_function_info(uint8_t bus, uint8_t device, uint8_t function) {
+	uint32_t temp;
+	pci_function_t *info = &pci_bus_info[bus]->devices[device].function[function];
+
+	temp = pci_config_read(bus, device, function, 0x08);
+	info->class = (temp >> 0x18);
+	info->subclass = (temp >> 0x10) & 0xFF;
 }
 
 /*
@@ -34,6 +52,32 @@ static void pci_probe_bus(pci_bus_t *bus) {
 		if(vendor != 0xFFFF) { // Does the device exist?
 			bus->devices[i].vendor_id = vendor;
 			bus->devices[i].device_id = device;
+
+			// Does device have multiple functions?
+			temp = pci_config_read(bus_number, i, 0, 0x0C);
+			uint8_t header_type = temp >> 0x10;
+
+			// Yes, go through all of them
+			if(header_type & 0x80) {
+				bus->devices[i].multifunction = true;
+
+				for(uint8_t f = 0; f < 7; f++) {
+					temp = pci_config_read(bus_number, i, f, 0x00);
+					vendor = temp & 0xFFFF;
+					device = temp >> 0x10;
+
+					bus->devices[i].function[f].vendor_id = vendor;
+					bus->devices[i].function[f].device_id = device;
+
+					// This function is defined
+					if(vendor != 0xFFFF) {
+						pci_set_function_info(bus_number, i, f);
+					}
+				}
+			} else {
+				pci_set_function_info(bus_number, i, 0);
+				bus->devices[i].multifunction = false;
+			}
 		} else {
 			bus->devices[i].vendor_id = 0xFFFF;
 		}
@@ -109,28 +153,45 @@ static pci_str_device_t* pci_info_get_device(uint16_t vendor, uint16_t device) {
  * Prints a pretty representation of the system's PCI devices.
  */
 static void pci_print_tree() {
+	// Check all possible busses
 	for(int i = 0; i < 256; i++) {
 		pci_bus_t *bus = pci_bus_info[i];
 
+		// Is bus defined?
 		if(bus) {
 			kprintf("Bus %i:\n", i);
 
+			// Search through all devices
 			for(int d = 0; d < 32; d++) {
+				// Process multifunction device
 				if(bus->devices[d].vendor_id != 0xFFFF) {
 					uint16_t vendor = bus->devices[d].vendor_id;
 					uint16_t device = bus->devices[d].device_id;
 
-					pci_str_vendor_t* vinfo = pci_info_get_vendor(vendor);
-					pci_str_device_t* dinfo = pci_info_get_device(vendor, device);
+					if(bus->devices[d].multifunction) {
+						kprintf("  Device %i: Multifunction\n", d);
 
-					if(vinfo && dinfo) {
-						kprintf("  Device %i[%4X:%4X]: %s %s\n", d, vendor, device, vinfo->vendor_full, dinfo->chip_desc);
-					} else if(dinfo) {
-						kprintf("  Device %i[%4X:%4X]: Unknown %s\n", d, vendor, device, dinfo->chip_desc);
-					} else if(vinfo) {
-						kprintf("  Device %i[%4X:%4X]: %s Unknown\n", d, vendor, device, vinfo->vendor_full);
+						for(int f = 0; f < 8; f++) {
+							pci_function_t function = bus->devices[d].function[f];
+							vendor = function.vendor_id;
+							device = function.device_id;
+
+							// This function is defined
+							if(vendor != 0xFFFF) {
+								pci_str_vendor_t* vinfo = pci_info_get_vendor(vendor);
+								pci_str_device_t* dinfo = pci_info_get_device(vendor, device);
+
+								if(vinfo && dinfo) {
+									kprintf("    Function %i[%4X:%4X %2X:%2X]: %s %s\n", f, vendor, device, function.class, function.subclass, vinfo->vendor_full, dinfo->chip_desc);
+								} else {
+									kprintf("    Function %i[%4X:%4X %2X:%2X]: Unknown\n", f, vendor, device, function.class, function.subclass);
+								}
+							}
+						}
 					} else {
-						kprintf("  Device %i[%4X:%4X]\n", d, vendor, device);
+						pci_str_vendor_t* vinfo = pci_info_get_vendor(vendor);
+						pci_str_device_t* dinfo = pci_info_get_device(vendor, device);
+						kprintf("  Device %i[%4X:%4X]: %s %s\n", d, vendor, device, vinfo->vendor_full, dinfo->chip_desc);
 					}
 				}
 			}
@@ -143,6 +204,7 @@ static void pci_print_tree() {
  */
 static int pci_init(void) {
 	memclr(pci_bus_info, 256*sizeof(pci_bus_t*));
+	pci_fast_config_avail = false;
 
 	kprintf("PCI: Probing bus...\n");
 

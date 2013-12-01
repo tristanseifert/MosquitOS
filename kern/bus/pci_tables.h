@@ -2618,7 +2618,6 @@ pci_str_device_t pci_map_device[] = {
 	{0x8086, 0x2669, "2028026", "jkn "},
 	{0x8086, 0x266A, "82801BA/CA", "SMBus Controller"},
 	{0x8086, 0x266C, "82801FB/FR/FW/FRW", "LAN Controller"},
-	{0x8086, 0x266D, "czc82809kr", "http://www.dell.com/support/drivers/us/en/19/DriverDetails/DriverFileFormats?DriverId=R104087&FileId"},
 	{0x8086, 0x266E, "VIA Technologies Vinyl AC'97 Codec Combo Driver (W", "VIA AC97, VIA Vinyl (or Tremor) Audio VT1612A, VT1613, VT1616/B, VT1617/A, VT1618"},
 	{0x8086, 0x266F, "82801FB/FBM/FW/FR/FRW", "PATA100 Controller - 266F"},
 	{0x8086, 0x2670, "631xESB/6321ESB/3100 ", "LPC Interface Controller"},
@@ -2985,7 +2984,6 @@ pci_str_device_t pci_map_device[] = {
 	{0x8086, 0xB555, "21555", "Non-Transparent PCI-to-PCI Bridge"},
 	{0x8086, 0xC50, "fd", "sdf"},
 	{0x8086, 0xE13A, "7600", "NXMOQSN00430812D49"},
-	{0x8086, 8671, "", ""},
 	{0x9004, 0x0078, "aic-7880x", "AHA-2940UW/CN"},
 	{0x9004, 0x1078, "AIC-7810C", "RAID Coprocessor"},
 	{0x9004, 0x1135, "0x0035", "Texas Instruments"},
@@ -3166,7 +3164,6 @@ pci_str_device_t pci_map_device[] = {
 	{0x173B, 0x03EA, "AC1002", "Gigabit Ethernet Adapter"},
 	{0x1584, 0x5054, "VAS5055", "VAS Vetronix Automotive Service"},
 	{0x1584, 4003, "VAS5052", "VAS Vetronix Automotive Service"},
-	{0x1586, 0x0803, "", ""},
 	{0x1588, 0x1100, "PAX.port 1100", "PAX.ware 1100 dual Gb classifier engine"},
 	{0x1588, 0x2000, "AMD '971", "SNP 8023 packet classifier - AMD component"},
 	{0x1588, 0x8023, "SNP8023", "PAX.ware 100 packet classifier"},
@@ -3200,14 +3197,12 @@ pci_str_device_t pci_map_device[] = {
 	{0x15D1, 0x0003, "PEB 20544 E v1.1", "6 Port Optimized Comm Ctrlr (SPOCC)"},
 	{0x15D1, 0x0004, "PNPA000", "Infineon Technologies AG"},
 	{0x15D1, 0x000B, "SLB9635", "TPM"},
-	{0x15D8, 0x9001, "", ""},
 	{0x15D9, 0x9876, "1234", "4567"},
 	{0x15DD, 0x7664, "vgn-ar51j", "idt high audio"},
 	{0x15DD, 0x7680, "2772", "SIGMATEL STAC 92XX C-Major HD Audio"},
 	{0x15DD, 0x769, "7690", "9200 HD Аудио КОДЕК"},
 	{0x15DD, 0x7690, "10F70000", "You'll Love me 4 this/ visit http://wendhelofopportunity.info Support Me!"},
 	{0x15DD, 0x8384, "HDAUDIO\\FUNC_01&VEN_8384&DEV_7616&SUBSYS_1028020A&", "Intel Audio Studio"},
-	{0x15DD, 0x9876, "1", "1"},
 	{0x15E0, 0x7134, "01385168", "01"},
 	{0x15E2, 0x0500, "", "Internet PhoneJack PCI Card"},
 	{0xEACE, 0x24C5, "1", "VIA Vynil v700b"},
@@ -3814,8 +3809,7 @@ pci_str_device_t pci_map_device[] = {
 	{0x1B73, 0x1000, "1", "PCI\\VEN_1000&DEV_0020&SUBSYS_10301000&REV_01PCI\\VEN"},
 	{0x1B73, 0x1100, "n/a", "USB 3.0 eXtensibile Host controller"},
 	{0x17FE, 0x2220, "n/a", "Generic IEEE 802.11b/g Wireless LAN Card"},
-	{0x0DF6, 0x9071, "   \\t9071\\t WL-113 - Wireless Network USB dongle 5", "\\t9071\\t   WL-113 - Wireless Network USB dongle 54g  "},
-	{0x1682, 0x9875, "", ""},
+	{0x0DF6, 0x9071, "   \\t9071\\t WL-113 - Wireless Network USB dongle 5", "\\t9071\\t   WL-113 - Wireless Network USB dongle 54g  "},	
 	{0x1B6F, 0x7023, "DEV_7023&REV_010", "Etron USB 3.0 Extensible Host Controller"},
 	{0x0E8D, 0x0002, "2200", "PCI Simple Communications Controller"},
 	{0x0E8D, 0x0003, "VT6212L", "usb"},
@@ -8954,12 +8948,12 @@ pci_str_device_t pci_map_device[] = {
 #define	PCI_DEVTABLE_LEN	(sizeof(pci_map_device) / sizeof(pci_str_device_t))
 
 typedef struct {
-	unsigned char	BaseClass ;
-	unsigned char	SubClass ;
-	unsigned char	ProgIf ;
-	char *		BaseDesc ;
-	char *		SubDesc ;
-	char *		ProgDesc ;
+	uint8_t class;
+	uint8_t subclass;
+	uint8_t progInt;
+	char* classDesc;
+	char* subclassDesc;
+	char* progIntDesc;
 }  pci_str_classcode_t;
 
 pci_str_classcode_t pci_str_classcode[] = {
