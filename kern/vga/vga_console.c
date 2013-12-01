@@ -65,6 +65,24 @@ static void vga_update_cursor() {
 }
 
 /*
+ * Scrolls up the screen by num_lines lines.
+ */
+static void vga_scroll_up(int num_lines) {
+	uint16_t *readBuf = (uint16_t*) VGA_TEXT_MEMORY + (VGA_WIDTH * num_lines);
+	uint16_t *writeBuf = (uint16_t*) VGA_TEXT_MEMORY;
+
+	for(int i = 0; i < (VGA_HEIGHT * VGA_WIDTH) - (VGA_WIDTH * num_lines); i++) {
+		writeBuf[i] = readBuf[i];
+	}
+
+	for(int i = (VGA_HEIGHT * VGA_WIDTH) - (VGA_WIDTH * num_lines); i < VGA_HEIGHT * VGA_WIDTH; i++) {
+		writeBuf[i] = make_vgaentry(' ', terminal_color);
+	}
+
+	vga_update_cursor();
+}
+
+/*
  * Initializes VGA console. (Clear text mode memory)
  */
 void vga_console_init() {
@@ -104,10 +122,11 @@ void vga_console_putchar(unsigned char c) {
 		}
 	} else {
 		terminal_putentryat(c, terminal_color, terminal_column, terminal_row);
-		if (++terminal_column == VGA_WIDTH) {
+		if (++terminal_column >= VGA_WIDTH) {
 			terminal_column = 0;
-			if (++terminal_row == VGA_HEIGHT) {
-				terminal_row = 0;
+			if (++terminal_row >= VGA_HEIGHT) {
+				terminal_row--;
+				vga_scroll_up(1);
 			}
 		}
 
@@ -122,6 +141,11 @@ void vga_console_control(unsigned char c) {
 	if(c == '\n') {
 		terminal_row++;
 		terminal_column = 0;
+
+		if(terminal_row >= VGA_HEIGHT) {
+			terminal_row--;
+			vga_scroll_up(1);
+		}
 
 		vga_update_cursor();
 	}

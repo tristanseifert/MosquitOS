@@ -9,13 +9,15 @@
 #include "sched.h"
 #include "syscall.h"
 #include "sys/multiboot.h"
+#include "runtime/hashmap.h"
 
-void sys_set_idt(void* base, uint16_t size);
-uint64_t sys_timer_ticks;
-uint64_t sys_tsc_boot_ticks;
-cpu_info_t* sys_current_cpu_info;
- 
+// This CANNOT be static as we need to access it elsewhere
 multiboot_info_t* sys_multiboot_info;
+
+static hashmap_t* sys_kern_arguments;
+static uint64_t sys_timer_ticks;
+static uint64_t sys_tsc_boot_ticks;
+static cpu_info_t* sys_current_cpu_info;
 
 // Allocate memory in the BSS for IDT, GDT, and TSSes
 static idt_entry_t sys_idt[256];
@@ -26,6 +28,7 @@ static i386_thread_state_t sys_tss[SYS_NUM_TSS];
 void sys_install_gdt(void* location);
 void flush_gdt(void);
 void sys_copy_multiboot();
+void sys_set_idt(void* base, uint16_t size);
 
 extern void rs232_set_up_irq();
 
@@ -79,6 +82,9 @@ void system_init() {
 
 /*
  * Copies the multiboot structure out of lowmem.
+ *
+ * This is run BEFORE the kernel heap is properly set up, so we can't free the
+ * memory we allocate here.
  */
 void sys_copy_multiboot() {
 	multiboot_info_t* lowmemStruct = sys_multiboot_info;
@@ -89,24 +95,48 @@ void sys_copy_multiboot() {
 	sys_multiboot_info = himemStruct;
 
 	// Command line
-	if(MULTIBOOT_CHECK_FLAG(himemStruct->flags, 2)) {
-		size_t length = strlen((char *) himemStruct->cmdline);
+	if(MULTIBOOT_CHECK_FLAG(lowmemStruct->flags, 2)) {
+		size_t length = strlen((char *) lowmemStruct->cmdline);
 		char *cmdline = (char *) kmalloc(length+2);
-		memcpy(cmdline, (void *) himemStruct->cmdline, length);
+		memcpy(cmdline, (void *) lowmemStruct->cmdline, length);
 		himemStruct->cmdline = (uint32_t) cmdline;
+
+		// Allocate kernel command line hashmap
+		sys_kern_arguments = hashmap_allocate();
+
+		// Parse the command line
+		char *cmdline_tmp = (char *) kmalloc(length+2);
+		memcpy(cmdline_tmp, cmdline, length);
+
+		char *pch = strtok(cmdline, " ");
+
+		// Loop through all entries
+		while(pch) {
+			pch = strtok(NULL, " ");
+
+			// This is not a key/value string
+			if(strchr(pch, '=') == NULL) {
+				hashmap_insert(sys_kern_arguments, pch, NULL);
+			} else {
+				char* value = strchr(pch, '=');
+				value[0] = 0x00; // terminate key string
+				value++;
+				hashmap_insert(sys_kern_arguments, pch, value);
+			}
+		}
 	}
 
 	// Copy ELF headers
-	if (MULTIBOOT_CHECK_FLAG(himemStruct->flags, 5)) {
-		multiboot_elf_section_header_table_t *multiboot_elf_sec = &(himemStruct->u.elf_sec);
+	if (MULTIBOOT_CHECK_FLAG(lowmemStruct->flags, 5)) {
+		multiboot_elf_section_header_table_t *multiboot_elf_sec = &(lowmemStruct->u.elf_sec);
 		memcpy(&himemStruct->u.elf_sec, multiboot_elf_sec, sizeof(multiboot_elf_section_header_table_t));
 	}
 
 	// Copy memory map
-	if (MULTIBOOT_CHECK_FLAG(himemStruct->flags, 6)) {
-		multiboot_memory_map_t *mmap = (multiboot_memory_map_t *) himemStruct->mmap_addr;
-		multiboot_memory_map_t *new = (multiboot_memory_map_t *) kmalloc(himemStruct->mmap_length);
-		memcpy(new, mmap, himemStruct->mmap_length);
+	if (MULTIBOOT_CHECK_FLAG(lowmemStruct->flags, 6)) {
+		multiboot_memory_map_t *mmap = (multiboot_memory_map_t *) lowmemStruct->mmap_addr;
+		multiboot_memory_map_t *new = (multiboot_memory_map_t *) kmalloc(lowmemStruct->mmap_length);
+		memcpy(new, mmap, lowmemStruct->mmap_length);
 		himemStruct->mmap_addr = (uint32_t) new;
 	}
 }

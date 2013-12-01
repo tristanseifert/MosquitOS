@@ -14,7 +14,7 @@ static void* sector_buffer;
 /*
  * Initialises the FAT filesystem driver.
  */
-void fat_init() {
+static void fat_init(void) {
 	// Allocate memory for info struct
 	fat_init_struct = (fs_type_t *) kmalloc(sizeof(fs_type_t));
 	memclr(fat_init_struct, sizeof(fs_type_t));
@@ -30,6 +30,16 @@ void fat_init() {
 	// Allocate other memory
 	sector_buffer = (void *) kmalloc(FAT_SECTOR_BUFFER_SIZE);
 }
+
+/*
+ * Cleans up resources used by the filesystem.
+ */
+static void fat_exit(void) {
+
+}
+
+module_init(fat_init);
+module_exit(fat_exit);
 
 /*
  * Reads from the filesystem to create a superblock.

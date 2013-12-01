@@ -36,28 +36,42 @@ static rs232_buffer_t rs232_buffer_ptrs[4];
  * By default, the driver initialises ports at 115.2kBaud, with 8 bits per
  * symbol, no parity and one stop bit.
  */
-void rs232_init() {
-	static uint16_t port;
+static int rs232_init(void) {
+	uint16_t port;
+	uint16_t *bios_port_map = (uint16_t *) 0x0400;
 
 	for(uint8_t i = 0; i < 4; i++) {
-		port = rs232_to_io_map[i];
+		port = bios_port_map[i];
+		rs232_to_io_map[i] = port;
 
-		rs232_buffer_ptrs[i].tx_buf = (uint8_t *) kmalloc(RS232_BUF_SIZE);
-		rs232_buffer_ptrs[i].rx_buf = (uint8_t *) kmalloc(RS232_BUF_SIZE);
+		// Only initialise if port is not zero
+		if(port != 0) {
+			rs232_buffer_ptrs[i].tx_buf = (uint8_t *) kmalloc(RS232_BUF_SIZE);
+			rs232_buffer_ptrs[i].rx_buf = (uint8_t *) kmalloc(RS232_BUF_SIZE);
 
-		rs232_buffer_ptrs[i].tx_buf_off = 0;
-		rs232_buffer_ptrs[i].rx_buf_off = 0;
+			rs232_buffer_ptrs[i].tx_buf_off = 0;
+			rs232_buffer_ptrs[i].rx_buf_off = 0;
 
-		io_outb(port + 1, 0x00);	// Disable all interrupts
-		io_outb(port + 3, 0x80);	// Enable DLAB (set baud rate divisor)
-		io_outb(port + 0, 0x01);	// Set divisor to 1 (lo byte) 115.2kbaud
-		io_outb(port + 1, 0x00);	//					(hi byte)
-		io_outb(port + 3, 0x03);	// 8 bits, no parity, one stop bit
-		io_outb(port + 2, 0xC7);	// Enable FIFO, clear them, with 14-byte threshold
-		io_outb(port + 4, 0x0F);	// IRQs enabled, RTS/DSR set
-		io_outb(port + 1, 0x0F);	// Enable all interrupts
+			io_outb(port + 1, 0x00);	// Disable all interrupts
+			io_outb(port + 3, 0x80);	// Enable DLAB (set baud rate divisor)
+			io_outb(port + 0, 0x01);	// Set divisor to 1 (lo byte) 115.2kbaud
+			io_outb(port + 1, 0x00);	//					(hi byte)
+			io_outb(port + 3, 0x03);	// 8 bits, no parity, one stop bit
+			io_outb(port + 2, 0xC7);	// Enable FIFO, clear them, with 14-byte threshold
+			io_outb(port + 4, 0x0F);	// IRQs enabled, RTS/DSR set
+			io_outb(port + 1, 0x0F);	// Enable all interrupts
+		}
 	}
+
+	return 0;
 }
+
+static void rs232_exit(void) {
+
+}
+
+module_init(rs232_init);
+module_exit(rs232_exit);
 
 /*
  * Sets up IRQs once IDT is set up
@@ -76,6 +90,7 @@ void rs232_set_up_irq() {
  */
 void rs232_set_baud(rs232_port_t port, rs232_baud_t baudrate) {
 	volatile uint16_t portnum = rs232_to_io_map[port-1];
+	if(!portnum) return;
 
 	uint16_t divisor = (uint16_t) baudrate;
 
@@ -94,6 +109,7 @@ void rs232_set_baud(rs232_port_t port, rs232_baud_t baudrate) {
  */
 void rs232_write(rs232_port_t port, size_t num_bytes, void* data) {
 	volatile uint16_t portnum = rs232_to_io_map[port-1];
+	if(!portnum) return;
 
 	uint8_t* data_read = data;
 	static uint8_t counter;
@@ -123,6 +139,7 @@ void rs232_write(rs232_port_t port, size_t num_bytes, void* data) {
  */
 void rs232_putchar(rs232_port_t port, char value) {
 	volatile uint16_t portnum = rs232_to_io_map[port-1];
+	if(!portnum) return;
 
 	if(!(io_inb(portnum + 5) & 0x20)) {
 		// Get buffer info struct
@@ -143,6 +160,7 @@ void rs232_putchar(rs232_port_t port, char value) {
  */
 int rs232_read(rs232_port_t port, size_t num_bytes, void* out, bool timeout) {
 	volatile uint16_t portnum = rs232_to_io_map[port-1];
+	if(!portnum) return 0;
 
 	uint8_t* data_write = out;
 	static uint8_t counter;

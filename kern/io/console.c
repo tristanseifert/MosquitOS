@@ -33,7 +33,6 @@ void console_putc(void* p, char c) {
  */
 void console_init() {
 	vga_console_init();
-	rs232_init();
 }
 
 /*

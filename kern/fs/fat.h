@@ -139,8 +139,6 @@ typedef struct {
 	uint32_t filesize; // in bytes
 } __attribute__((packed)) fat_dirent_t;
 
-void fat_init();
-
 void fat_read_get_root_dir(fs_superblock_t* superblock, void* buffer, uint32_t buffer_size);
 void* fat_read_directory(fs_superblock_t* superblock, char* path);
 void* fat_read_file(fs_superblock_t* superblock, char* file, void* buffer, uint32_t buffer_size);

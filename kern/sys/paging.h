@@ -43,6 +43,9 @@ paging_stats_t paging_get_stats();
 
 void paging_init();
 void paging_switch_directory(page_directory_t* new);
+
+page_directory_t *paging_new_directory();
+
 page_t* paging_get_page(uint32_t address, bool make, page_directory_t* dir);
 
 void paging_page_fault_handler();

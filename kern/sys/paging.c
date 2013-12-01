@@ -10,6 +10,7 @@ extern multiboot_info_t* sys_multiboot_info;
 extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
 
 static uint32_t pages_total, pages_wired;
+static uint32_t previous_directory;
 
 void sys_build_gdt();
 
@@ -210,9 +211,33 @@ void paging_init() {
  * Switches the currently-used page directory.
  */
 void paging_switch_directory(page_directory_t* new) {
+	__asm__ volatile("mov %%cr3, %0" : "=r" (previous_directory));
+
 	uint32_t tables_phys_ptr = (uint32_t) new->physicalAddr;
 	current_directory = new;
 	__asm__ volatile("mov %0, %%cr3" : : "r"(tables_phys_ptr));
+}
+
+/*
+ * Creates a new page directory with 0xC0000000 to 0xC7FFFFFF mapped as kernel
+ * data. Heap and friends are not mapped as this pagetable merely needs to map
+ * code so IRQ handlers won't triple-fault the machine.
+ */
+page_directory_t *paging_new_directory() {
+	uint32_t phys_loc;
+
+	// Allocate a page-aligned block of memory, put physical address in phys_loc
+	page_directory_t* directory = (page_directory_t *) kmalloc_int(sizeof(page_directory_t), true, &phys_loc);
+	ASSERT(directory != NULL);
+	memclr(directory, sizeof(page_directory_t));
+
+	// We need to copy entries 0x300 to 0x31F in the directory.
+	for(int i = 0x300; i < 0x320; i++) {
+		directory->tables[i] = kernel_directory->tables[i];
+		directory->tablesPhysical[i] = kernel_directory->tablesPhysical[i];
+	}
+
+	directory->physicalAddr = phys_loc + offsetof(page_directory_t, tablesPhysical);
 }
 
 /*

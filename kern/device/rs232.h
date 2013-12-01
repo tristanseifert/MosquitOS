@@ -42,7 +42,6 @@ typedef struct {
 	uint16_t io_port;
 } rs232_port_info_t;
 
-void rs232_init();
 void rs232_set_baud(rs232_port_t port, rs232_baud_t baudrate);
 void rs232_write(rs232_port_t port, size_t num_bytes, void* data);
 void rs232_putchar(rs232_port_t port, char value);

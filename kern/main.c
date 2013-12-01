@@ -56,8 +56,6 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 	if(ret != kDiskErrorNone) {
 		kprintf("hd0 initialisation error: 0x%X\n", ret);
 	} else {
-		fat_init();
-
 		ptable_t* mbr = mbr_load(hda0);
 
 		// Mount the root filesystem
@@ -116,6 +114,8 @@ void kernel_init(void) {
 	sys_build_idt();
 
 	// Initialize console so we can display stuff
-	sys_copy_multiboot();
 	console_init();
+
+	// Copy multiboot structure
+	sys_copy_multiboot();
 }
