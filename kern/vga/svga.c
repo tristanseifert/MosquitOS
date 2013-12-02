@@ -2,8 +2,10 @@
 #include "svga.h"
 
 #include "sys/paging.h"
+#include "sys/multiboot.h"
 
 extern page_directory_t *kernel_directory;
+extern multiboot_info_t* sys_multiboot_info;
 
 /*
  * Switches the SVGA mode to the specified mode number.
@@ -16,7 +18,7 @@ void svga_change_mode(uint16_t mode) {
  * Returns a pointer to the info struct about a certain SVGA mode.
  */
 svga_mode_info_t* svga_mode_get_info(uint16_t mode) {
-	return (svga_mode_info_t *) 0x001C00;
+	return (svga_mode_info_t *) sys_multiboot_info->vbe_mode_info;
 }
 
 /*

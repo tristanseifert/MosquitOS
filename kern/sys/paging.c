@@ -238,6 +238,8 @@ page_directory_t *paging_new_directory() {
 	}
 
 	directory->physicalAddr = phys_loc + offsetof(page_directory_t, tablesPhysical);
+	
+	return directory;
 }
 
 /*

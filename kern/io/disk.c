@@ -8,7 +8,9 @@
  */
 disk_t* disk_allocate() {
 	disk_t *disk = (disk_t *) kmalloc(sizeof(disk_t));
+	memclr(disk, sizeof(disk_t));
 	disk->driver_calls = (void *) kmalloc(sizeof(driver_functions_t));
+	memclr(disk->driver_calls, sizeof(driver_functions_t));
 
 	return disk;
 }

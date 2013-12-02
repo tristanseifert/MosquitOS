@@ -10,6 +10,8 @@ static uint32_t v86_memory_phys;
 static void* v86_memory;
 static page_directory_t *v86_pagedir;
 
+extern uint32_t v86_trampoline, v86_trampoline_end;
+
 /*
  * Initialises Virtual 8086 mode.
  */
@@ -60,6 +62,11 @@ static int v86_init(void) {
 		page->user = 1;
 		page->frame = (i >> 12);
 	}
+
+	// Copy the trampoline to the start of our V86 memory
+	uint32_t v86_trampoline_length = ((uint32_t) &v86_trampoline_end) - ((uint32_t) &v86_trampoline);
+
+	memcpy(v86_memory, (void *)&v86_trampoline, v86_trampoline_length);
 
 	return 0;
 }

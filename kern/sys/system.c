@@ -10,6 +10,7 @@
 #include "syscall.h"
 #include "sys/multiboot.h"
 #include "runtime/hashmap.h"
+#include "vga/svga.h"
 
 // This CANNOT be static as we need to access it elsewhere
 multiboot_info_t* sys_multiboot_info;
@@ -138,6 +139,21 @@ void sys_copy_multiboot() {
 		multiboot_memory_map_t *new = (multiboot_memory_map_t *) kmalloc(lowmemStruct->mmap_length);
 		memcpy(new, mmap, lowmemStruct->mmap_length);
 		himemStruct->mmap_addr = (uint32_t) new;
+	}
+
+	// If bootloader sets up video, copy video info
+	if (MULTIBOOT_CHECK_FLAG(lowmemStruct->flags, 11)) {
+		// Copy mode info
+		svga_mode_info_t *vbe_info = (svga_mode_info_t *) lowmemStruct->vbe_mode_info;
+		svga_mode_info_t *new_vbe_info = (svga_mode_info_t *) kmalloc(sizeof(svga_mode_info_t));
+		memcpy(new_vbe_info, vbe_info, sizeof(svga_mode_info_t));
+		himemStruct->vbe_mode_info = (uint32_t) new_vbe_info;
+
+		// Copy control info
+		void *vbe_control = (void *) lowmemStruct->vbe_control_info;
+		void *new_vbe_control = (void *) kmalloc(512);
+		memcpy(new_vbe_control, vbe_control, 512);
+		himemStruct->vbe_control_info = (uint32_t) new_vbe_control;
 	}
 }
 

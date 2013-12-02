@@ -14,7 +14,7 @@ static void* sector_buffer;
 /*
  * Initialises the FAT filesystem driver.
  */
-static void fat_init(void) {
+static int fat_init(void) {
 	// Allocate memory for info struct
 	fat_init_struct = (fs_type_t *) kmalloc(sizeof(fs_type_t));
 	memclr(fat_init_struct, sizeof(fs_type_t));
@@ -29,6 +29,8 @@ static void fat_init(void) {
 
 	// Allocate other memory
 	sector_buffer = (void *) kmalloc(FAT_SECTOR_BUFFER_SIZE);
+
+	return 0;
 }
 
 /*

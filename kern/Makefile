@@ -64,8 +64,9 @@ io: io/*.c
 	@$(make_obj_archive)
 
 # Virtual 8086 mode support
-v86: v86/*.c
+v86: v86/*.c v86/*.S
 	@$(CC) $(CFLAGS) -ffreestanding v86/*.c
+	@nasm -f elf v86/v86_trampoline.S -o v86_trampoline.o
 	@$(make_obj_archive)
 
 # System interfaces, such as syscalls and hardware setup (V86 too!)

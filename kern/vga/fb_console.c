@@ -7,7 +7,7 @@
 #include "rsrc/ter-i16b.h"
 #include "rsrc/ter-i16n.h"
 
-static void fb_console_putpixel(uint8_t* screen, int x, int y, uint32_t color);
+static void fb_console_putpixel_24bpp(uint8_t* screen, int x, int y, uint32_t color);
 static void fb_console_scroll_up(unsigned int num_rows);
 
 // Pointers to fonts
@@ -46,11 +46,7 @@ void fb_console_init() {
 	fb_console_set_font(&ter_i16n_raw, &ter_i16b_raw);
 
 	// Clear screen
-	for(int y = 0; y < height; y++) {
-		for(int x = 0; x < width; x++) {
-			fb_console_putpixel((uint8_t *) video_base, x, y, fb_console_col_map[0x00]);
-		}
-	}
+	memclr((void *) video_base, bytesPerLine * height);
 
 	is_bold = false;
 	next_char_is_escape_seq = false;
@@ -71,7 +67,7 @@ void fb_console_putchar(unsigned char c) {
 
 	// Check if the following character is part of an escape sequence
 	if(next_char_is_escape_seq) {
-		// Codes 0x00 to 0x0F are colours
+		// Codes 0x00 to 0x0F are colours 
 		if(c >= 0x00 && c <= 0x0F) {
 			fg_colour = c;
 			next_char_is_escape_seq = false;
@@ -84,22 +80,42 @@ void fb_console_putchar(unsigned char c) {
 		}
 	} else { // Handle printing of a regular character
 		// Characters are 16 px tall, i.e. 0x10 bytes in stored rep
-		uint8_t *read_ptr = ((is_bold) ? font_bold : font_reg) + (c * CHAR_HEIGHT);
+		uint8_t *read_ptr = (uint8_t *) ((is_bold) ? font_bold : font_reg) + (c * CHAR_HEIGHT);
+		uint32_t *write_base;
 
-		static const uint8_t x_to_bitmap[CHAR_WIDTH] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
-		static uint8_t fontChar;
-		static uint32_t out;
+		const uint8_t x_to_bitmap[CHAR_WIDTH] = {0x80, 0x40, 0x20, 0x10, 0x08, 0x04, 0x02, 0x01};
+		uint8_t fontChar = 0;
+		uint32_t out = 0;
 
 		for(uint8_t y = 0; y < CHAR_HEIGHT; y++) {
 			fontChar = read_ptr[y];
 
 			// Process one column at a time
-			for(uint8_t x = 0; x < CHAR_WIDTH; x++) {
-				if(x_to_bitmap[x] & fontChar) {
-					fb_console_putpixel((uint8_t *) video_base, x+(col*CHAR_WIDTH), y+(row*CHAR_HEIGHT), fb_console_col_map[fg_colour]);
-				}/* else {
-					fb_console_putpixel((uint8_t *) video_base, x+(col*CHAR_WIDTH), y+(row*CHAR_HEIGHT), fb_console_col_map[bg_colour]);
-				}*/
+			if(depth == 4) {
+				write_base = (uint32_t *) (video_base) + (((bytesPerLine / 4) * CHAR_HEIGHT * row)) + (CHAR_WIDTH * col);
+
+				for(uint8_t x = 0; x < CHAR_WIDTH; x++) {
+					if(x_to_bitmap[x] & fontChar) {
+						write_base[x+(y * (bytesPerLine / 4))] = fb_console_col_map[fg_colour];
+					}
+				}
+			} else if(depth == 2) {
+				write_base = (uint32_t *) (video_base) + (((bytesPerLine / 4) * CHAR_HEIGHT * row)) + ((CHAR_WIDTH * (col)) >> 1);
+
+				// In 16bpp, process two pixels at once
+				for(uint8_t x = 0; x < CHAR_WIDTH; x+=2) {
+					out = 0;
+
+					if(x_to_bitmap[x] & fontChar) {
+						out = ((SVGA_24TO16BPP(fb_console_col_map[fg_colour])) & 0xFFFF) << 16;
+					}
+
+					if(x_to_bitmap[x+1] & fontChar) {
+						out |= ((SVGA_24TO16BPP(fb_console_col_map[fg_colour])) & 0xFFFF);
+					}
+
+					write_base[(x >> 1) + (y * (bytesPerLine / 4))] = out;
+				}
 			}
 		}
 
@@ -122,16 +138,7 @@ void fb_console_control(unsigned char c) {
 			col = 0;
 
 			if(row > (height / CHAR_HEIGHT)) {
-				uint32_t *videoMem = (uint32_t *) video_base;
-				uint32_t pixel = (fb_console_col_map[0x00] << 0x10) | fb_console_col_map[0x00];
-				for(int i = 0; i < ((bytesPerLine / depth) * height)/8; i++) {
-					videoMem[0] = pixel;
-					videoMem[1] = pixel;
-					videoMem[2] = pixel;
-					videoMem[3] = pixel;
-
-					videoMem += 4;
-				}
+				memclr((void *) video_base, bytesPerLine * height);
 
 				row = 0;
 			}
@@ -173,7 +180,7 @@ static void fb_console_scroll_up(unsigned int num_rows) {
 /*
  * Plots a pixel in 24bpp mode.
  */
-static void fb_console_putpixel(uint8_t* screen, int x, int y, uint32_t color) {
+static void fb_console_putpixel_24bpp(uint8_t* screen, int x, int y, uint32_t color) {
     int where = (x * depth) + (y * bytesPerLine);
     screen[where] = color & 255;              // BLUE
     screen[where + 1] = (color >> 8) & 255;   // GREEN

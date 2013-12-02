@@ -17,27 +17,30 @@
 #include "sys/task.h"
 #include "sys/multiboot.h"
  
-extern multiboot_info_t* sys_multiboot_info;
+static void kernel_preload(void);
 
+extern multiboot_info_t* sys_multiboot_info;
 extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
 extern uint32_t KERN_BNUM;
 extern page_directory_t *kernel_directory;
 extern heap_t *kheap;
 
-#if defined(__cplusplus)
-extern "C" /* Use C linkage for kernel_main. */
-#endif
+/*
+ * Kernel's main entrypoint.
+ */
 void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 	// Make sure we're booted by a multiboot loader
 	if (magic != MULTIBOOT_BOOTLOADER_MAGIC) {
 		PANIC("Not booted with multiboot-compliant bootloader!");
 	}
 
+	kernel_preload();
+
 	paging_stats_t paging_info = paging_get_stats();
 
 	kprintf("%iKB low memory, %iKB high memory\n", sys_multiboot_info->mem_lower, sys_multiboot_info->mem_upper);
 	kprintf("%i/%i pages mapped (%i pages free, %i pages wired)\n", paging_info.pages_mapped, paging_info.total_pages, paging_info.pages_free, paging_info.pages_wired);
-	kprintf("%i/%i KB allocated (%i KB free, %i KB wired)\n", paging_info.pages_mapped*4, paging_info.total_pages*4, paging_info.pages_free*4, paging_info.pages_wired*4);
+//	kprintf("%i/%i KB allocated (%i KB free, %i KB wired)\n", paging_info.pages_mapped*4, paging_info.total_pages*4, paging_info.pages_free*4, paging_info.pages_wired*4);
 
 	// kernel stuff
 	system_init();
@@ -118,4 +121,17 @@ void kernel_init(void) {
 
 	// Copy multiboot structure
 	sys_copy_multiboot();
+}
+
+/*
+ * Performs more system initialisation dependant on paging and more advanced
+ * kernel facilities.
+ */
+static void kernel_preload(void) {
+	// Check if we're in a VBE mode that's 32bpp or 16bpp and set up FB console
+	svga_mode_info_t *vbe_info = (svga_mode_info_t *) sys_multiboot_info->vbe_mode_info;
+	if(vbe_info->bpp == 32 || vbe_info->bpp == 16) {
+		kprintf("VBE mode: 0x%X is %ibpp, initialising fb_console\n", sys_multiboot_info->vbe_mode, vbe_info->bpp);
+		//console_init_fb();
+	}
 }

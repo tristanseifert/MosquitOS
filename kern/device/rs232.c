@@ -41,8 +41,9 @@ static int rs232_init(void) {
 	uint16_t *bios_port_map = (uint16_t *) 0x0400;
 
 	for(uint8_t i = 0; i < 4; i++) {
-		port = bios_port_map[i];
-		rs232_to_io_map[i] = port;
+		//port = bios_port_map[i];
+		port = rs232_to_io_map[i];
+		//rs232_to_io_map[i] = port;
 
 		// Only initialise if port is not zero
 		if(port != 0) {
@@ -54,7 +55,7 @@ static int rs232_init(void) {
 
 			io_outb(port + 1, 0x00);	// Disable all interrupts
 			io_outb(port + 3, 0x80);	// Enable DLAB (set baud rate divisor)
-			io_outb(port + 0, 0x01);	// Set divisor to 1 (lo byte) 115.2kbaud
+			io_outb(port + 0, 0x01);	// Set divisor to 1 (lo byte) 115.2 kbaud
 			io_outb(port + 1, 0x00);	//					(hi byte)
 			io_outb(port + 3, 0x03);	// 8 bits, no parity, one stop bit
 			io_outb(port + 2, 0xC7);	// Enable FIFO, clear them, with 14-byte threshold
@@ -70,7 +71,7 @@ static void rs232_exit(void) {
 
 }
 
-module_init(rs232_init);
+module_early_init(rs232_init);
 module_exit(rs232_exit);
 
 /*
@@ -95,7 +96,7 @@ void rs232_set_baud(rs232_port_t port, rs232_baud_t baudrate) {
 	uint16_t divisor = (uint16_t) baudrate;
 
 	io_outb(portnum + 3, 0x80); // Enable DLAB (set baud rate divisor)
-	io_outb(portnum + 0, (divisor & 0xFF)); // Set divisor (lo byte) 115.2kbaud
+	io_outb(portnum + 0, (divisor & 0xFF)); // Set divisor (lo byte)
 	io_outb(portnum + 1, (divisor >> 0x08) & 0xFF);    // (hi byte)
 	io_outb(portnum + 3, 0x03); // 8 bits, no parity, one stop bit (disable DLAB)
 
@@ -111,8 +112,7 @@ void rs232_write(rs232_port_t port, size_t num_bytes, void* data) {
 	volatile uint16_t portnum = rs232_to_io_map[port-1];
 	if(!portnum) return;
 
-	uint8_t* data_read = data;
-	static uint8_t counter;
+	uint8_t *data_read = (uint8_t *) data;
 
 	// If less than or equal to 16 total bytes, write directly
 	if(num_bytes <= 16) {
@@ -145,7 +145,6 @@ void rs232_putchar(rs232_port_t port, char value) {
 		// Get buffer info struct
 		rs232_buffer_t *bufInfo = &rs232_buffer_ptrs[port-1];
 
-		// Stuff into buffer
 		bufInfo->tx_buf[bufInfo->tx_buf_off++] = value;
 	} else {
 		io_outb(portnum, value);

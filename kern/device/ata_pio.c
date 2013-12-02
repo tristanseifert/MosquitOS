@@ -6,7 +6,7 @@ static void ata_do_pio_read(void* dest, uint32_t num_words, uint8_t bus);
 static char* ata_convert_string(void* in, size_t length);
 
 // Maps a bus to IO addresses
-static uint16_t ata_bus_to_ioaddr[4] = {ATA_BUS_0_IOADDR, ATA_BUS_1_IOADDR, 0x0000, 0x0000};
+static const uint16_t ata_bus_to_ioaddr[4] = {ATA_BUS_0_IOADDR, ATA_BUS_1_IOADDR, 0x0000, 0x0000};
 
 /*
  * Private data structures used internally by the driver for each disk.

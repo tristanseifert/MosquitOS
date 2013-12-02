@@ -30,9 +30,9 @@ rm -rf /Volumes/MOSQUITOS/.Trashes
 dot_clean -m /Volumes/MOSQUITOS/
 
 # Unmount disk image
-diskutil unmount /Volumes/MOSQUITOS/
+# diskutil unmount /Volumes/MOSQUITOS/
 
 clear
 
 # -monitor telnet::4444,server
-qemu-1.60/qemu-system-i386 -hda /Users/tristanseifert/SquelchenOS/disk_image.img -m 256M -soundhw ac97 -net nic,model=e1000 -net user -device sysbus-ohci -device usb-ehci -device vmware-svga -smbios type=1,manufacturer=NoEuh,product=Computermajig -s
+qemu-1.60/qemu-system-i386 -hda /Users/tristanseifert/SquelchenOS/disk_image.img -m 256M -soundhw ac97 -net nic,model=e1000 -net user -device sysbus-ohci -device usb-ehci -serial stdio -device vmware-svga -smbios type=1,manufacturer=NoEuh,product=Computermajig -s

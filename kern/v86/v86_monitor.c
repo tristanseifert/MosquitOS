@@ -10,11 +10,11 @@ static v86m_swi_handler v86m_swi_special[8] = {
 	v86m_handler_exit
 };
 
-/*
+/* 
  * Pops a 16-bit value from the VM stack.
  */
 uint16_t v86m_pop16(v86_regs *registers) {
-	
+
 }
 
 /*
