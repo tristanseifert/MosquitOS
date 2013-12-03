@@ -10,9 +10,12 @@ typedef struct device device_t;
 typedef struct driver driver_t;
 
 struct device {
-	bus_t *bus; // the bus this device is on
+	node_t node;
+
 	void *bus_info; // pointer to bus-specific structure
 	void *device_info; // pointer to device-specific info
+
+	void *sysInfo; // hook for system-specific info
 };
 
 struct driver {
@@ -36,6 +39,7 @@ struct bus {
 	int (*match)(device_t*, driver_t*);
 };
 
+// Registers a bus with the driver
 void bus_register(bus_t *bus, char *name);
 
 #endif

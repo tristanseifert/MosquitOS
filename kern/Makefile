@@ -54,8 +54,9 @@ runtime: runtime/*.c
 	@$(make_obj_archive)
 
 # Drivers for hardware
-drivers: device/*.c
+drivers: device/*.c drivers/*.c
 	@$(CC) $(CFLAGS) -ffreestanding device/*.c
+	@$(CC) $(CFLAGS) -ffreestanding drivers/*.c
 	@$(make_obj_archive)
 
 # IO routines, i.e. driver interfaces
