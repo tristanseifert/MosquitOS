@@ -1,7 +1,8 @@
 #ifndef MODULE_H
 #define MODULE_H
 
-#include "device/device.h"
+#include <types.h>
+#include "bus/bus.h"
 
 typedef int (*module_initcall_t)(void);
 typedef void (*module_exitcall_t)(void);

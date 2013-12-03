@@ -209,12 +209,8 @@ static int pci_init(void) {
 	memclr(pci_bus_info, 256*sizeof(pci_bus_t*));
 	pci_fast_config_avail = false;
 
-	kprintf("PCI: Probing bus...\n");
-
 	pci_enumerate_busses();
 	pci_print_tree();
-
-	kprintf("PCI: Bus enumerated.\n");
 
 	return -1;
 }

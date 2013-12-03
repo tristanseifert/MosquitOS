@@ -21,6 +21,7 @@ SECTIONS {
 		__kern_initcalls = .;
 		*(.initcall0*);
 		*(.initcall1*);
+		*(.initcall*);
 		BYTE(0x00); BYTE(0x00); BYTE(0x00); BYTE(0x00);
 
 		__kern_exitcalls = .;
