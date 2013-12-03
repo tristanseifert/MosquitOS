@@ -2,6 +2,8 @@
 #define DEVICE_H
 
 #include <types.h>
+
+// Include bus registration functions
 #include "bus/bus.h"
 
 typedef struct {

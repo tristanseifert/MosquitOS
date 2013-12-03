@@ -18,4 +18,7 @@ typedef struct {
 	bus_type_t bus_type;
 } bus_t;
 
+void bus_register(bus_t *bus, char *name);
+
 #endif
+
