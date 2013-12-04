@@ -2,13 +2,9 @@
 #define MODULE_H
 
 #include <types.h>
-#include "bus/bus.h"
 
 typedef int (*module_initcall_t)(void);
 typedef void (*module_exitcall_t)(void);
-
-// Prototype a bus driver can register
-typedef int (*module_find_device_t)(device_t*);
 
 #define module_early_init(fn)	__define_initcall(fn, 0)
 #define module_bus_init(fn)	__define_initcall(fn, 1)

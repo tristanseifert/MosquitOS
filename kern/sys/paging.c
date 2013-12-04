@@ -12,6 +12,16 @@ extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
 static uint32_t pages_total, pages_wired;
 static uint32_t previous_directory;
 
+// Maps a memory section enum entry to a range
+static uint32_t section_to_memrange[6][2] = {
+	{0x00000000, 0x00000000}, // kMemorySectionNone
+	{0x00000000, 0x7FFFFFFF}, // kMemorySectionProcess
+	{0x80000000, 0xBFFFFFFF}, // kMemorySectionSharedLibraries
+	{0xC0000000, 0xC7FFFFFF}, // kMemorySectionKernel
+	{0xC8000000, 0xCFFFFFFF}, // kMemorySectionKernelHeap
+	{0xD0000000, 0xFFFFFFFF}  // kMemorySectionHardware
+};
+
 void sys_build_gdt();
 
 // The kernel's page directory
@@ -243,6 +253,91 @@ page_directory_t *paging_new_directory() {
 }
 
 /*
+ * Maps length bytes starting at physicalAddress anywhere in the specified memory
+ * region.
+ */
+uint32_t paging_map_section(uint32_t physAddress, uint32_t length, page_directory_t* dir, paging_memory_section_t sec) {
+	uint32_t section_start = section_to_memrange[sec][0];
+	uint32_t section_end = section_to_memrange[sec][1];
+
+	// Round up length to a multiple of a page
+	length &= 0xFFFFF000;
+	length += 0x1000;
+
+	// Align physical address to a page boundary.
+	uint32_t phys_transformed = physAddress & 0xFFFFF000;
+
+	uint32_t found_length = 0;
+	uint32_t mapping_start = 0;
+
+	for(int i = section_start; i < section_end; i+= 0x1000) {
+		// Try to get the page, but do not allocate it
+		page_t* page = paging_get_page(i, false, dir);
+
+		// Store pointer to the start of the free block.
+		if(found_length == 0) {
+			mapping_start = i;
+		}
+
+		// If page doesn't exist, we can allocate some memory here.
+		if(page == NULL) {
+			found_length += 0x1000;
+		} else {
+			// Is page not present or mapped to 0?
+			if(page->present == 0 || page->frame == 0) {
+				found_length += 0x1000;
+			} else {
+				found_length = 0x0000;
+			}
+		}
+
+		// Check if we found enough memory.
+		if(found_length == length) {
+			break;
+		}
+	}
+
+	// We found enough memory, so map it
+	if(mapping_start != 0) {
+		// Note we don't call alloc_frame as this doesn't allocate any of our
+		// physical RAM.
+		// kprintf("Mapping 0x%X to 0x%X -> 0x%X phys\n", mapping_start, mapping_start+length, phys_transformed);
+
+		for(int i = mapping_start; i < mapping_start+length; i+= 0x1000) {
+			// Get pagetable and allocate if needed
+			page_t* page = paging_get_page(i, true, dir);
+			memclr(page, sizeof(page_t));
+
+			// Present, RW, supervisor only
+			page->present = 1;
+			page->rw = 1;
+			page->user = 0;
+			page->frame = (((phys_transformed + (i - mapping_start)) & 0xFFFFF000) >> 12);
+		}
+
+		// Add the offset into the page we were requested to map
+		return mapping_start + (physAddress & 0x00000FFF);
+	} else {
+		return 0;
+	}
+}
+
+/*
+ * Basically performs the exact opposite of the above, unmapping a section of
+ * memory.
+ */
+void paging_unmap_section(uint32_t physAddress, uint32_t length, page_directory_t* dir) {
+	// Round up length to a multiple of a page
+	length &= 0xFFFFF000;
+	length += 0x1000;
+
+	for(int i = physAddress; i < physAddress+length; i+= 0x1000) {
+		page_t* page = paging_get_page(i, false, dir);
+		memclr(page, sizeof(page_t));
+	}
+}
+
+/*
  * Returns the number of free pages.
  */
 unsigned int paging_get_free_pages() {
@@ -309,6 +404,8 @@ page_t* paging_get_page(uint32_t address, bool make, page_directory_t* dir) {
 		uint32_t phys_ptr = tmp | 0x7;
 		phys_ptr &= 0x0FFFFFFF; // get rid of high nybble
 		dir->tablesPhysical[table_idx] = phys_ptr;
+
+		dir->tables[table_idx]->pages[address % 0x400].present = 0;
 
 		return &dir->tables[table_idx]->pages[address % 0x400];
 	} else {

@@ -6,7 +6,7 @@
 #ifndef LIST_H
 #define LIST_H
 
-#include <stdbool.h>
+#include <types.h>
 
 #define LIST_OVERWRITE 0x80000000
 

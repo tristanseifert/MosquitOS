@@ -3,6 +3,15 @@
 
 #include <types.h>
 
+typedef enum {
+	kMemorySectionNone = 0,
+	kMemorySectionProcess = 1, // 0x00000000 to 0x7FFFFFFF
+	kMemorySectionSharedLibraries = 2, // 0x80000000 to 0xBFFFFFFF
+	kMemorySectionKernel = 3, // 0xC0000000 to 0xC7FFFFFF
+	kMemorySectionKernelHeap = 4, // 0xC8000000 to 0xCFFFFFFF
+	kMemorySectionHardware = 5 // 0xD0000000 and above
+} paging_memory_section_t;
+
 /*
  * Contains functions to set up and deal with paging.
  */
@@ -36,20 +45,20 @@ typedef struct paging_stats {
 	uint32_t pages_wired;
 } paging_stats_t;
 
-void alloc_frame(page_t* page, bool is_kernel, bool is_writeable);
-void free_frame(page_t* page);
+void alloc_frame(page_t*, bool, bool);
+void free_frame(page_t*);
 
 paging_stats_t paging_get_stats();
 
 void paging_init();
-void paging_switch_directory(page_directory_t* new);
-
+void paging_switch_directory(page_directory_t*);
 page_directory_t *paging_new_directory();
+page_t* paging_get_page(uint32_t, bool, page_directory_t*);
 
-page_t* paging_get_page(uint32_t address, bool make, page_directory_t* dir);
+uint32_t paging_map_section(uint32_t, uint32_t, page_directory_t*, paging_memory_section_t);
+void paging_unmap_section(uint32_t physAddress, uint32_t length, page_directory_t* dir);
 
 void paging_page_fault_handler();
-
-void paging_flush_tlb(uint32_t addr);
+void paging_flush_tlb(uint32_t);
 
 #endif

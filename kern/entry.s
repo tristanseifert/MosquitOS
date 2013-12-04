@@ -8,7 +8,7 @@
 #########################################################################################
 .set ALIGN,    1 << 0						# align loaded modules on page boundaries
 .set MEMINFO,  1 << 1						# provide memory map
-.set VIDINFO,  1 << 1						# OS wants video mode set
+.set VIDINFO,  1 << 2						# OS wants video mode set
 .set FLAGS,    ALIGN | MEMINFO | VIDINFO	# this is the multiboot 'flag' field
 .set MAGIC,    0x1BADB002					# 'magic number' lets bootloader find the header
 .set CHECKSUM, -(MAGIC + FLAGS)				# checksum required
@@ -22,7 +22,7 @@
 .long FLAGS
 .long CHECKSUM
 .long 0, 0, 0, 0, 0							# This is load address stuff we don't care for
-.long 0										# Graphics mode
+.long 0										# Set graphics mode
 .long 1024, 768, 16							# Width, height, depth
 
 .section .entry

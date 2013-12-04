@@ -19,12 +19,12 @@ static list_entry_t *find_first_free_entry(list_t *list, unsigned int* index) {
 		list->last = newLast;
 	}
 
-	// Increment number count
-	list->num_entries++;
-
 	if(index) {
 		*index = list->num_entries;
 	}
+
+	// Increment number count
+	list->num_entries++;
 
 	return newLast;
 }

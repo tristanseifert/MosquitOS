@@ -23,7 +23,7 @@ CFLAGSNOOPT = $(filter-out -O3,$(CFLAGS))
 
 ASFLAGS =
 
-all: setup runtime drivers io vga system fs bus v86 modules loader kernel clean
+all: setup runtime dev_drivers system fs bus v86 modules loader kernel clean
 
 # Clean up from previous build
 clean:
@@ -54,9 +54,8 @@ runtime: runtime/*.c
 	@$(make_obj_archive)
 
 # Drivers for hardware
-drivers: device/*.c drivers/*.c
-	@$(CC) $(CFLAGS) -ffreestanding device/*.c
-	@$(CC) $(CFLAGS) -ffreestanding drivers/*.c
+dev_drivers: device/*.c driver/*.c io vga
+	@$(CC) $(CFLAGS) -ffreestanding device/*.c driver/*.c
 	@$(make_obj_archive)
 
 # IO routines, i.e. driver interfaces

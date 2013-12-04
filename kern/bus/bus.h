@@ -9,6 +9,12 @@ typedef struct bus bus_t;
 typedef struct device device_t;
 typedef struct driver driver_t;
 
+struct node {
+	char *name;
+	node_t *parent;
+	list_t *children;
+};
+
 struct device {
 	node_t node;
 
@@ -20,12 +26,6 @@ struct device {
 
 struct driver {
 
-};
-
-struct node {
-	char *name;
-	node_t *parent;
-	list_t *children;
 };
 
 struct bus {

@@ -29,10 +29,6 @@ module_early_init(bus_sys_init);
  * Registers a bus with the system.
  */
 void bus_register(bus_t *bus, char *name) {
-	if(!bus_list) {
-		bus_sys_init();
-	}
-
 	bus->drivers = list_allocate();
 	bus->devices = list_allocate();
 	bus->unknown_devices = list_allocate();
