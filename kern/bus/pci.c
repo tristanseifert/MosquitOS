@@ -65,16 +65,19 @@ static void pci_probe_bus(pci_bus_t *bus) {
 			if(header_type & 0x80) {
 				bus->devices[i].multifunction = true;
 
+				memclr(&bus->devices[i].function[0], sizeof(pci_function_t)*8);
+
 				for(uint8_t f = 0; f < 7; f++) {
 					temp = pci_config_read(bus_number, i, f, 0x00);
 					vendor = temp & 0xFFFF;
 
 					bus->devices[i].function[f].ident.vendor = vendor;
-					bus->devices[i].function[f].ident.device = temp >> 0x10;
 
 					// This function is defined
 					if(vendor != 0xFFFF) {
 						pci_set_function_info(bus_number, i, f);
+
+						bus->devices[i].function[f].ident.device = temp >> 0x10;
 					}
 				}
 			} else {
@@ -121,6 +124,7 @@ static void pci_enumerate_busses() {
 				pci_probe_bus(bus);
 			} else { // It isn't a bridge, but maybe this bus does have something on it
 				uint32_t class = pci_config_read(i, 0, 0, 0x08) >> 0x18;
+				kprintf("Found non-bridge device at bus %i\n", i);
 			}
 		}
 	}
@@ -174,7 +178,7 @@ static void pci_print_tree() {
 					if(bus->devices[d].multifunction) {
 						kprintf("  Device %i: Multifunction\n", d);
 
-						for(int f = 0; f < 8; f++) {
+						for(int f = 0; f < 7; f++) {
 							pci_function_t function = bus->devices[d].function[f];
 							vendor = function.ident.vendor;
 							device = function.ident.device;

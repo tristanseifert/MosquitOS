@@ -23,7 +23,7 @@
 .long CHECKSUM
 .long 0, 0, 0, 0, 0							# This is load address stuff we don't care for
 .long 0										# Set graphics mode
-.long 1024, 768, 16							# Width, height, depth
+.long 1024, 768, 32							# Width, height, depth
 
 .section .entry
 
