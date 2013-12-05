@@ -27,22 +27,25 @@ typedef struct {
 } pci_function_t;
 
 typedef struct {
+	device_t d;
+
 	pci_ident_t ident;
 	pci_loc_t location;
 
 	bool multifunction;
+
 	pci_function_t function[8];
 } pci_device_t;
 
 typedef struct {
+	device_t d;
+
+	pci_ident_t ident;
+
 	uint8_t bus_number;
 
-	bool isBridge;
-	uint8_t bridge_secondary_bus;
-
-	uint16_t vendor_id, device_id;
-
-	pci_device_t devices[32];
+	// The secondary bus is ONLY set if this is a bridge, otherwise it's 0xFFFF
+	uint16_t bridge_secondary_bus;
 } pci_bus_t;
 
 #endif

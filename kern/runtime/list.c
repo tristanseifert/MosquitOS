@@ -35,13 +35,16 @@ static list_entry_t *find_first_free_entry(list_t *list, unsigned int* index) {
 static list_entry_t *get_index(list_t *list, unsigned int index) {
 	list_entry_t *entry = list->first;
 
+	// If it's not 0, we must traverse the list
 	for(int i = 0; i < index; i++) {
-		if(entry->next == NULL) break;
+		if(entry == NULL) {
+			break; // equivalent to "return NULL;" as entry == NULL
+		}
 
 		entry = entry->next;
 	}
 
-	return NULL;
+	return entry;
 }
 
 /*
@@ -60,9 +63,12 @@ list_t *list_allocate() {
 void list_destroy(list_t *list, bool freeData) {
 	// Delete all entries within the list.
 	list_entry_t *entry = list->first;
+	list_entry_t *next;
 
 	while(entry) {
-		entry = entry->next;
+		next = entry->next;
+		kfree(entry);
+		entry = next;
 	}
 
 	// Finally free the list structure itself.
@@ -77,6 +83,8 @@ unsigned int list_add(list_t *list, void* data) {
 	unsigned int index;
 	list_entry_t *entry = find_first_free_entry(list, &index);
 	entry->data = data;
+
+	// kprintf("Entry for list 0x%X at 0x%X (index = %i, data = 0x%X 0x%X)\n", list, entry, index, data, entry->data);
 
 	return index;
 }
@@ -107,6 +115,7 @@ unsigned int list_insert(list_t *list, void* data, unsigned int index) {
  */
 void* list_get(list_t *list, unsigned int index) {
 	list_entry_t *entry = get_index(list, index);
+	// kprintf("Entry for list 0x%X at 0x%X (index = %i, data = 0x%X)\n", list, entry, index, entry->data);
 	return entry->data;
 }
 
