@@ -1,7 +1,13 @@
 #include <types.h>
 #include "io/io.h"
+#include "bus.h"
 #include "pci.h"
 #include "pci_tables.h"
+
+// Struct passed to bus driver
+static bus_t pci_bus = {
+
+};
 
 // We have initialised a faster way to do config reads rather than IO if this is set
 static bool pci_fast_config_avail;
@@ -212,6 +218,8 @@ static void pci_print_tree() {
 static int pci_init(void) {
 	memclr(pci_bus_info, 256*sizeof(pci_bus_t*));
 	pci_fast_config_avail = false;
+
+	bus_register(&pci_bus, "pci_bus");
 
 	pci_enumerate_busses();
 	pci_print_tree();
