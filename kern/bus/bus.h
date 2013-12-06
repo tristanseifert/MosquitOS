@@ -36,7 +36,7 @@ struct bus {
 	list_t *unknown_devices;
 
 	// This checks if the driver will work for the device
-	int (*match)(device_t*, driver_t*);
+	bool (*match)(device_t*, driver_t*);
 };
 
 // Registers a bus with the driver

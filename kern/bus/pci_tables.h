@@ -1603,6 +1603,7 @@ pci_str_vendor_t pci_map_vendor[] = {
 	{0xEDD8, "ARK Logic", "ARK Logic, Inc"},
 	{0xF5F5, "", "F5 Networks Inc."},
 	{0xFA57, "Interagon", "Interagon AS"},
+	{0xFFFF, "Generic", "Generic"}
 };
 
 #define	PCI_VENDOR_MAP_LENGTH	(sizeof(pci_map_vendor) / sizeof(pci_str_vendor_t))
@@ -1615,6 +1616,9 @@ typedef struct {
 }  pci_str_device_t;
 
 pci_str_device_t pci_map_device[] = {
+	// AGP bus
+	{0xFFFF, 0xDEAD, "AGP Bridge", "AGP Bus Bridge"},
+
 	{0x165C, 0x0002, "FT232BL", "FT232BL"},
 	{0x16AE, 0x000A, "SafeXcel-1841", "Crypto Accelerator"},
 	{0x16AE, 0x1141, "SafeXcel-1141", "Crypto Accelerator"},

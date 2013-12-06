@@ -6,7 +6,7 @@
 
 // Struct passed to bus driver
 static bus_t pci_bus = {
-
+	.match = pci_match
 };
 
 // We have initialised a faster way to do config reads rather than IO if this is set
@@ -129,7 +129,12 @@ static void pci_enumerate_busses() {
 				uint32_t busInfo = pci_config_read(i, 0, 0, 0x18);
 
 				bus->bus_number = i;
-				bus->bridge_secondary_bus = (busInfo & 0x0000FF00) >> 8;
+
+				if((busInfo & 0x0000FF00) >> 8 != i) {
+					bus->bridge_secondary_bus = (busInfo & 0x0000FF00) >> 8;
+				} else {
+					bus->bridge_secondary_bus = 0xFFFF;
+				}
 
 				bus->ident.vendor = vendor; bus->ident.device = device;
 
@@ -141,9 +146,25 @@ static void pci_enumerate_busses() {
 
 				// Insert bus as a child of the root PCI bus driver
 				list_add(pci_bus.node.children, bus);
+			} else if(class == 0x03) { // AGP busses have only a single device on them, the card !!!
+				pci_bus_t *bus = (pci_bus_t *) kmalloc(sizeof(pci_bus_t));
+				memclr(bus, sizeof(pci_bus_t));
+
+				bus->bridge_secondary_bus = 0xFFFF;
+				bus->bus_number = i;
+				bus->ident.vendor = 0xFFFF;
+				bus->ident.device = 0xDEAD;
+
+				bus->d.node.name = "AGP Bus Bridge";
+				bus->d.node.parent = &pci_bus.node;
+				bus->d.node.children = list_allocate();
+
+				pci_probe_bus(bus);
+
+				list_add(pci_bus.node.children, bus);
 			} else { // It isn't a bridge, but maybe this bus does have something on it
 				uint32_t class = pci_config_read(i, 0, 0, 0x08) >> 0x18;
-				kprintf("Found non-bridge device at bus %i\n", i);
+				kprintf("Found non-bridge device at bus %i (class = 0x%X, vendor = 0x%X, device = 0x%X)\n", i, temp, vendor, device);
 			}
 		}
 	}
@@ -179,7 +200,7 @@ static pci_str_device_t* pci_info_get_device(uint16_t vendor, uint16_t device) {
  * Prints a pretty representation of the system's PCI devices.
  */
 static void pci_print_tree() {
-	kprintf("================ Bus Device Listing ================\n");
+	kprintf("================ PCI Bus Device Listing ================\n");
 
 	// Check all possible busses
 	for(int i = 0; i < pci_bus.node.children->num_entries; i++) {
@@ -187,7 +208,7 @@ static void pci_print_tree() {
 
 		// Is bus defined?
 		if(bus) {
-			kprintf("Bus %i:\n", i);
+			kprintf("Bus %i:\n", bus->bus_number);
 
 			// Search through all devices
 			for(int d = 0; d < bus->d.node.children->num_entries; d++) {
@@ -230,6 +251,19 @@ static void pci_print_tree() {
 		}
 	}
 }
+
+/*
+ * Checks if a driver will work for a given device. Returns true if the device
+ * is in the list of supported device types or classes of the device. In this
+ * instance, the device will actually be of type pci_device_t, which is an
+ * extended version of device_t.
+ */
+bool pci_match(device_t* dev, driver_t* driver) {
+	pci_device_t *device = (pci_device_t *) dev;
+
+	return false;
+}
+
 
 /*
  * Initialise PCI subsystem

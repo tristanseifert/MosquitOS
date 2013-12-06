@@ -48,4 +48,6 @@ typedef struct {
 	uint16_t bridge_secondary_bus;
 } pci_bus_t;
 
+bool pci_match(device_t* device, driver_t* driver);
+
 #endif

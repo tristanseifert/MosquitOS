@@ -292,5 +292,5 @@ static void ps2_exit(void) {
 
 }
 
-module_init(ps2_init);
-module_exit(ps2_exit);
+/*module_init(ps2_init);
+module_exit(ps2_exit);*/
