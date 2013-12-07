@@ -1619,6 +1619,7 @@ pci_str_device_t pci_map_device[] = {
 	// AGP bus
 	{0xFFFF, 0xDEAD, "AGP Bridge", "AGP Bus Bridge"},
 
+	// Actual PCI devices
 	{0x165C, 0x0002, "FT232BL", "FT232BL"},
 	{0x16AE, 0x000A, "SafeXcel-1841", "Crypto Accelerator"},
 	{0x16AE, 0x1141, "SafeXcel-1141", "Crypto Accelerator"},

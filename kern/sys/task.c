@@ -69,8 +69,6 @@ void task_switch(i386_task_t* task) {
  * from.
  */
 i386_task_t* task_allocate(elf_file_t* binary) {
-	ASSERT(binary != NULL);
-
 	// Try to get some memory for the task
 	i386_task_t *task = (i386_task_t*) kmalloc(sizeof(i386_task_t));
 	ASSERT(task != NULL);
@@ -78,11 +76,21 @@ i386_task_t* task_allocate(elf_file_t* binary) {
 	// Set up the task struct
 	memclr(task, sizeof(i386_task_t));
 
+	// If there is a previous task, set its next task to this
+	if(task_last) {
+		task_last->next = task;
+	}
+
+	// If there is no task currently, set it
+	if(!task_first) {
+		task_first = task;
+	}
+
+	// Update this task's previous ptr
 	task->prev = task_last;
 	task_last = task;
 
 	task->pid = next_pid++;
-
 	// Try to get memory for the state struct
 	i386_task_state_t *state = (i386_task_state_t*) kmalloc(sizeof(i386_task_state_t));
 	ASSERT(state != NULL);
@@ -91,32 +99,37 @@ i386_task_t* task_allocate(elf_file_t* binary) {
 	// Set up the state struct
 	task->task_state->fpu_state = (void *) kmalloc(512);
 
-	// Set up page table
-	uint32_t directory_phys, directory_phys_phys;
+	if(binary) {
+		// Set up page table
+		uint32_t directory_phys, directory_phys_phys;
 
-	page_directory_t *directory = (page_directory_t *) kmalloc_p(sizeof(page_directory_t), &directory_phys);
-	ASSERT(directory != NULL);
-	memclr(directory, sizeof(page_directory_t));
+		page_directory_t *directory = (page_directory_t *) kmalloc_p(sizeof(page_directory_t), &directory_phys);
+		ASSERT(directory != NULL);
+		memclr(directory, sizeof(page_directory_t));
 
-	directory_phys_phys = directory_phys + (sizeof(page_table_t*) * 1024);
+		directory_phys_phys = directory_phys + (sizeof(page_table_t*) * 1024);
 
-	kprintf("Process page table at 0x%X virt 0x%X (0x%X) phys\n", directory, directory_phys, directory_phys_phys);
+		kprintf("Process page table at 0x%X virt 0x%X (0x%X) phys\n", directory, directory_phys, directory_phys_phys);
 
-	// Set up 0xC0000000 and above to point to the kernel page tables (copy 0x100)
-	for(int i = 0x300; i < 0x400; i++) {
-		directory->tables[i] = kernel_directory->tables[i];
-		directory->tablesPhysical[i] = kernel_directory->tablesPhysical[i];
+		// Set up 0xC0000000 and above to point to the kernel page tables (copy 0x100)
+		for(int i = 0x300; i < 0x400; i++) {
+			directory->tables[i] = kernel_directory->tables[i];
+			directory->tablesPhysical[i] = kernel_directory->tablesPhysical[i];
+		}
+
+		// Switch to the process' pagetable so we can allocate frames
+		// __asm__ volatile("mov %0, %%cr3" : : "r"(directory_phys_phys));
+
+		// Switch back to kernel pagetable
+		paging_switch_directory(kernel_directory);
+
+		// Store page table pointers
+		state->page_directory = directory;
+		state->page_table = directory_phys;
+	} else { // The binary is NULL, so use kernel pagetables
+		task->task_state->page_directory = kernel_directory;
+		task->task_state->page_table = kernel_directory->physicalAddr;
 	}
-
-	// Switch to the process' pagetable so we can allocate frames
-	// __asm__ volatile("mov %0, %%cr3" : : "r"(directory_phys_phys));
-
-	// Switch back to kernel pagetable
-	paging_switch_directory(kernel_directory);
-
-	// Store page table pointers
-	state->page_directory = directory;
-	state->page_table = directory_phys;
 
 	// Notify scheduler so task is added to the queue
 	sched_task_created(task);

@@ -36,12 +36,14 @@ typedef struct sched_info {
 // Initialises scheduler
 void sched_init();
 // Called when a process yields control to the scheduler
-void sched_yield(sched_trap_regs_t regs);
+void sched_yield(sched_trap_regs_t);
 // Called when a task is destroyed
-void sched_task_deleted(void *in);
+void sched_task_deleted(void*);
 // Called when a task is created
-void sched_task_created(void *in);
+void sched_task_created(void*);
 // Returns the currently executing task.
 void* sched_curr_task();
+// Initialises multitasking
+void multitasking_init();
 
 #endif

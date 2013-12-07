@@ -3,9 +3,13 @@
 #include "task.h"
 #include "system.h"
 #include "kheap.h"
+#include "paging.h"
 
 // External handler
 extern void sched_trap(void);
+
+// Backup of stack pointer when scheduler trap is taken
+uint32_t sched_old_esp, sched_old_ebp;
 
 // Miscellaneous required stuff
 static uint64_t scheduler_cycle;
@@ -14,6 +18,8 @@ static uint64_t scheduler_cycle;
 static i386_task_t *prevTask;
 static i386_task_t *currTask;
 static i386_task_t *nextTask;
+
+extern page_directory_t *kernel_directory;
 
 // Selects the next process to run
 void sched_chose_next();
@@ -37,20 +43,34 @@ void sched_init() {
  */
 void sched_yield(sched_trap_regs_t regs) {
 	// Save the task state
+	// currTask->task_state->esp = sched_old_esp;
+	// currTask->task_state->ebp = sched_old_ebp;
+
 	task_save_state(currTask, &regs);
 
-	/*// Prepare the next process for execution
-	prevTask = currTask;
-	currTask = nextTask;
+	i386_task_t *task = task_get_first();
+	while(task) {
+		kprintf("0x%X ", task);
+		task = task->next;
+	}
+	kprintf("\n");
+	//while(1);
+
+	// Prepare the next process for execution, if there is more
+	if(nextTask != NULL) {
+		prevTask = currTask;
+		currTask = nextTask;
+	}
 
 	// Run scheduler to decide next process
 	sched_chose_next();
 
+	kprintf("Next task: 0x%X\n", currTask);
+
 	// Update scheduler cycle info
 	sched_task_t *schedInfo = currTask->scheduler_info;
 	schedInfo->last_cycle = scheduler_cycle;
-	*/
-
+	
 	// Do context switch
 	task_switch(currTask);
 }
@@ -142,4 +162,16 @@ void sched_task_created(void *in) {
  */
 void* sched_curr_task() {
 	return currTask;
+}
+
+/*
+ * Initialises multitasking.
+ */
+void multitasking_init() {
+	// Allocate kernel task
+	i386_task_t *task = task_allocate(NULL);
+	task->task_state->page_directory = kernel_directory;
+	task->task_state->page_table = kernel_directory->physicalAddr;
+
+	currTask = task;
 }

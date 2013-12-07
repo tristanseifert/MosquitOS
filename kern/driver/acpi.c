@@ -52,7 +52,6 @@ static int acpi_init(void) {
 
 			uint32_t rsdtLogical = paging_map_section(acpi_rsdp->RSDTAddress, sizeof(acpi_rsdt_t), kernel_directory, kMemorySectionHardware);
 			acpi_rsdt_t *rsdt = (acpi_rsdt_t *) rsdtLogical;
-			kprintf("RSDT signature: %s\n", rsdt->h.signature);
 		}
 
 		searchStart += 0x10;

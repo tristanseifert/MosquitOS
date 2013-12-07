@@ -10,6 +10,7 @@
 #include "syscall.h"
 #include "sys/multiboot.h"
 #include "runtime/hashmap.h"
+#include "task.h"
 #include "vga/svga.h"
 
 // This CANNOT be static as we need to access it elsewhere
@@ -76,6 +77,9 @@ void system_init() {
 
 	// Set up scheduler
 	sched_init();
+
+	// Set up multitasking
+	multitasking_init();
 
 	// Set up RS232
 	rs232_set_up_irq();
