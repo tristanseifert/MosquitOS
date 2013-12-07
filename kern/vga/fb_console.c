@@ -134,13 +134,12 @@ void fb_console_putchar(unsigned char c) {
 void fb_console_control(unsigned char c) {
 	switch(c) {
 		case '\n':
-			row++;
 			col = 0;
-
-			if(row > (height / CHAR_HEIGHT)) {
-				memclr((void *) video_base, bytesPerLine * height);
-
-				row = 0;
+			// We're on the last row, a newline should only scroll the viewport up
+			if(row == (height / CHAR_HEIGHT)-1) {
+				fb_console_scroll_up(1);
+			} else {
+				row++;
 			}
 
 			break;
@@ -162,19 +161,15 @@ void fb_console_set_font(void* reg, void* bold) {
  * Scrolls the display up number of rows
  */
 static void fb_console_scroll_up(unsigned int num_rows) {
-	uint32_t *read_ptr = (uint32_t *) video_base + ((num_rows * CHAR_HEIGHT) * (bytesPerLine / depth) / 2);
-	uint32_t *write_ptr = (uint32_t *) video_base;
+	// Copy rows upwards
+	uint8_t *read_ptr = (uint8_t *) video_base + ((num_rows * CHAR_HEIGHT) * bytesPerLine);
+	uint8_t *write_ptr = (uint8_t *) video_base;
+	unsigned int num_bytes = (bytesPerLine * height) - (bytesPerLine * (num_rows * CHAR_HEIGHT));
+	memcpy(write_ptr, read_ptr, num_bytes);
 
-	int num_pixels = ((height - (num_rows * CHAR_HEIGHT)) * (bytesPerLine / depth)) / 2;
-
-	for(int i = 0; i < num_pixels/4; i++) {
-		*write_ptr++ = *read_ptr++;
-		*write_ptr++ = *read_ptr++;
-		*write_ptr++ = *read_ptr++;
-		*write_ptr++ = *read_ptr++;
-	}
-
-	row -= num_rows;
+	// Clear the rows at the end
+	read_ptr = (uint8_t *) video_base + (bytesPerLine * height) - (bytesPerLine * (num_rows * CHAR_HEIGHT));
+	memclr(read_ptr, bytesPerLine * (num_rows * CHAR_HEIGHT));
 }
 
 /*

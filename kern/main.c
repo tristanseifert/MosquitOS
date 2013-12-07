@@ -104,9 +104,14 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 	uint32_t test = *doomen;
 	kprintf("Pagefaulting read: 0x%X\n", test);*/
 
+	for(int i = 0; i < 64; i++) {
+		kprintf("%i\n", i);
+	}
+
 	// Now, make a new task and set its SP to somewhere in RAM, and the IP to
 	// the multitasking_test function
 	void *newStack = (void *) kmalloc(1024*32);
+	memclr(newStack, 1024*32);
 	kprintf("Allocated a stack at 0x%X, EIP = 0x%X\n", newStack, (uint32_t) multitasking_test);
 	i386_task_t *task = task_allocate(NULL);
 	task->task_state->page_directory = kernel_directory;

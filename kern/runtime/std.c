@@ -490,11 +490,22 @@ int memcmp(void* ptr1, void* ptr2, size_t num) {
  * Copies num bytes from source to destination.
  */
 void* memcpy(void* destination, void* source, size_t num) {
-	uint8_t *dst = (uint8_t *) destination;
-	uint8_t *src = (uint8_t *) source;
+	uint32_t *dst = (uint32_t *) destination;
+	uint32_t *src = (uint32_t *) source;
 
-	for(int i = 0; i < num; i++) {
-		dst[i] = src[i];
+	int i = 0;
+	for(i = 0; i < num/4; i++) {
+		*dst++ = *src++;
+	}
+
+	// If we have more bytes to copy, perform the copy
+	if((i * 4) != num) {
+		uint8_t *dst_byte = (uint8_t *) dst;
+		uint8_t *src_byte = (uint8_t *) src;
+
+		for(int x = (i * 4); x < num; x++) {
+			*dst_byte++ = *src_byte++;
+		}
 	}
 
 	return destination;
@@ -504,9 +515,9 @@ void* memcpy(void* destination, void* source, size_t num) {
  * Fills a given segment of memory with a specified value.
  */
 void* memset(void* ptr, uint8_t value, size_t num) {
-	/*if(value == 0x00) {
+	if(value == 0x00) {
 		return memclr(ptr, num);
-	}*/
+	}
 
 	uint8_t *write = (uint8_t *) ptr;
 
