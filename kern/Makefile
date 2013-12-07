@@ -13,11 +13,10 @@ BUILD_NUMBER_FILE=build.num
 BUILD_NUMBER_LDFLAGS += -Xlinker --defsym -Xlinker KERN_BNUM=$$(cat $(BUILD_NUMBER_FILE))
 
 # Freestanding binary, strip extra shits
-CFLAGS= -c -finline-functions -g -Wall -fno-builtin -static\
-		-mno-sse2 -O3 -fno-exceptions\
-		-nostartfiles -nodefaultlibs -std=c99 -Wno-unused-variable \
-		-mfpmath=387 -fno-stack-protector -I. -I./includes/\
-		-Wno-unused-function
+CFLAGS= -c -finline-functions -g -Wall -static -mmmx -msse\
+		-O3 -fno-exceptions -ftree-vectorize -nostartfiles -nodefaultlibs -std=c99\
+		-Wno-unused-variable -mfpmath=387+sse -fno-stack-protector -I. -I./includes/\
+		-Wno-unused-function -mtune=pentium3 -fno-omit-frame-pointer
 
 CFLAGSNOOPT = $(filter-out -O3,$(CFLAGS))
 
@@ -36,7 +35,7 @@ kernel: main.c
 	@echo $$(($$(cat $(BUILD_NUMBER_FILE)) + 1)) > $(BUILD_NUMBER_FILE)
 
 	@$(CC) $(CFLAGS) -ffreestanding *.c -o kern_main.$(obj_arc_ext)
-	@i686-pc-elf-gcc -Wl,-T,kern.ld -o kernel.elf -ffreestanding -g -O2 -nostdlib $(BUILD_NUMBER_LDFLAGS) tmp/entry.o *.$(obj_arc_ext)
+	@$(CC) -Wl,-T,kern.ld -o kernel.elf -ffreestanding -g -O2 -nostdlib $(BUILD_NUMBER_LDFLAGS) tmp/entry.o *.$(obj_arc_ext)
 	
 	@gobjcopy -I elf32-i386 --only-keep-debug kernel.elf kernel.sym
 	@gobjcopy -I elf32-i386 --strip-debug kernel.elf

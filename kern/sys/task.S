@@ -8,9 +8,11 @@
 	+0x10 uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; *
 	+0x30 uint32_t eip, cs, eflags, useresp, ss; *
 
-	+0x44 uint32_t page_table; *
+	+0x44 uint32_t reserved[2];
 
-	+0x48 uint8_t *fpu_state; 
+	+0x4C uint32_t pagetable_phys; *
+
+	+0x50 uint8_t *fpu_state; 
   */
 .extern task_temp_fxsave_region
 .globl task_restore_context
@@ -35,7 +37,7 @@ task_restore_context:
 	fxrstor	task_temp_fxsave_region
 
 	# Get page table pointer and set it
-	mov		0x44(%edi), %eax
+	mov		0x4C(%edi), %eax
 	mov		%eax, %cr3
 
 	# Move stack pointer to top of PUSHAL image
@@ -46,8 +48,8 @@ task_restore_context:
 	# Restore registers by using POPAL
 	popal
 
-	# The value we just popped off the stack is the IRET image that we want to
-	# pop to restore the process' EIP and privilege level.
+	# We need to restore the previous stack to properly restore the process
+	# data
 	mov		iret_image_loc, %esp
 
 	# Restore EFLAGS, ESP, EIP, all that fun stuff from user mode
@@ -59,4 +61,4 @@ task_restore_context:
  */
 .bss
 iret_image_loc:
-	.word	0
+	.long	0

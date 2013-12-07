@@ -1,6 +1,7 @@
 #include <types.h>
 #include "task.h"
 #include "kheap.h"
+#include "system.h"
 
 // Needed to set up the task
 static uint32_t next_pid;
@@ -19,7 +20,7 @@ uint8_t task_temp_fxsave_region[512] __attribute__((aligned(16)));
 /*
  * Saves the state of the task.
  */
-void task_save_state(i386_task_t* task, void* regPtr) {
+void task_save_state(i386_task_t* task, sched_trap_regs_t regs) {
 	// Back up the process' FPU/SSE state
 	i386_task_state_t *state = task->task_state;
 
@@ -35,13 +36,36 @@ void task_save_state(i386_task_t* task, void* regPtr) {
 	// Copy FPU state into the thread context table
 	memcpy(state->fpu_state, &task_temp_fxsave_region, 512);
 
-	// Cast the register struct pointer to what it really is
-	sched_trap_regs_t *regs = regPtr+offsetof(sched_trap_regs_t, gs);
+	// DS and CS are fixed for kernel/user
+	// state->ds = regs->ds;
+	// state->cs = regs->cs;
 
-	// Since starting at gs and ending with ss, the format of sched_trap_regs_t
-	// and i386_task_state_t is identical, we can simply perform a memcpy of
-	// 68 bytes (17 dwords) the relevant places in the struct.
-	memcpy(state, regs, 0x44);
+	if(task->isKernel) {
+		state->cs = SYS_KERN_CODE_SEG;
+		state->ds = SYS_KERN_DATA_SEG;
+	} else {
+		state->cs = SYS_USER_CODE_SEG;
+		state->ds = SYS_USER_DATA_SEG;
+	}
+
+	// Copy registers
+	state->gs = regs.gs;
+	state->fs = regs.fs;
+	state->es = regs.es;
+
+	state->edi = regs.edi;
+	state->esi = regs.esi;
+	state->ebp = regs.ebp;
+	state->esp = regs.esp;
+	state->ebx = regs.ebx;
+	state->edx = regs.edx;
+	state->ecx = regs.ecx;
+	state->eax = regs.eax;
+
+	state->eip = regs.eip;
+	state->eflags = regs.eflags;
+	state->useresp = regs.useresp;
+	state->ss = regs.ss;
 }
 
 /*
@@ -49,13 +73,6 @@ void task_save_state(i386_task_t* task, void* regPtr) {
  */
 void task_switch(i386_task_t* task) {
 	i386_task_state_t *state = task->task_state;
-
-	// Get pointer to page tables
-	state->page_table = (uint32_t) state->page_directory->tablesPhysical;
-
-	uint32_t cr3;
-	__asm__ volatile("mov %%cr3, %0" : "=r" (cr3));
-	state->page_table = cr3;
 
 	// Copy backed-up FPU state to memory
 	memcpy(&task_temp_fxsave_region, state->fpu_state, 512);
@@ -69,8 +86,8 @@ void task_switch(i386_task_t* task) {
  * from.
  */
 i386_task_t* task_allocate(elf_file_t* binary) {
-	// Try to get some memory for the task
-	i386_task_t *task = (i386_task_t*) kmalloc(sizeof(i386_task_t));
+	// Try to get some page-aligned memory for the task struct
+	i386_task_t *task = (i386_task_t*) kmalloc_a(sizeof(i386_task_t));
 	ASSERT(task != NULL);
 
 	// Set up the task struct
@@ -95,9 +112,11 @@ i386_task_t* task_allocate(elf_file_t* binary) {
 	i386_task_state_t *state = (i386_task_state_t*) kmalloc(sizeof(i386_task_state_t));
 	ASSERT(state != NULL);
 	task->task_state = state;
+	memclr(state, sizeof(i386_task_state_t));
 
 	// Set up the state struct
 	task->task_state->fpu_state = (void *) kmalloc(512);
+	memclr(task->task_state->fpu_state, 512);
 
 	if(binary) {
 		// Set up page table
@@ -125,10 +144,10 @@ i386_task_t* task_allocate(elf_file_t* binary) {
 
 		// Store page table pointers
 		state->page_directory = directory;
-		state->page_table = directory_phys;
+		state->pagetable_phys = directory_phys;
 	} else { // The binary is NULL, so use kernel pagetables
 		task->task_state->page_directory = kernel_directory;
-		task->task_state->page_table = kernel_directory->physicalAddr;
+		task->task_state->pagetable_phys = kernel_directory->physicalAddr;
 	}
 
 	// Notify scheduler so task is added to the queue

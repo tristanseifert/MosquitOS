@@ -7,6 +7,15 @@
 #include "vm.h"
 #include "binfmt_elf.h"
 
+typedef struct sched_trap_registers {
+	uint32_t event_code, event_state;
+
+	uint32_t gs, fs, es, ds;
+
+	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
+	uint32_t eip, cs, eflags, useresp, ss; // Pushed by the processor automatically.
+} __attribute__((packed)) sched_trap_regs_t;
+
 // Task's context information
 typedef struct task_state {
 	// Manually backed up
@@ -16,8 +25,10 @@ typedef struct task_state {
 	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
 	uint32_t eip, cs, eflags, useresp, ss; // Pushed by the processor automatically.
 
+	uint32_t reserved[2];
+
 	// Page table address (physical)
-	uint32_t page_table;
+	uint32_t pagetable_phys;
 
 	// FPU/SSE state memory (must be aligned to 16 byte boundary)
 	void *fpu_state; // FXSAVE/FXRSTOR
@@ -35,6 +46,7 @@ typedef struct task {
 	uint32_t pid;
 	uint32_t user;
 	uint32_t group;
+	bool isKernel;
 
 	char name[128];
 
@@ -62,7 +74,7 @@ typedef struct task_entry_info {
 } task_entry_info_t;
 
 // Saves the state of the task in an interrupt/syscall handler
-void task_save_state(i386_task_t*, void*);
+void task_save_state(i386_task_t*, sched_trap_regs_t);
 // Switches to the specified task
 void task_switch(i386_task_t*);
 

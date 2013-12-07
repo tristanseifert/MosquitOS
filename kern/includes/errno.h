@@ -13,6 +13,7 @@
 #define ERANGE 1
 #define ENOTFOUND 2
 #define EBUSY 3
+#define EINVAL 4
 
 // Global symbol indicating last error
 static int errno;

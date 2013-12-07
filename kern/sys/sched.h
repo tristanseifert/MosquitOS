@@ -8,20 +8,11 @@
 #define SCHED_TRAP_NUM 0x88
 
 // PIT interval for a timeslice
-#define SCHED_TIMESLICE 14915
+#define SCHED_TIMESLICE 1194
 #define SCHED_TIMESLICE_MS SCHED_TIMESLICE / (3579545 / 3) * 1000
 
 // Maximum times a process can get run in one scheduling cycle
 #define SCHED_MAX_EXEC_PER_CYCLE 8
-
-typedef struct sched_trap_registers {
-	uint32_t event_code, event_state;
-
-	uint32_t gs, fs, es, ds;
-
-	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
-	uint32_t eip, cs, eflags, useresp, ss; // Pushed by the processor automatically.
-} __attribute__((packed)) sched_trap_regs_t;
 
 typedef struct sched_info {
 	// The last "scheduling cycle" this process was ran.
