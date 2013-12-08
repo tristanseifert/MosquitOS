@@ -25,13 +25,6 @@ extern uint32_t KERN_BNUM;
 extern page_directory_t *kernel_directory;
 extern heap_t *kheap;
 
-void multitasking_test() {
-	while(1) {
-		kprintf("I'm another task.\n");
-		__asm__("mov $0xDEADC0DE, %edx; int $0x88");
-	}
-}
-
 /*
  * Kernel's main entrypoint.
  */
@@ -103,30 +96,6 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 /*	uint32_t *doomen = 0x1800DEAD;
 	uint32_t test = *doomen;
 	kprintf("Pagefaulting read: 0x%X\n", test);*/
-
-	// Now, make a new task and set its SP to somewhere in RAM, and the IP to
-	// the multitasking_test function
-	void *newStack = (void *) kmalloc(1024*32);
-	memclr(newStack, 1024*32);
-	kprintf("Allocated a stack at 0x%X, EIP = 0x%X\n", newStack, (uint32_t) multitasking_test);
-	i386_task_t *task = task_allocate(NULL);
-	task->task_state->page_directory = kernel_directory;
-	task->task_state->pagetable_phys = kernel_directory->physicalAddr;
-
-	task->task_state->esp = (uint32_t) newStack;
-	task->task_state->ebp = (uint32_t) newStack;
-	task->task_state->ds = (uint32_t) SYS_KERN_DATA_SEG;
-	task->task_state->ss = (uint32_t) SYS_KERN_DATA_SEG;
-	task->task_state->cs = (uint32_t) SYS_KERN_CODE_SEG;
-	task->task_state->eip = (uint32_t) multitasking_test;
-	task->isKernel = true;
-
-	__asm__("mov $0xDEADC0DE, %edx; int $0x88");
-
-	while(1) {
-		kprintf("I'm the kernel task.\n");
-		__asm__("mov $0xDEADC0DE, %edx; int $0x88");
-	}
 
 	// Explanation of the 7: The MOV opcode is 5 bytes, SYSENTER is 2.
 	// __asm__("mov %esp, %ecx; mov $0x0, %ebx; mov $.+7, %edx; sysenter;");

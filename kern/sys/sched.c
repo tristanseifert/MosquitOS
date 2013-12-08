@@ -160,5 +160,7 @@ void multitasking_init() {
 	task->task_state->pagetable_phys = kernel_directory->physicalAddr;
 	task->isKernel = true;
 
+	memcpy(&task->name, "kernel_task", 11);
+
 	currTask = task;
 }

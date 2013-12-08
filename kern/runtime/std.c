@@ -49,25 +49,6 @@ typedef void* (*memclr_prototype)(void*, size_t);
 memclr_prototype std_memclr_fp;
 
 /*
- * Miscellaneous little standard library functions
- */
-static int isupper(int ch) {
-	return (ch >= 'A' && ch <= 'Z');
-}
-
-static int isdigit(int ch) {
-	return (ch >= '0' && ch <= '9');
-}
-
-static int isspace(int ch) {
-	return (ch == ' ');
-}
-
-static int isalpha(int ch) {
-	return (ch >= 'A' && ch <= 'Z') || (ch >= 'a' && ch <= 'z');
-}
-
-/*
  * Sets up function pointers to SEE/non-SSE versions of some STD functions.
  */
 void std_set_up_fp() {
@@ -194,8 +175,32 @@ char* strsep(char **stringp, const char *delim) {
 }
 
 /*
+ * Compares two strings.
+ */
+int strcmp(const char* s1, const char* s2) {
+	while(*s1 && (*s1==*s2)) {
+		s1++, s2++;
+	}
+
+	return *(const unsigned char*)s1 - *(const unsigned char*)s2;
+}
+
+/*
+ * Compares n bytes of the two strings.
+ */
+int strncmp(const char* s1, const char* s2, size_t n) {
+	while(n--) {
+		if(*s1++!=*s2++) {
+			return *(unsigned char*)(s1 - 1) - *(unsigned char*)(s2 - 1);
+		}
+	}
+	
+	return 0;
+}
+
+/*
  * This array is designed for mapping upper and lower case letter
- * together for a case independent comparison.  The mappings are
+ * together for a case independent comparison. The mappings are
  * based upon ASCII character sequences.
  */
 static const unsigned char strcasecmp_charmap[] = {
@@ -275,6 +280,51 @@ int strncasecmp(const char *s1, const char *s2, size_t n) {
 	}
 
 	return 0;
+}
+
+/*
+ * Copies the input string into the buffer pointed to by destination. Does NOT
+ * perform bound checking.
+ */
+char *strcpy(char *dest, const char* src) {
+	char *ret = dest;
+	
+	while (*dest++ = *src++);
+
+	return ret;
+}
+
+/*
+ * Copies n bytes from the source string to the destination buffer, filling the
+ * destination with zeros if source ends prematurely.
+ */
+char *strncpy(char *dest, const char *src, size_t n) {
+	char *ret = dest;
+	do {
+		if (!n--) {
+			return ret;
+		}
+	} while (*dest++ = *src++);
+	
+	while (n--) {
+		*dest++ = 0;
+	}
+
+	return ret;
+}
+
+/*
+ * Appends the null-terminated string pointed to by src to the one pointed to
+ * by dest.
+ */
+char *strcat(char *dest, const char *src) {
+	char *ret = dest;
+	while (*dest) {
+		dest++;
+	}
+	
+	while (*dest++ = *src++);
+	return ret;
 }
 
 /*
@@ -472,7 +522,7 @@ void* memchr(void* ptr, uint8_t value, size_t num) {
  * greater than the first byte in ptr2; and a value less than zero if the
  * opposite. Note that these comparisons are performed on uint8_t types.
  */
-int memcmp(void* ptr1, void* ptr2, size_t num) {
+int memcmp(const void* ptr1, const void* ptr2, size_t num) {
 	uint8_t *read1 = (uint8_t *) ptr1;
 	uint8_t *read2 = (uint8_t *) ptr2;
 

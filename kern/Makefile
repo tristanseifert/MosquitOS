@@ -22,7 +22,7 @@ CFLAGSNOOPT = $(filter-out -O3,$(CFLAGS))
 
 ASFLAGS =
 
-all: setup runtime dev_drivers system fs bus v86 modules loader kernel clean
+all: setup acpi runtime dev_drivers system fs bus v86 modules loader kernel clean
 
 # Clean up from previous build
 clean:
@@ -97,6 +97,12 @@ bus: bus/*.c
 # Management of kernel modules
 modules: modules/*.c
 	@$(CC) $(CFLAGS) -ffreestanding modules/*.c
+	@$(make_obj_archive)
+
+# ACPI-related code
+acpi: acpi/*.c
+	@$(CC) $(CFLAGS) -I./acpi/acpica/include/ -Wno-format -fno-strict-aliasing -ffreestanding acpi/acpica/*.c
+	@$(CC) $(CFLAGS) -I./acpi/acpica/include/ -ffreestanding acpi/*.c
 	@$(make_obj_archive)
 
 # Assembly loader

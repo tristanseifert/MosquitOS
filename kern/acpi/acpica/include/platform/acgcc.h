@@ -136,4 +136,9 @@
  */
 #define ACPI_UNUSED_VAR __attribute__ ((unused))
 
+#include <stdint.h>
+
+#define COMPILER_DEPENDENT_UINT64 uint64_t
+#define COMPILER_DEPENDENT_INT64 int64_t
+
 #endif /* __ACGCC_H__ */
