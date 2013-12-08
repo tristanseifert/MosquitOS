@@ -101,9 +101,15 @@ modules: modules/*.c
 
 # ACPI-related code
 acpi: acpi/*.c
-	@$(CC) $(CFLAGS) -I./acpi/acpica/include/ -Wno-format -fno-strict-aliasing -ffreestanding acpi/acpica/*.c
 	@$(CC) $(CFLAGS) -I./acpi/acpica/include/ -ffreestanding acpi/*.c
+	@cp objs/acpica.oa acpica.o
 	@$(make_obj_archive)
+
+# ACPICA is only compiled on request, otherwise we link against the prebuilt one
+acpica: acpi/acpica/*.c
+	@$(CC) $(CFLAGSNOOPT) -I./acpi/acpica/include/ -Wno-format -fno-strict-aliasing -ffreestanding acpi/acpica/*.c
+	@$(make_obj_archive)
+	@mv $@.oa objs/$@.oa
 
 # Assembly loader
 loader: entry.s

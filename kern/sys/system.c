@@ -397,6 +397,13 @@ void sys_timer_tick_handler(void) {
 }
 
 /*
+ * Flush CPU caches.
+ */
+void sys_flush_cpu_caches(void) {
+	__asm__ volatile("wbinvd");
+}
+
+/*
  * Page fault handler
  */
 void sys_page_fault_handler(uint32_t address) {

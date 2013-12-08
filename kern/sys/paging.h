@@ -56,7 +56,7 @@ page_directory_t *paging_new_directory();
 page_t* paging_get_page(uint32_t, bool, page_directory_t*);
 
 uint32_t paging_map_section(uint32_t, uint32_t, page_directory_t*, paging_memory_section_t);
-void paging_unmap_section(uint32_t physAddress, uint32_t length, page_directory_t* dir);
+void paging_unmap_section(uint32_t, uint32_t, page_directory_t*);
 
 void paging_page_fault_handler();
 void paging_flush_tlb(uint32_t);

@@ -326,12 +326,12 @@ uint32_t paging_map_section(uint32_t physAddress, uint32_t length, page_director
  * Basically performs the exact opposite of the above, unmapping a section of
  * memory.
  */
-void paging_unmap_section(uint32_t physAddress, uint32_t length, page_directory_t* dir) {
+void paging_unmap_section(uint32_t virtAddr, uint32_t length, page_directory_t* dir) {
 	// Round up length to a multiple of a page
 	length &= 0xFFFFF000;
 	length += 0x1000;
 
-	for(int i = physAddress; i < physAddress+length; i+= 0x1000) {
+	for(int i = virtAddr; i < virtAddr+length; i+= 0x1000) {
 		page_t* page = paging_get_page(i, false, dir);
 		memclr(page, sizeof(page_t));
 	}
