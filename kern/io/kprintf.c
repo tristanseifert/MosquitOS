@@ -1,227 +1,303 @@
 #include <types.h>
 #include <stdarg.h>
 
-// Prototype of print function
-typedef void (*putcf) (void*, char);
-
-/*
- * Prints a character to a buffer.
- */
-static void putcp(void* p, char c) {
-	*(*((char**)p))++ = c;
+int snprintf(char* str, size_t size, const char* format, ...) {
+	va_list ap;
+	va_start(ap, format);
+	int n = vsnprintf(str, size, format, ap);
+	va_end(ap);
+	return n;
 }
 
-/*
- * Prints an unsigned long in the base specified by base to *bf.
- */
-static void kprintf_ulong2ascii(unsigned long int num, unsigned int base, bool uc, char* bf) {
-	int n = 0;
-	unsigned int d = 1;
-	while (num/d >= base)
-		d *= base;
+int sprintf(char* str, const char* format, ...) {
+	va_list ap;
+	va_start(ap, format);
+	int n = vsprintf(str, format, ap);
+	va_end(ap);
+	return n;
+}
+
+int vsnprintf(char* str, size_t size, const char* format, va_list ap) {
+	// TODO: 'e', 'f', 'g', 'n' specifiers to do
 	
-	while (d != 0) {
-		int dgt = num / d;
-		num %= d;
-		d /= base;
-		if (n || dgt > 0|| d == 0) {
-			*bf++ = dgt + (dgt < 10 ? '0' : (uc ? 'A' : 'a') - 10);
-			++n;
+	if (size == 0) {
+		return 0;
+	}
+	
+	while (*format != '\0' && size > 1) {
+		if (*format != '%') {
+			*str++ = *format++;
+			continue;
 		}
-	}
-	
-	*bf = 0;
-}
-
-/*
- * Prints a signed long in the base specified by base to *bf.
- */
-static void kprintf_long2ascii(long num, char* bf) {
-	if (num < 0) {
-		num =- num;
-		*bf++ = '-';
-	}
-
-	kprintf_ulong2ascii(num, 10, 0, bf);
-}
-
-/*
- * Prints an unsigned integer in the base specified by base to *bf.
- */
-static void kprintf_uint2ascii(unsigned int num, unsigned int base, bool uc, char* bf) {
-	int n=0;
-	unsigned int d=1;
-	while (num/d >= base)
-		d *= base;        
-	while (d!=0) {
-		int dgt = num / d;
-		num%= d;
-		d/=base;
-		if (n || dgt>0 || d==0) {
-			*bf++ = dgt + (dgt < 10 ? '0' : (uc ? 'A' : 'a') - 10);
-			++n;
+		
+		format++;
+		if (*format == '%') {
+			*str++ = '%';
+			format++;
+			continue;
 		}
-	}
-	*bf=0;
-}
+		
+		// now we are sure we are in a special case
+		// what we do is that we store flags, width, precision, length in variables
+		bool sharpFlag = false;
+		bool alignLeft = false;
+		bool alwaysSign = false;
+		bool noSign = false;
+		bool padding = ' ';
+		int minimumWidth = 0;
+		int precision = 1;
+		bool numberMustBeShort = false;
+		bool numberMustBeLong = false;
+		bool unsignedNumber = false;
+		bool capitalLetters = false;
+		bool octal = false;
+		bool hexadecimal = false;
+		bool pointer = false;
+		bool tagFinished = false;
 
-/*
- * Prints a signed integer in the base specified by base to *bf.
- */
-static void kprintf_int2ascii(int num, char* bf) {
-	if (num < 0) {
-		num =- num;
-		*bf++ = '-';
-	}
-
-	kprintf_uint2ascii(num, 10, 0, bf);
-}
-
-/*
- * Turns an ASCII character into an integer.
- */
-static int kprintf_char2int(char ch) {
-	if (ch >= '0' && ch <= '9') {
-		return ch-'0';
-	} else if (ch >= 'a' && ch <= 'f') {
-		return ch-'a'+10;
-	} else if (ch >= 'A' && ch <= 'F') {
-		return ch-'A'+10;
-	} else { 
-		return -1;
-	}
-}
-
-/*
- * Turns an ASCII string into an integer.
- */
-static char kprintf_ascii2int(char ch, char** src, int base, int* nump) {
-	char* p= *src;
-	int num=0;
-	int digit;
-	
-	while ((digit = kprintf_char2int(ch)) >= 0) {
-		if (digit > base) break;
-		num = num * base + digit;
-		ch =* p++;
-	}
-
-	*src = p;
-	*nump = num;
-	return ch;
-}
-
-/*
- * Puts a string of characters into the buffer.
- */
-static void kprintf_putchw(void* putp, putcf putf, int n, char z, char* bf) {
-	char fc = z? '0' : ' ';
-	char ch;
-	char* p = bf;
-	while (*p++ && n > 0)
-		n--;
-	while (n-- > 0) 
-		putf(putp, fc);
-	while ((ch = *bf++))
-		putf(putp, ch);
-}
-
-/*
- * This function does the actual formatting
- */
-void kprintf_format(void* putp, putcf putf, char *fmt, va_list va) {
-	char bf[12];
-	
-	char ch;
-
-	while ((ch =* (fmt++))) {
-		if (ch != '%') 
-			putf(putp, ch);
-		else {
-			char lz = 0;
-			char lng = 0;
-			int w = 0;
-			ch =* (fmt++);
+		bool precisionSet = false;
+		bool minWidthSet = false;
+		
+		// then we loop (and we modify variables) until we find a specifier
+		do {
 			
-			if (ch =='0') {
-				ch =* (fmt++);
-				lz = 1;
-			}
-			
-			if (ch >= '0' && ch <= '9') {
-				ch = kprintf_ascii2int(ch, &fmt, 10, &w);
-			}
-			
-			// If the specifier is prefixed with l, it will read a longword, or
-			// 64 bits, instead of 32 bit.
-			if (ch =='l') {
-				ch =* (fmt++);
-				lng = 1;
-			}
-
-			switch (ch) {
-				case 0: // end of string
-					goto abort;
-
-				case 'u': case 'i': // unsigned int/long
-					if (lng) {
-						kprintf_ulong2ascii(va_arg(va, unsigned long int), 10, false, bf);
-					} else {
-						kprintf_uint2ascii(va_arg(va, unsigned int), 10, false, bf);
-					}
-
-					kprintf_putchw(putp, putf, w, lz, bf);
+			switch (*format) {
+				// flags
+				case '-': alignLeft = true;	     format++; break;
+				case '+': alwaysSign = true;	    format++; break;
+				case ' ': noSign = true;		format++; break;
+				case '0': padding = '0';			format++; break;
+				case '#': sharpFlag = true;	     format++; break;
+				
+				// width
+				case '1':
+				case '2':
+				case '3':
+				case '4':
+				case '5':	       // width cannot start with 0 or it would be a flag
+				case '6':
+				case '7':
+				case '8':
+				case '9':
+					minimumWidth = atoi(format);
+					minWidthSet = true;
+					while (*format >= '0' && *format <= '9') format++;
+					break;
+				case '*':
+					minimumWidth = va_arg(ap, int);
+					minWidthSet = true;
+					format++;
 					break;
 					
-				case 'd': // signed int/long
-					if (lng) {
-						kprintf_long2ascii(va_arg(va, unsigned long int), bf);
+				// precision
+				case '.':
+					format++;
+					if (*format == '*') {
+						precision = va_arg(ap, int);
+						format++;
+					} else if (*format >= '0' && *format <= '9') {
+						precision = atoi(format);
+						while (*format >= '0' && *format <= '9') format++;
 					} else {
-						kprintf_int2ascii(va_arg(va, int), bf);
+						precision = 0;	  // this behavior is standardized
 					}
 
-					kprintf_putchw(putp, putf, w, lz, bf);
+					precisionSet = true;
 					break;
+					
+				// length
+				case 'h': numberMustBeShort = true;     format++; break;
+				case 'l':
+				case 'L': numberMustBeLong = true;      format++; break;
+				
+				// specifiers
+				
+				
+				//      strings
+				case 's': {
+					char* nStr = va_arg(ap, char*);
+					size_t len = strlen(nStr);
 
-				case 'x': case 'X': // print as hexadecimal
-					if (lng) {
-						kprintf_ulong2ascii(va_arg(va, unsigned long int), 16, (ch == 'X') ? true : false, bf);
-					} else {
-						kprintf_uint2ascii(va_arg(va, unsigned int), 16, (ch == 'X') ? true : false, bf);
+					if(precisionSet) {
+						len = precision;
+					} else if(minWidthSet) {
+						len = minimumWidth;
 					}
-
-					kprintf_putchw(putp, putf, w, lz, bf);
-					break;
-
-				case 'c': // character
-					putf(putp, (char) (va_arg(va, int)));
-					break;
-
-				case 's': // string
-					kprintf_putchw(putp, putf, w, 0, va_arg(va, char*));
-					break;
-
-				case '%': // escaped percent sign
-					putf(putp, ch);
-
-				default: // unknown
-					putf(putp, ch);
+					
+					if (!alignLeft && len < minimumWidth) {
+						while (len++ < minimumWidth) {
+							*str++ = padding;
+						}
+					}
+					
+					for(int i = 0; i < len; i++) {
+						*str++ = *nStr++;
+					}
+					/*while (*nStr)
+						*str++ = *nStr++;*/
+					
+					if (alignLeft && len < minimumWidth) {
+						while (len++ < minimumWidth) {
+							*str++ = padding;
+						}
+					}
+					
+					format++;
+					tagFinished = true;
 					break;
 				}
-			}
-		}
+				
+				
+				
+				//      characters
+				case 'c': {
+					char toWrite;
+					/*if (numberMustBeLong)	 toWrite = (char)va_arg(ap, wchar_t);
+					else				    */toWrite = (char)va_arg(ap, int);
+					
+					if (!alignLeft) {
+						for (; minimumWidth > 1; minimumWidth--) {
+							*str++ = padding;
+						}
+					}
+					
+					*str++ = toWrite;
+					
+					if (alignLeft) {
+						for (; minimumWidth > 1; minimumWidth--) {
+							*str++ = padding;
+						}
+					}
+					
+					format++;
+					tagFinished = true;
+					break;
+				}
+				
+				
+				//      numbers
+				case 'o':       octal = true;
+				case 'p':       pointer = true;
+				case 'X':       capitalLetters = true;
+				case 'x':       hexadecimal = true;
+				case 'u':       unsignedNumber = true;
+				case 'd':
+				case 'i': {
+					// first we handle problems with our switch-case
+					if (octal) {
+						pointer = false;
+						hexadecimal = false;
+						unsignedNumber = false;
+					}
+					
+					// then we retreive the value to write
+					unsigned long int toWrite;
+					if (numberMustBeLong) {
+						toWrite = va_arg(ap, long int);
+					} else if(numberMustBeShort) {
+						toWrite = (short int)va_arg(ap, int);
+					} else if(pointer) {
+						toWrite = (unsigned long int)va_arg(ap, void*);
+					} else {
+						toWrite = va_arg(ap, int);
+					}
+					
+					// handling sign
+					if (!noSign) {
+						bool positive = (unsignedNumber || (((signed)toWrite) > 0));
+						if (alwaysSign || !positive) {
+							*str++ = (positive ? '+' : '-');
+						}
 
-	abort: ;
+						if (!unsignedNumber && (((signed)toWrite) < 0)) {
+							toWrite = -((signed)toWrite);
+						}
+					}
+					
+					if (sharpFlag && toWrite != 0) {
+						if (octal || hexadecimal) {
+							*str++ = '0';
+						}
+						
+						if (hexadecimal) {
+							if (capitalLetters) {
+								*str++ = 'X';
+							} else {
+								*str++ = 'x';
+							}
+						}
+					}
+					
+					// writing number
+					int digitSwitch = 10;
+					if (hexadecimal) {
+						digitSwitch = 16;
+					} else if (octal) { 
+						digitSwitch = 8;
+					}
+					
+					// this variable will be usefull
+					char* baseStr = str;
+					
+					int numDigits = 0;
+					do {
+						if (numDigits) {
+							memmove(baseStr + 1, baseStr, numDigits * sizeof(char));
+						}
+
+						int modResult = toWrite % digitSwitch;
+						if (modResult < 10) {
+							*baseStr = '0' + modResult;
+							str++;
+						} else if (capitalLetters) {
+							*baseStr = 'A' + (modResult - 10);
+							str++;
+						} else {
+							*baseStr = 'a' + (modResult - 10);
+							str++;
+						}
+						
+						toWrite /= digitSwitch;
+						numDigits++;
+					} while (toWrite != 0);
+					
+					if (numDigits < minimumWidth) {
+						minimumWidth -= numDigits;
+						if (alignLeft) {
+							for (; minimumWidth > 0; minimumWidth--) {
+								*str++ = padding;
+							}
+						} else {
+							memmove(baseStr + minimumWidth * sizeof(char), baseStr, numDigits * sizeof(char));
+							memset(baseStr, padding, minimumWidth * sizeof(char));
+							str += minimumWidth;
+						}
+					}
+					
+					// finished
+					format++;
+					tagFinished = true;
+					precisionSet = false;
+					minWidthSet = false;
+					break;
+				}
+				
+				default:
+					format++;
+					tagFinished = true;
+					precisionSet = false;
+					minWidthSet = false;
+					break;
+				
+			}
+		} while (!tagFinished);
+	}
+	
+	*str = '\0';
+	
+	return 1;
 }
 
-/*
- * Formats the string fmt, then stores it in the memory pointed to by s instead
- * of stdio.
- */
-void sprintf(char* s, char *fmt, ...) {
-	va_list va;
-	va_start(va, fmt);
-	kprintf_format(&s, putcp, fmt, va);
-	putcp(&s, 0);
-	va_end(va);
+int vsprintf(char* str, const char* format, va_list ap) {
+	return vsnprintf(str, (size_t)-1, format, ap);
 }

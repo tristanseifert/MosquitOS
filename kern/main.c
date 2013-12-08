@@ -127,7 +127,6 @@ static void kernel_preload(void) {
 	// Check if we're in a VBE mode that's 32bpp or 16bpp and set up FB console
 	svga_mode_info_t *vbe_info = (svga_mode_info_t *) sys_multiboot_info->vbe_mode_info;
 	if(vbe_info->bpp == 32 || vbe_info->bpp == 16) {
-		kprintf("VBE mode: 0x%X is %ibpp, initialising fb_console\n", sys_multiboot_info->vbe_mode, vbe_info->bpp);
 		console_init_fb();
 	}
 }

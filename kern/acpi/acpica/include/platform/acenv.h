@@ -132,80 +132,8 @@
 #define DEBUGGER_SINGLE_THREADED    1
 #define DEBUGGER_MULTI_THREADED     0
 
-
-/******************************************************************************
- *
- * Configuration for ACPI tools and utilities
- *
- *****************************************************************************/
-
-/* iASL configuration */
-
-#ifdef ACPI_ASL_COMPILER
-#define ACPI_APPLICATION
-#define ACPI_DISASSEMBLER
-#define ACPI_DEBUG_OUTPUT
-#define ACPI_CONSTANT_EVAL_ONLY
-#define ACPI_LARGE_NAMESPACE_NODE
-#define ACPI_DATA_TABLE_DISASSEMBLY
-#define ACPI_SINGLE_THREADED
-#endif
-
-/* AcpiExec configuration. Multithreaded with full AML debugger */
-
-#ifdef ACPI_EXEC_APP
-#define ACPI_APPLICATION
-#define ACPI_FULL_DEBUG
-#define ACPI_MUTEX_DEBUG
-#define ACPI_DBG_TRACK_ALLOCATIONS
-#endif
-
-/* AcpiNames configuration. Single threaded with debugger output enabled. */
-
-#ifdef ACPI_NAMES_APP
-#define ACPI_DEBUGGER
-#define ACPI_APPLICATION
-#define ACPI_SINGLE_THREADED
-#endif
-
-/*
- * AcpiBin/AcpiDump/AcpiSrc/AcpiXtract configuration. All single
- * threaded, with no debug output.
- */
-#if (defined ACPI_BIN_APP)   || \
-    (defined ACPI_DUMP_APP)  || \
-    (defined ACPI_SRC_APP)   || \
-    (defined ACPI_XTRACT_APP)
-#define ACPI_APPLICATION
-#define ACPI_SINGLE_THREADED
-#endif
-
-#ifdef ACPI_HELP_APP
-#define ACPI_APPLICATION
-#define ACPI_SINGLE_THREADED
-#define ACPI_NO_ERROR_MESSAGES
-#endif
-
-/* Linkable ACPICA library */
-
-#ifdef ACPI_LIBRARY
-#define ACPI_USE_LOCAL_CACHE
-#endif
-
-/* Common for all ACPICA applications */
-
-#ifdef ACPI_APPLICATION
-#define ACPI_USE_SYSTEM_CLIBRARY
-#define ACPI_USE_LOCAL_CACHE
-#endif
-
-/* Common debug support */
-
-#ifdef ACPI_FULL_DEBUG
-#define ACPI_DEBUGGER
-#define ACPI_DEBUG_OUTPUT
-#define ACPI_DISASSEMBLER
-#endif
+#define ACPI_CACHE_T				ACPI_MEMORY_LIST
+#define ACPI_USE_LOCAL_CACHE		1
 
 /******************************************************************************
  *

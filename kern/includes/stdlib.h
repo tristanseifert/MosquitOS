@@ -1,6 +1,8 @@
 #ifndef STD_H
 #define STD_H
 
+#include <stdarg.h>
+
 // string functions: strings
 size_t strlen(char* str);
 char* strtok(char *s, const char *delim);
@@ -23,6 +25,7 @@ void* memchr(void* ptr, uint8_t value, size_t num);
 int memcmp(const void* ptr1, const void* ptr2, size_t num);
 void* memcpy(void* destination, void* source, size_t num);
 void *memset(void* ptr, uint8_t value, size_t num);
+void *memmove(void *dest, const void *src, size_t n);
 
 // string functions: miscellaneous
 int isalnum(int c);
@@ -61,8 +64,11 @@ int toupper(int c);
 void* malloc(size_t num_bytes);
 void* memclr(void* start, size_t count);
 
-// sprintf (defined in kprintf.c)
-void sprintf(char* s, char *fmt, ...);
+// standard library: input/output
+int snprintf(char* str, size_t size, const char* format, ...);
+int sprintf(char* str, const char* format, ...);
+int vsprintf(char* str, const char* format, va_list ap);
+int vsnprintf(char* str, size_t size, const char* format, va_list ap);
 
 // MosquitOS extensions
 unsigned int mstd_popCnt(uint32_t x);

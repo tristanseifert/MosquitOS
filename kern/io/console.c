@@ -6,18 +6,13 @@
 #include "console.h"
 #include "device/rs232.h"
 
-#define printf tfp_printf 
-#define sprintf tfp_sprintf 
-
-typedef void (*putcf) (void*, char);
-void kprintf_format(void* putp, putcf putf, char *fmt, va_list va);
-
 static bool fb_console_initialized;
+char* printf_buffer;
 
 /*
  * Outputs a character to the display.
  */
-void console_putc(void* p, char c) {
+void console_putc(char c) {
 	if(c == '\n') {
 		(fb_console_initialized) ? fb_console_control(c) : vga_console_control(c);
 		rs232_putchar(KERN_DEBUG_SERIAL_PORT, '\r');
@@ -46,9 +41,21 @@ void console_init_fb() {
 /*
  * Implements printf for the kernel.
  */
-void kprintf(char *fmt, ...) {
-	va_list va;
-	va_start(va, fmt);
-	kprintf_format(NULL, console_putc, fmt, va);
-	va_end(va);
+int kprintf(const char* format, ...) {
+	// Allocate buffer if needed
+	if(unlikely(!printf_buffer)) {
+		printf_buffer = (char *) kmalloc(0x1000);
+	}
+
+	memclr(printf_buffer, 0x1000);
+
+	char* buffer = (char *) printf_buffer;
+	va_list ap;
+	va_start(ap, format);
+	int n = vsprintf(buffer, format, ap);
+	va_end(ap);
+
+	while(*buffer != 0x00) console_putc(*buffer++);
+
+	return n;
 }

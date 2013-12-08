@@ -16,13 +16,14 @@ BUILD_NUMBER_LDFLAGS += -Xlinker --defsym -Xlinker KERN_BNUM=$$(cat $(BUILD_NUMB
 CFLAGS= -c -finline-functions -g -Wall -static -mmmx -msse\
 		-O3 -fno-exceptions -ftree-vectorize -nostartfiles -nodefaultlibs -std=c99\
 		-Wno-unused-variable -mfpmath=387+sse -fno-stack-protector -I. -I./includes/\
-		-Wno-unused-function -mtune=pentium3 -fno-omit-frame-pointer
+		-Wno-unused-function -mtune=pentium3 -fno-omit-frame-pointer \
+		-Wno-unused-but-set-variable
 
 CFLAGSNOOPT = $(filter-out -O3,$(CFLAGS))
 
 ASFLAGS =
 
-all: setup acpi runtime dev_drivers system fs bus v86 modules loader kernel clean
+all: setup acpi vga dev_drivers runtime system fs bus v86 modules loader kernel clean
 
 # Clean up from previous build
 clean:
@@ -53,8 +54,8 @@ runtime: runtime/*.c
 	@$(make_obj_archive)
 
 # Drivers for hardware
-dev_drivers: device/*.c driver/*.c io vga
-	@$(CC) $(CFLAGS) -ffreestanding device/*.c driver/*.c
+dev_drivers: io device/*.c
+	@$(CC) $(CFLAGS) -ffreestanding device/*.c
 	@$(make_obj_archive)
 
 # IO routines, i.e. driver interfaces

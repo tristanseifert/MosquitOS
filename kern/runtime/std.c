@@ -289,7 +289,7 @@ int strncasecmp(const char *s1, const char *s2, size_t n) {
 char *strcpy(char *dest, const char* src) {
 	char *ret = dest;
 	
-	while (*dest++ = *src++);
+	while ((*dest++ = *src++));
 
 	return ret;
 }
@@ -304,7 +304,7 @@ char *strncpy(char *dest, const char *src, size_t n) {
 		if (!n--) {
 			return ret;
 		}
-	} while (*dest++ = *src++);
+	} while ((*dest++ = *src++));
 	
 	while (n--) {
 		*dest++ = 0;
@@ -323,7 +323,7 @@ char *strcat(char *dest, const char *src) {
 		dest++;
 	}
 	
-	while (*dest++ = *src++);
+	while ((*dest++ = *src++));
 	return ret;
 }
 
@@ -600,6 +600,13 @@ void* memclr(void* start, size_t count) {
 	} else {
 		return memclr_std(start, count);
 	}
+}
+
+void *memmove(void *dest, const void *src, size_t n) {
+	unsigned char tmp[n];
+	memcpy(tmp, (char *) src, n);
+	memcpy(dest, tmp, n);
+	return dest;
 }
 
 /*

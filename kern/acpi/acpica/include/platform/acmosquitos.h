@@ -22,7 +22,6 @@
 #define ACPI_MACHINE_WIDTH			32
 #define ACPI_EXPORT_SYMBOL(symbol)
 
-#define ACPI_CACHE_T				void
 #define ACPI_SPINLOCK				void *
 #define ACPI_CPU_FLAGS				unsigned long
 

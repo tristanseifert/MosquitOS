@@ -208,7 +208,7 @@ static void pci_print_tree() {
 
 		// Is bus defined?
 		if(bus) {
-			kprintf("Bus %i:\n", bus->bus_number);
+			kprintf("Bus %u:\n", bus->bus_number);
 
 			// Search through all devices
 			for(int d = 0; d < bus->d.node.children->num_entries; d++) {
@@ -221,7 +221,7 @@ static void pci_print_tree() {
 						uint16_t device_id = device->ident.device;
 
 						if(device->multifunction) {
-							kprintf("  Device %i: Multifunction\n", d);
+							kprintf("  Device %u: Multifunction\n", d);
 
 							for(int f = 0; f < 7; f++) {
 								pci_function_t function = device->function[f];
@@ -234,16 +234,16 @@ static void pci_print_tree() {
 									pci_str_device_t* dinfo = pci_info_get_device(vendor_id, device_id);
 
 									if(vinfo && dinfo) {
-										kprintf("    Function %i[%4X:%4X %2X:%2X]: %s %s\n", f, vendor_id, device_id, PCI_GET_CLASS(function.class), PCI_GET_SUBCLASS(function.class), vinfo->vendor_full, dinfo->chip_desc);
+										kprintf("    Function %u[%.4X:%.4X %.2X:%.2X]: %s %s\n", f, vendor_id, device_id, PCI_GET_CLASS(function.class), PCI_GET_SUBCLASS(function.class), vinfo->vendor_full, dinfo->chip_desc);
 									} else {
-										kprintf("    Function %i[%4X:%4X %2X:%2X]: Unknown\n", f, vendor_id, device_id, PCI_GET_CLASS(function.class), PCI_GET_SUBCLASS(function.class));
+										kprintf("    Function %u[%.4X:%.4X %.2X:%.2X]: Unknown\n", f, vendor_id, device_id, PCI_GET_CLASS(function.class), PCI_GET_SUBCLASS(function.class));
 									}
 								}
 							}
 						} else {
 							pci_str_vendor_t* vinfo = pci_info_get_vendor(vendor_id);
 							pci_str_device_t* dinfo = pci_info_get_device(vendor_id, device_id);
-							kprintf("  Device %i[%4X:%4X]: %s %s\n", d, vendor_id, device_id, vinfo->vendor_full, dinfo->chip_desc);
+							kprintf("  Device %u[%.4X:%.4X]: %s %s\n", d, vendor_id, device_id, vinfo->vendor_full, dinfo->chip_desc);
 						}
 					}
 				}
