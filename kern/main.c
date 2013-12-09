@@ -44,7 +44,6 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 
 	// kernel stuff
 	system_init();
-	vfs_init();
 
 	kprintf("\x01\x11\x01\x0EMosquitOS\x01\x0F\x01\x10 Kernel v0.1 build %u compiled %s on %s with %s\n", (unsigned long) &KERN_BNUM, KERN_BDATE, KERN_BTIME, KERN_COMPILER);
 

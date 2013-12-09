@@ -12,10 +12,14 @@ static hashmap_t* mountPointMap;
 /*
  * Initialises the VFS subsystem
  */
-void vfs_init() {
+static int vfs_init(void) {
 	mountPointMap = hashmap_allocate();
 	ASSERT(mountPointMap != NULL);
+
+	return 0;
 }
+
+module_early_init(vfs_init);
 
 /*
  * Registers a filesystem with the kernel.

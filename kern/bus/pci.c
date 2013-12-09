@@ -276,7 +276,7 @@ static int pci_init(void) {
 	pci_enumerate_busses();
 	pci_print_tree();
 
-	return -1;
+	return 0;
 }
 
 /*

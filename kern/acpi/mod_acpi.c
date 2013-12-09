@@ -52,8 +52,6 @@ static int acpi_init(void) {
 		kprintf("Object initialisation failed (%i)\n", status);
 		return status;
 	}
-
-	kprintf("ACPI Initialised.\n");
 	return 0;
 }
 
@@ -150,7 +148,7 @@ ACPI_STATUS AcpiOsGetPhysicalAddress(void *LogicalAddress, ACPI_PHYSICAL_ADDRESS
  * Allocate size bytes of memory.
  */
 inline void *AcpiOsAllocate(ACPI_SIZE size) {
-	void* ptr = malloc(size);
+	void* ptr = (void *) kmalloc(size);
 	memclr(ptr, size);
 	return ptr;
 }
@@ -159,7 +157,7 @@ inline void *AcpiOsAllocate(ACPI_SIZE size) {
  * Deallocate memory that was previously allocated through AcpiOsAllocate.
  */
 inline void AcpiOsFree(void *memory) {
-	// kfree(memory);
+	//kfree(memory);
 }
 
 /*
@@ -288,6 +286,7 @@ void AcpiOsReleaseLock(ACPI_SPINLOCK Handle, ACPI_CPU_FLAGS Flags) {
  * to it when called.
  */
 ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLER Handler, void *Context) {
+	kprintf("ACPI: Register IRQ handler for level %i at 0x%X\n", InterruptLevel, Handler);
 	return AE_OK;
 }
 

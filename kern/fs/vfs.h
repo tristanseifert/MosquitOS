@@ -42,8 +42,6 @@ typedef struct fs_type {
 	struct fs_type *prev;
 } fs_type_t;
 
-void vfs_init();
-
 int vfs_register(fs_type_t* fs);
 void vfs_deregister(fs_type_t* fs);
 

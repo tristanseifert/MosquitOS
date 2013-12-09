@@ -16,12 +16,7 @@ bool apic_supported() {
  * Module initialisation/exit functions.
  */
 static int apic_init(void) {
-	return -1;
-}
-
-static void apic_exit(void) {
-
+	return 0;
 }
 
 module_init(apic_init);
-module_exit(apic_exit);

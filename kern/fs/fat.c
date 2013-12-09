@@ -28,20 +28,13 @@ static int fat_init(void) {
 	vfs_register(fat_init_struct);
 
 	// Allocate other memory
-	sector_buffer = (void *) kmalloc(FAT_SECTOR_BUFFER_SIZE);
+	sector_buffer = (void *) kmalloc_a(FAT_SECTOR_BUFFER_SIZE);
+	memclr(sector_buffer, FAT_SECTOR_BUFFER_SIZE);
 
 	return 0;
 }
 
-/*
- * Cleans up resources used by the filesystem.
- */
-static void fat_exit(void) {
-
-}
-
 module_init(fat_init);
-module_exit(fat_exit);
 
 /*
  * Reads from the filesystem to create a superblock.

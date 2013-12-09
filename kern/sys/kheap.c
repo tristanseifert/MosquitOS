@@ -4,7 +4,7 @@
 #include "paging.h"
 
 extern uint32_t __kern_end;
-uint32_t kheap_placement_address = (uint32_t) &__kern_end; // After end of BSS
+uint32_t kheap_placement_address = (uint32_t) (&__kern_end) + 0x020000; // After end of BSS
 extern page_directory_t *kernel_directory;
 heap_t *kheap = 0;
 
@@ -76,7 +76,7 @@ static void expand(uint32_t new_size, heap_t *heap, int size) {
 
 	uint32_t i = old_size;
 	while (i < new_size) {
-		alloc_frame(paging_get_page(heap->start_address+i, 1, kernel_directory), (heap->supervisor) ? 1 : 0, (heap->readonly) ? 0 : 1);
+		alloc_frame(paging_get_page(heap->start_address+i, true, kernel_directory), (heap->supervisor) ? 1 : 0, true);
 		i += 0x1000; // Page size
 	}
 
