@@ -8,6 +8,4 @@
 
 #include <types.h>
 
-bool apic_supported();
-
 #endif

@@ -386,15 +386,15 @@ ACPI_STATUS AcpiOsWriteMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64 Value, UINT3
 ACPI_STATUS AcpiOsReadPort(ACPI_IO_ADDRESS Address, UINT32 *Value, UINT32 Width) {
 	switch(Width) {
 		case 8: {
-			uint32_t ret = 0;
+			uint8_t ret = 0;
 			__asm__ volatile("inb %1, %0" : "=a"(ret) : "Nd"((uint16_t) Address));
-			*Value = ret;
+			*Value = (uint32_t) ret;
 			break;
 		}
 		case 16: {
-			uint32_t ret = 0;
+			uint16_t ret = 0;
 			__asm__ volatile("inw %1, %0" : "=a"(ret) : "Nd"((uint16_t) Address));
-			*Value = ret;
+			*Value = (uint32_t) ret;
 			break;
 		}
 		case 32: {
