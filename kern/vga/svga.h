@@ -35,8 +35,8 @@ typedef struct svga_mode_info {
 	uint8_t reserved1[206];
 } __attribute__((packed)) svga_mode_info_t;
 
-void svga_change_mode(uint16_t mode);
-svga_mode_info_t* svga_mode_get_info(uint16_t mode);
-uint32_t svga_map_fb(uint32_t real_addr);
+void svga_change_mode(uint16_t);
+svga_mode_info_t* svga_mode_get_info(uint16_t);
+uint32_t svga_map_fb(uint32_t, uint32_t);
 
 #endif

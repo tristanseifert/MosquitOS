@@ -19,18 +19,18 @@ echo "Assembling hard drive image..."
 hdiutil attach disk_image.img
 
 # Copy kernel, etc
-rm -f /Volumes/MOSQUITOS/kernel.elf
-cp kern/kernel.elf /Volumes/MOSQUITOS/kernel.elf
+rm -f /Volumes/MosquitOS/kernel.elf
+cp kern/kernel.elf /Volumes/MosquitOS/kernel.elf
 
 # Clean up OS X's crap
-rm -rf /Volumes/MOSQUITOS/.fseventsd
-rm -rf /Volumes/MOSQUITOS/.Trashes
+rm -rf /Volumes/MosquitOS/.fseventsd
+rm -rf /Volumes/MosquitOS/.Trashes
 
 # Remove "dot underbar" resource forks
-dot_clean -m /Volumes/MOSQUITOS/
+dot_clean -m /Volumes/MosquitOS/
 
 # Unmount disk image
-# diskutil unmount /Volumes/MOSQUITOS/
+# diskutil unmount /Volumes/MosquitOS/
 
 clear
 

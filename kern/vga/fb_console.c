@@ -36,7 +36,7 @@ static uint32_t fb_console_col_map[16] = {
  */
 void fb_console_init() {
 	svga_mode_info_t *svga_mode_info = svga_mode_get_info(SVGA_DEFAULT_MODE);
-	video_base = svga_map_fb(svga_mode_info->physbase);
+	video_base = svga_map_fb(svga_mode_info->physbase, svga_mode_info->pitch * svga_mode_info->screen_height);
 
 	bytesPerLine = svga_mode_info->pitch;
 	width = svga_mode_info->screen_width;
