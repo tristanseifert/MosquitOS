@@ -1,16 +1,21 @@
 #include <types.h>
 #include "i8042.h"
 
+#include <bus/platform.h>
 #include <io/io.h>
 
 #define PS2_DATA 0x60
 #define PS2_CMD 0x64
 
+// Function declarations
+static int i8042_kbc_init(bus_t *platform_bus);
+static int i8042_port_init(bool secondPort, dev_i8042_t *device);
+
 /*
  * Performs required initialisation.
  */
 static int i8042_module_init(void) {
-	return -1;
+	return i8042_kbc_init(platform_bus);
 }
 
 /*

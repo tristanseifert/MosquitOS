@@ -22,10 +22,14 @@ struct device {
 	void *device_info; // pointer to device-specific info
 
 	void *sysInfo; // hook for system-specific info
+
+	// Resources used by device
+	list_t *resources;
 };
 
 struct driver {
-
+	char* name;
+	list_t *supported_busses;
 };
 
 struct bus {

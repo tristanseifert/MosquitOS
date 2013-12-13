@@ -3,7 +3,6 @@
 #include "sys/system.h"
 #include "sys/kheap.h"
 #include "sys/paging.h"
-#include "io/ps2.h"
 #include "vga/svga.h"
 #include "vga/gui.h"
 #include "device/rs232.h"
