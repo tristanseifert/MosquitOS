@@ -120,6 +120,23 @@ void* list_get(list_t *list, unsigned int index) {
 }
 
 /*
+ * Iterates through the list to see if it contains the value passed in.
+ */
+bool list_contains(list_t *list, void *data) {
+	list_entry_t *entry = list->first;
+
+	while(entry != NULL) {
+		if(entry->data == data) {
+			return true;
+		}
+
+		entry = entry->next;
+	}
+
+	return false;
+}
+
+/*
  * Removes the item at index from the list, if it exists. In addition, if
  * free_ptr is true, the list will call kfree() with the list entry's data
  * pointer as the parameter in addition to freeing the list_entry_t structure.

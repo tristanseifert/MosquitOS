@@ -1,3 +1,0 @@
-/*
- * Miscallenous virtual memory functions
- */

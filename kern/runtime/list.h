@@ -31,6 +31,7 @@ void list_destroy(list_t*, bool);
 unsigned int list_add(list_t*, void*);
 unsigned int list_insert(list_t*, void*, unsigned int);
 void* list_get(list_t*, unsigned int);
+bool list_contains(list_t*, void *);
 void list_delete(list_t*, unsigned int, bool);
 
 #endif

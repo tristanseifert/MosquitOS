@@ -29,36 +29,40 @@ sys_timer_tick_irq:
 	iretl
 
 /*
- * Page fault handler
+ * IRQ handlers
  */
-.globl	sys_page_fault_irq
-sys_page_fault_irq:
-	pushal
-	call	paging_page_fault_handler
-	popal
-	iretl
+.extern irq_handler
+.extern irq_last_request_num
+.macro IRQ_HANDLER ARG1
+	.globl irq_\ARG1
+	.align 4
+	irq_\ARG1:
+		cli
+		pushal
+		mov		%eax, \ARG1
+		mov		irq_last_request_num, %eax
+		call	irq_handler
+		popal
+		sti
+		iretl
+.endm
 
-/*
- * RS232/serial IRQ handlers
- */
-.globl	sys_rs232_irq_handler1
-sys_rs232_irq_handler1: # COM 1, 3
-	pushal
-	pushl	$0x01
-	call	rs232_irq_handler
-	popl	%eax
-	popal
-	iretl
-
-.globl	sys_rs232_irq_handler2
-sys_rs232_irq_handler2: # COM 2, 4
-	pushal
-	pushl	$0x00
-	call	rs232_irq_handler
-	popl	%eax
-	popal
-	iretl
-
+IRQ_HANDLER 0
+IRQ_HANDLER 1
+IRQ_HANDLER 2
+IRQ_HANDLER 3
+IRQ_HANDLER 4
+IRQ_HANDLER 5
+IRQ_HANDLER 6
+IRQ_HANDLER 7
+IRQ_HANDLER 8
+IRQ_HANDLER 9
+IRQ_HANDLER 10
+IRQ_HANDLER 11
+IRQ_HANDLER 12
+IRQ_HANDLER 13
+IRQ_HANDLER 14
+IRQ_HANDLER 15
 
 /*
  * Handlers for exceptions

@@ -2,6 +2,8 @@
 #include "mod_acpi.h"
 #include "sys/paging.h"
 #include "sys/sched.h"
+#include "sys/task.h"
+#include "sys/irq.h"
 
 #include <acpi.h>
 
@@ -287,6 +289,7 @@ void AcpiOsReleaseLock(ACPI_SPINLOCK Handle, ACPI_CPU_FLAGS Flags) {
  */
 ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLER Handler, void *Context) {
 	kprintf("ACPI: Register IRQ handler for level %i at 0x%X\n", InterruptLevel, Handler);
+	irq_register(InterruptLevel, (irq_t) Handler, Context);
 	return AE_OK;
 }
 

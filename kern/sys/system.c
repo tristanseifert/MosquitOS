@@ -5,6 +5,7 @@
 #include <device/rs232.h>
 #include <device/apic.h>	
 
+#include "irq.h"
 #include "system.h"
 #include "sched.h"
 #include "syscall.h"
@@ -36,10 +37,9 @@ extern void rs232_set_up_irq();
 
 // Define the assembly IRQ handlers
 extern void sys_dummy_irq(void);
-extern void sys_timer_tick_irq(void);
 extern void sys_page_fault_irq(void);
 
-// ISR/Exception handlers
+// Exception handlers
 extern void isr0(void);
 extern void isr1(void);
 extern void isr2(void);
@@ -60,10 +60,13 @@ extern void isr16(void);
 extern void isr17(void);
 extern void isr18(void);
 
+void sys_timer_tick_handler(void* context);
+
 /*
  * Initialises the system into a known state.
  */ 
 void system_init() {
+	// Set up IDT.
 	sys_setup_ints();
 
 	// Read x86 TSC
@@ -80,9 +83,6 @@ void system_init() {
 
 	// Set up multitasking
 	multitasking_init();
-
-	// Set up RS232
-	rs232_set_up_irq();
 }
 
 /*
@@ -174,9 +174,6 @@ void sys_build_idt() {
 		sys_set_idt_gate(i, (uint32_t) sys_dummy_irq, 0x08, 0x8E);
 	}
 
-	// Set IDT gate for IRQ0 (timer)
-	sys_set_idt_gate(IRQ_0, (uint32_t) sys_timer_tick_irq, 0x08, 0x8E);
-
 	// Install exception handlers (BSOD)
 	sys_set_idt_gate(0, (uint32_t) isr0, 0x08, 0x8E);
 	sys_set_idt_gate(1, (uint32_t) isr1, 0x08, 0x8E);
@@ -208,15 +205,18 @@ void sys_setup_ints() {
 	// Remap PICs
 	sys_pic_irq_remap(0x20, 0x28);
 
-	// Unmask timer and both PS2 channel interrupts
-	sys_pic_irq_clear_mask(0);
-
 	// Initialise PIT ch0 to hardware int
 	sys_pit_init(0, 0);
 	// time in ms = reload_value / (3579545 / 3) * 1000
 	sys_pit_set_reload(0, SCHED_TIMESLICE);
 
 	sys_timer_ticks = 0;
+
+	// Initialise IRQ registration system
+	irq_init();
+
+	// Register timer IRQ
+	irq_register(0, sys_timer_tick_handler, NULL);
 
 	// Re-enable interrupts now
 	__asm__("sti");
@@ -391,8 +391,7 @@ void sys_write_MSR(uint32_t msr, uint32_t lo, uint32_t hi) {
 /*
  * IRQ handler for the system tick.
  */
-void sys_timer_tick_handler(void) {
-	sys_pic_irq_eoi(0x00); // send int ack
+void sys_timer_tick_handler(void* context) {
 	sys_timer_ticks++;
 }
 

@@ -98,6 +98,8 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 	// Explanation of the 7: The MOV opcode is 5 bytes, SYSENTER is 2.
 	// __asm__("mov %esp, %ecx; mov $0x0, %ebx; mov $.+7, %edx; sysenter;");
 
+	kprintf("0x%X\n", sys_get_ticks());
+
 	while(1);
 }
 

@@ -77,7 +77,6 @@ system: sys/*.c sys/*.S
 	@$(AS) $(ASFLAGS) -o syscall_alt.o sys/syscall.S
 	@$(AS) $(ASFLAGS) -o sched_alt.o sys/sched.S
 	@$(AS) $(ASFLAGS) -o task_alt.o sys/task.S
-	@$(AS) $(ASFLAGS) -o vm_alt.o sys/vm.S
 	@$(make_obj_archive)
 
 # Filesystem libraries

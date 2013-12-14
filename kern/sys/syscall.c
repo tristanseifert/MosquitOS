@@ -2,12 +2,20 @@
 #include "syscall.h"
 #include "system.h"
 #include "sched.h"
-#include "syscalls.h"
+#include "task.h"
 
 extern void syscall_handler_stub(void);
 static void* syscallStack;
 
-/* Stores the return value of the function to be placed in %eax on return by the assembly
+/*
+ * Stub for unimplemented syscalls.
+ */
+int syscall_stub(void* task, syscall_callstack_t regs, void* syscall_struct) {
+	return -1;
+}
+
+/* 
+ * Stores the return value of the function to be placed in %eax on return by the assembly
  * syscall handler so we don't need to modify the stack image
  */
 int syscall_return_value;

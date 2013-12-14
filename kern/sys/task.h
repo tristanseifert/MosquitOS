@@ -7,15 +7,6 @@
 #include "vm.h"
 #include "binfmt_elf.h"
 
-typedef struct sched_trap_registers {
-	uint32_t event_code, event_state;
-
-	uint32_t gs, fs, es, ds;
-
-	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
-	uint32_t eip, cs, eflags, useresp, ss; // Pushed by the processor automatically.
-} __attribute__((packed)) sched_trap_regs_t;
-
 // Task's context information
 typedef struct task_state {
 	// Manually backed up

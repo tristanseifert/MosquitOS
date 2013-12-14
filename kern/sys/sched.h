@@ -2,7 +2,6 @@
 #define SCHED_H
 
 #include <types.h>
-#include "task.h"
 
 // software interrupt to trap into scheduler
 #define SCHED_TRAP_NUM 0x88
@@ -24,10 +23,17 @@ typedef struct sched_info {
 	void *task_descriptor;
 } sched_task_t;
 
+typedef struct sched_trap_registers {
+	uint32_t event_code, event_state;
+
+	uint32_t gs, fs, es, ds;
+
+	uint32_t edi, esi, ebp, esp, ebx, edx, ecx, eax; // Pushed by pusha.
+	uint32_t eip, cs, eflags, useresp, ss; // Pushed by the processor automatically.
+} __attribute__((packed)) sched_trap_regs_t;
+
 // Initialises scheduler
 void sched_init();
-// Called when a process yields control to the scheduler
-void sched_yield(sched_trap_regs_t);
 // Called when a task is destroyed
 void sched_task_deleted(void*);
 // Called when a task is created

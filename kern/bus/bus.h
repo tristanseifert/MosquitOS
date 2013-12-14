@@ -4,6 +4,9 @@
 #include <types.h>
 #include "runtime/list.h"
 
+#define BUS_NOT_EXISTANT -1
+#define BUS_DRIVER_ALREADY_REGISTERED -2
+
 typedef struct node node_t;
 typedef struct bus bus_t;
 typedef struct device device_t;
@@ -29,7 +32,6 @@ struct device {
 
 struct driver {
 	char* name;
-	list_t *supported_busses;
 };
 
 struct bus {
@@ -41,6 +43,9 @@ struct bus {
 
 	// This checks if the driver will work for the device
 	bool (*match)(device_t*, driver_t*);
+
+	// List of drivers
+	list_t *loadedDrivers;
 };
 
 // Registers a bus with the driver

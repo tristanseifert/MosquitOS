@@ -79,11 +79,6 @@ module_exit(rs232_exit);
  */
 void rs232_set_up_irq() {
 	// Set up IRQs
-	sys_set_idt_gate(IRQ_3, (uint32_t) sys_rs232_irq_handler1, 0x08, 0x8E); // COM 2, 4
-	sys_set_idt_gate(IRQ_4, (uint32_t) sys_rs232_irq_handler2, 0x08, 0x8E); // COM 1, 3
-
-	sys_pic_irq_clear_mask(3);
-	sys_pic_irq_clear_mask(4);
 }
 
 /*
