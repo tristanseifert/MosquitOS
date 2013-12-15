@@ -67,37 +67,3 @@ void gui_fill_rect(framebuffer_t* buffer, rect_t rect, uint16_t colour) {
 		writePtr += buffer->size.width;
 	}
 }
-
-/*
- * Renders a bitmap on the screen.
- */
-void gui_draw_bmp(void* bitmap, int px, int py) {
-	void *buf = (void *) 0xD0000000;
-
-	uint8_t *read = (uint8_t *) bitmap;
-	uint8_t *write = buf + (px * 3) + (py * 0xC00);
-
-	int width, height;
-	// Read width, height from file
-	width = read[0x12] | (read[0x13] << 8);
-	height = read[0x16] | (read[0x17] << 8);
-
-	// Read pointer (bottom to top)
-	read += read[0x0E] + 0x0E;
-	read += (width * height * 3) - (width * 3);
-
-	for(int y = 0; y < height; y++) {
-		uint8_t *ptr = write + (y * 0xC00);
-
-		for(int x = 0; x < width; x++) {
-			ptr[0] = read[0];
-			ptr[1] = read[1];
-			ptr[2] = read[2];
-
-			read += 3;
-			ptr += 3;
-		}
-
-		read -= (width * 6);
-	}
-}

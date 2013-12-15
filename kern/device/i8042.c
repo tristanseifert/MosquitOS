@@ -11,12 +11,27 @@
 static int i8042_kbc_init(bus_t *platform_bus);
 static int i8042_port_init(bool secondPort, dev_i8042_t *device);
 
+// Driver definition
+static platform_driver_t i8042_driver = {
+	.d.name = "i8042 Keyboard Controller Driver",
+
+	.supported_devices[0] = {
+		.class = PLATFORM_CLASS_HID,
+		.subclass = PLATFORM_SUBCLASS_KBC
+	}
+};
+
 /*
  * Performs required initialisation.
  */
 static int i8042_module_init(void) {
-	return i8042_kbc_init(platform_bus);
+	bus_register_driver((driver_t *) &i8042_driver, "platform");
+	return 0;
+
+	// return i8042_kbc_init(platform_bus);
 }
+
+module_init(i8042_module_init);
 
 /*
  * Waits for the PS2 controller to have data available.
@@ -183,5 +198,3 @@ static int i8042_kbc_init(bus_t *platform_bus) {
 	kfree(device);
 	return errno;
 }
-
-module_init(i8042_module_init);

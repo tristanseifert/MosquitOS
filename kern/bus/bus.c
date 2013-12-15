@@ -40,7 +40,7 @@ module_early_init(bus_sys_init);
  */
 void bus_register(bus_t *bus, char *name) {
 	// Check if name is used already
-	if(hashmap_get(driver_array, name) != NULL) {
+	if(unlikely(hashmap_get(driver_array, name) != NULL)) {
 		kprintf("A bus named '%s' is already registered!\n", name);
 		return;
 	}
@@ -67,7 +67,7 @@ void bus_register(bus_t *bus, char *name) {
 	hashmap_insert(driver_array, name, drivers);
 
 	// Store a pointer to the list in the bus structure
-	bus->loadedDrivers = drivers->drivers;
+	bus->drivers = drivers->drivers;
 }
 
 /*
@@ -76,7 +76,7 @@ void bus_register(bus_t *bus, char *name) {
 int bus_register_driver(driver_t *driver, char* busName) {
 	bus_drivers_t *drivers = hashmap_get(driver_array, busName);
 
-	if(drivers != NULL) {
+	if(likely(drivers != NULL)) {
 		// Make sure we don't register the same driver twice
 		if(list_contains(drivers->drivers, driver)) {
 			return BUS_DRIVER_ALREADY_REGISTERED;
@@ -84,10 +84,51 @@ int bus_register_driver(driver_t *driver, char* busName) {
 
 		// Insert driver into the array.
 		list_add(drivers->drivers, driver);
+		// kprintf("Initialised driver '%s' for bus '%s'\n", driver->name, busName);
 
 		return 0;
 	} else {
 		kprintf("Attempted to register driver for bus '%s' without such a bus\n", busName);
 		return BUS_NOT_EXISTANT;
 	}
+}
+
+/*
+ * Tries to find a bus with the specified name.
+ */
+bus_t *bus_get_by_name(char *name) {
+	bus_drivers_t *drivers = hashmap_get(driver_array, name);
+
+	if(likely(drivers)) {
+		return drivers->bus;
+	}
+
+	return NULL;
+}
+
+/*
+ * Enumerates all drivers registered for the specified bus to find one that can
+ * support the device.
+ */
+driver_t *bus_find_driver(device_t *device, bus_t *bus) {
+	driver_t *driver;
+
+	// Loop through all drivers for the bus
+	for(int i = 0; i < bus->drivers->num_entries; i++) {
+		driver = list_get(bus->drivers, i);
+
+		if(bus->match(device, driver)) {
+			return driver;
+		}
+	}
+
+	// We haven't found a driver that supports it.
+	return NULL;
+}
+
+/*
+ * Adds a device to the specified bus.
+ */
+int bus_add_device(device_t *device, bus_t *bus) {
+	return BUS_DEVICE_REGISTERED;
 }

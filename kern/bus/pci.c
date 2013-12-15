@@ -99,7 +99,7 @@ static void pci_probe_bus(pci_bus_t *bus) {
 			device->d.node.name = "PCI Device";
 			device->d.node.parent = &bus->d.node;
 
-			list_add(bus->d.node.children, device);
+			list_add(bus->d.node.children, device);	
 		}
 	}
 }

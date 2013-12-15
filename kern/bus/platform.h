@@ -6,6 +6,9 @@
 
 extern bus_t *platform_bus;
 
+#define PLATFORM_CLASS_HID 0xD000
+#define PLATFORM_SUBCLASS_KBC 0xCACA
+
 typedef struct platform_driver platform_driver_t;
 typedef struct platform_device platform_device_t;
 typedef struct platform_devid platform_devid_t;
