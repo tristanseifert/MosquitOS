@@ -3,18 +3,10 @@
 #include "sys/system.h"
 #include "sys/kheap.h"
 #include "sys/paging.h"
-#include "vga/svga.h"
-#include "vga/gui.h"
-#include "device/rs232.h"
-#include "io/disk.h"
-#include "device/ata_pio.h"
-#include "fs/mbr.h"
-#include "fs/vfs.h"
-#include "fs/fat.h"
-#include "runtime/error_handler.h"
 #include "sys/binfmt_elf.h"
 #include "sys/task.h"
 #include "sys/multiboot.h"
+#include "vga/svga.h"
  
 static void kernel_preload(void);
 
@@ -101,7 +93,7 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 	// Explanation of the 7: The MOV opcode is 5 bytes, SYSENTER is 2.
 	// __asm__("mov %esp, %ecx; mov $0x0, %ebx; mov $.+7, %edx; sysenter;");
 
-	kprintf("0x%X\n", sys_get_ticks());
+	// kprintf("0x%X\n", sys_get_ticks());
 
 	while(1);
 }

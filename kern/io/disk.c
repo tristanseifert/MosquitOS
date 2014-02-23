@@ -1,5 +1,5 @@
 #include <types.h>
-#include "device/ata_pio.h"
+#include "device/ata.h"
 
 #include "disk.h"
 
