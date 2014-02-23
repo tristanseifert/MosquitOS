@@ -25,7 +25,7 @@ static platform_driver_t i8042_driver = {
  * Performs required initialisation.
  */
 static int i8042_module_init(void) {
-	bus_register_driver((driver_t *) &i8042_driver, "platform");
+	bus_register_driver((driver_t *) &i8042_driver, BUS_NAME_PLATFORM);
 	return 0;
 
 	// return i8042_kbc_init(platform_bus);

@@ -5,7 +5,9 @@
 #include "io/disk.h"
 
 #define ATA_BUS_0_IOADDR 0x1F0
+#define ATA_BUS_0_CTRLADDR 0x1F8
 #define ATA_BUS_1_IOADDR 0x170
+#define ATA_BUS_1_CTRLADDR 0x178
 
 #define ATA_NO_ERR kDiskErrorNone
 #define ATA_ERR_NO_DRIVE 0xFF

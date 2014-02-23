@@ -14,7 +14,7 @@ static uint32_t default_hash(char *key, size_t len) {
 		hash += key[i];
 		hash += (hash << 10);
 		hash ^= (hash >> 6);
-	}
+	} 
 
 	hash += (hash << 3);
 	hash ^= (hash >> 11);

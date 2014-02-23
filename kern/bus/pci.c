@@ -4,6 +4,9 @@
 #include "pci.h"
 #include "pci_tables.h"
 
+#define PCI_CONFIG_ADDR 0xCF8
+#define PCI_CONFIG_DATA 0xCFC
+
 // Struct passed to bus driver
 static bus_t pci_bus = {
 	.match = pci_match
@@ -13,18 +16,103 @@ static bus_t pci_bus = {
 static bool pci_fast_config_avail;
 
 /*
+ * Performs either a longword, word or byte write to PCI config space.
+ */
+void pci_config_write_l(uint32_t address, uint32_t value) {
+	io_outl(PCI_CONFIG_ADDR, address);
+	io_outl(PCI_CONFIG_DATA, value);
+}
+
+void pci_config_write_w(uint32_t address, uint16_t value) {
+	io_outl(PCI_CONFIG_ADDR, address);
+	io_outl(PCI_CONFIG_DATA + (address & 0x02), value);
+
+}
+
+void pci_config_write_b(uint32_t address, uint8_t value) {
+	io_outl(PCI_CONFIG_ADDR, address);
+	io_outl(PCI_CONFIG_DATA + (address & 0x3), value);
+}
+
+/*
+ * Performs either a longword, word or byte read from PCI config space
+ */
+uint32_t pci_config_read_l(uint32_t address) {
+	io_outl(PCI_CONFIG_ADDR, address);
+	return io_inl(PCI_CONFIG_DATA);
+}
+
+uint16_t pci_config_read_w(uint32_t address) {
+	io_outl(PCI_CONFIG_ADDR, address);
+	return io_inl(PCI_CONFIG_DATA + (address & 0x2));
+
+}
+
+uint8_t pci_config_read_b(uint32_t address) {
+	io_outl(PCI_CONFIG_ADDR, address);
+	return io_inl(PCI_CONFIG_DATA+ (address & 0x3));
+}
+
+/*
  * Reads from PCI config space with the specified address
  */
 static uint32_t pci_config_read(uint8_t bus, uint8_t device, uint8_t function, uint8_t reg) {
 	if(!pci_fast_config_avail) {
 		uint32_t address;
 
-		address = (uint32_t) ((bus << 16) | (device << 11) | (function<< 8) | (reg & 0xFC) | 0x80000000);
+		address = pci_config_address(bus, device, function, reg);
 
-		io_outl(0xCF8, address);
-		return io_inl(0xCFC);
+		io_outl(PCI_CONFIG_ADDR, address);
+		return io_inl(PCI_CONFIG_DATA);
 	} else {
 		return 0xFFFFFFFF;
+	}
+}
+
+/*
+ * Updates the BAR of a specific function on a device, and updates the PCI
+ * config space.
+ */
+void pci_device_update_bar(pci_device_t *d, int function, int bar, uint32_t value) {
+	ASSERT(bar < 6);
+
+	// Calculate length and address to write to
+	uint32_t length = d->function[function].bar[bar].end - d->function[function].bar[bar].start;
+	uint32_t addr = pci_config_address(d->location.bus, d->location.device, function, (0x10 + (bar << 2)));
+
+	kprintf("PCI BAR UPDATE: bus %u, device %u, function %u, BAR %X, value 0x%X, address 0x%X\n", d->location.bus, d->location.device, function, (0x10 + (bar << 2)), value, addr);
+
+	// Do write to PCI config space
+	pci_config_write_l(addr, value);
+
+	// Reset flags
+	d->function[function].bar[bar].flags = 0;
+
+	// IO BAR
+	if(bar & 0x01) {
+		d->function[function].bar[bar].start = value & 0xFFFFFFFC;
+		d->function[function].bar[bar].end = (value & 0xFFFFFFFC) + length;
+		d->function[function].bar[bar].flags = kPCIBARFlagsIOAddress;
+	} else { // Memory address BAR
+		d->function[function].bar[bar].start = value & 0xFFFFFFF0;
+		d->function[function].bar[bar].end = (value & 0xFFFFFFF0) + length;
+
+		// Is this BAR prefetchable?
+		if(value & 0x8) {
+			d->function[function].bar[bar].flags = kPCIBARFlagsPrefetchable;
+		}
+
+		// Get BAR type
+		uint8_t type = (value & 0x6) >> 1;
+
+		// Is the BAR 64 bits?
+		if(type == 0x02) {
+			d->function[function].bar[bar].flags |= kPCIBARFlags64Bits;
+		} else if(type == 0x01) { // 16 bits?
+			d->function[function].bar[bar].flags |= kPCIBARFlags16Bits;
+		} else if(type == 0x00) { // 32 bits?
+			d->function[function].bar[bar].flags |= kPCIBARFlags32Bits;
+		}
 	}
 }
 
@@ -35,13 +123,70 @@ static void pci_set_function_info(uint8_t bus, uint8_t device, uint8_t function,
 	uint32_t temp;
 
 	finfo->class = pci_config_read(bus, device, function, 0x08);
+
+	uint8_t header_type = ((pci_config_read(bus, device, function, 0x0C)) >> 0x10) & 0x7F;
+
+	int num_bars = 0;
+
+	// Device has six BARs if header type == 0x00
+	if(header_type == 0x00) num_bars = 6;
+	// Device has two BARs if header type == 0x01
+	if(header_type == 0x01) num_bars = 2;
+
+	for (unsigned int b = 0; b < num_bars; b++) {
+		finfo->bar[b].flags = 0;
+
+		// Get address of BAR: 0x10 is first, each BAR is 4 bytes long
+		uint32_t addr = pci_config_address(bus, device, function, (0x10 + (b << 2)));
+
+		// Read original BAR
+		uint32_t bar = pci_config_read_l(addr);
+
+		// Write all 1's to get size required
+		pci_config_write_l(addr, 0xFFFFFFFF);
+
+		// Read size
+		uint32_t size = pci_config_read_l(addr);
+
+		// IO BAR
+		if(bar & 0x01) {
+			size &= 0xFFFFFFFC;
+			finfo->bar[b].start = bar & 0xFFFFFFFC;
+			finfo->bar[b].end = finfo->bar[b].start + (~(size) + 1);
+			finfo->bar[b].flags = kPCIBARFlagsIOAddress;
+		} else { // Memory address BAR
+			size &= 0xFFFFFFF0;
+			finfo->bar[b].start = bar & 0xFFFFFFF0;
+			finfo->bar[b].end = finfo->bar[b].start + (~(size) + 1);
+
+			// Is this BAR prefetchable?
+			if(bar & 0x8) {
+				finfo->bar[b].flags = kPCIBARFlagsPrefetchable;
+			}
+
+			// Get BAR type
+			uint8_t type = (bar & 0x6) >> 1;
+
+			// Is the BAR 64 bits?
+			if(type == 0x02) {
+				finfo->bar[b].flags |= kPCIBARFlags64Bits;
+			} else if(type == 0x01) { // 16 bits?
+				finfo->bar[b].flags |= kPCIBARFlags16Bits;
+			} else if(type == 0x00) { // 32 bits?
+				finfo->bar[b].flags |= kPCIBARFlags32Bits;
+			}
+		}
+
+		// Restore BAR value
+		pci_config_write_l(addr, bar);
+	}
 }
 
 /*
  * Tries to find all devices on a given bus through brute-force.
  */
 static void pci_probe_bus(pci_bus_t *bus) {
-	uint32_t temp;
+	uint32_t temp, temp2;
 	uint8_t bus_number;
 
 	if(bus->bridge_secondary_bus != 0xFFFF) {
@@ -71,7 +216,7 @@ static void pci_probe_bus(pci_bus_t *bus) {
 			temp = pci_config_read(bus_number, i, 0, 0x0C);
 			uint8_t header_type = temp >> 0x10;
 
-			// Yes, go through all of them
+			// If so, go through all of them
 			if(header_type & 0x80) {
 				device->multifunction = true;
 
@@ -107,7 +252,7 @@ static void pci_probe_bus(pci_bus_t *bus) {
 /*
  * Searches through every bus on the system and reads info if it's valid.
  */
-static void pci_enumerate_busses() {
+void pci_enumerate_busses() {
 	uint32_t temp;
 
 	for(int i = 0; i < 256; i++) {
@@ -200,7 +345,7 @@ static pci_str_device_t* pci_info_get_device(uint16_t vendor, uint16_t device) {
  * Prints a pretty representation of the system's PCI devices.
  */
 static void pci_print_tree() {
-	kprintf("================ PCI Bus Device Listing ================\n");
+	kprintf("==================== PCI Bus Device Listing ====================\n");
 
 	// Check all possible busses
 	for(int i = 0; i < pci_bus.node.children->num_entries; i++) {
@@ -250,6 +395,8 @@ static void pci_print_tree() {
 			}
 		}
 	}
+
+	kprintf("\n");
 }
 
 /*
@@ -259,11 +406,43 @@ static void pci_print_tree() {
  * extended version of device_t.
  */
 bool pci_match(device_t* dev, driver_t* driver) {
-	pci_device_t *device = (pci_device_t *) dev;
+	driver->supportQuery(dev);
 
 	return false;
 }
 
+/*
+ * Go through all PCI devices that have been enumerated and try to load drivers
+ * for them.
+ */
+static int pci_load_drivers(void) {
+	// Check all possible busses
+	for(int i = 0; i < pci_bus.node.children->num_entries; i++) {
+		pci_bus_t *bus = (pci_bus_t *) list_get(pci_bus.node.children, i);
+
+		// Is bus defined?
+		if(bus) {
+			// Search through all devices
+			for(int d = 0; d < bus->d.node.children->num_entries; d++) {
+				// Process multifunction device
+				pci_device_t *device = (pci_device_t *) list_get(bus->d.node.children, d);
+
+				if(device) {
+					if(device->ident.vendor != 0xFFFF) {
+						uint16_t vendor_id = device->ident.vendor;
+						uint16_t device_id = device->ident.device;
+						
+						driver_t *driver = bus_find_driver((device_t *) device, &pci_bus);
+					}
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
+module_post_driver_init(pci_load_drivers);
 
 /*
  * Initialise PCI subsystem
@@ -271,7 +450,7 @@ bool pci_match(device_t* dev, driver_t* driver) {
 static int pci_init(void) {
 	pci_fast_config_avail = false;
 
-	bus_register(&pci_bus, "pci_bus");
+	bus_register(&pci_bus, BUS_NAME_PCI);
 
 	pci_enumerate_busses();
 	pci_print_tree();

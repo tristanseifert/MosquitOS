@@ -23,7 +23,10 @@ CFLAGSNOOPT = $(filter-out -O3,$(CFLAGS))
 
 ASFLAGS =
 
-all: setup acpi vga dev_drivers runtime system fs bus v86 modules loader kernel clean
+# Add toolchain to path
+export PATH := ../toolchain/gcc/bin/:$(PATH)
+
+all: setup acpi vga drivers_intel dev_drivers runtime system fs bus v86 modules loader kernel
 
 # Clean up from previous build
 clean:
@@ -38,9 +41,9 @@ kernel: main.c
 	@$(CC) $(CFLAGS) -ffreestanding *.c -o kern_main.$(obj_arc_ext)
 	@$(CC) -Wl,-T,kern.ld -o kernel.elf -ffreestanding -g -O2 -nostdlib $(BUILD_NUMBER_LDFLAGS) tmp/entry.o *.$(obj_arc_ext)
 	
-	@gobjcopy -I elf32-i386 --only-keep-debug kernel.elf kernel.sym
-	@gobjcopy -I elf32-i386 --strip-debug kernel.elf
-	@gobjdump -b elf32-i386 -d kernel.elf > symbols.txt
+	@i686-pc-elf-objcopy -I elf32-i386 --only-keep-debug kernel.elf kernel.sym
+	@i686-pc-elf-objcopy -I elf32-i386 --strip-debug kernel.elf
+	@i686-pc-elf-objdump -b elf32-i386 -d kernel.elf > symbols.txt
 
 # Sets up directories and stuff.
 setup:
@@ -115,3 +118,8 @@ acpica: acpi/acpica/*.c
 loader: entry.s
 	@$(AS) $(ASFLAGS) -o entry.o entry.s
 	@mv entry.o tmp/entry.o
+
+# Drivers for Intel hardware and chipsets
+drivers_intel: drivers_intel/*.c
+	@$(CC) $(CFLAGS) -ffreestanding drivers_intel/*.c
+	@$(make_obj_archive)

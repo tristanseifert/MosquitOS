@@ -57,7 +57,7 @@ static int acpi_init(void) {
 	return 0;
 }
 
-module_early_init(acpi_init);
+// module_early_init(acpi_init);
 
 /*
  * Called during ACPICA initialisation/shutdown. Do nothing.

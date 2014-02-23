@@ -33,13 +33,14 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 		PANIC("Not booted with multiboot-compliant bootloader!");
 	}
 
+	// Perform some preloading stuff
 	kernel_preload();
 
+	// Get memory info
 	paging_stats_t paging_info = paging_get_stats();
-
 	kprintf("%iKB low memory, %iKB high memory\n", sys_multiboot_info->mem_lower, sys_multiboot_info->mem_upper);
 	kprintf("%i/%i pages mapped (%i pages free, %i pages wired)\n", paging_info.pages_mapped, paging_info.total_pages, paging_info.pages_free, paging_info.pages_wired);
-//	kprintf("%i/%i KB allocated (%i KB free, %i KB wired)\n", paging_info.pages_mapped*4, paging_info.total_pages*4, paging_info.pages_free*4, paging_info.pages_wired*4);
+	kprintf("%i/%i KB allocated (%i KB free, %i KB wired)\n", paging_info.pages_mapped*4, paging_info.total_pages*4, paging_info.pages_free*4, paging_info.pages_wired*4);
 
 	// kernel stuff
 	system_init();
@@ -51,6 +52,8 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 
 	// Disk test
 	disk_t *hda0 = disk_allocate();
+	hda0->bus = 0;
+	hda0->drive_id = 0;
 	ata_driver_init(hda0);
 	DISK_ERROR ret = disk_init(hda0);
 

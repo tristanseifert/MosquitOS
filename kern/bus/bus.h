@@ -8,6 +8,9 @@
 #define BUS_DRIVER_ALREADY_REGISTERED -2
 #define BUS_DEVICE_REGISTERED -3
 
+#define BUS_NAME_PCI "pci_bus"
+#define BUS_NAME_PLATFORM "platform"
+
 typedef struct node node_t;
 typedef struct bus bus_t;
 typedef struct device device_t;
@@ -33,6 +36,8 @@ struct device {
 
 struct driver {
 	char* name;
+
+	bool (*supportQuery)(device_t *); // function to query driver support
 };
 
 struct bus {

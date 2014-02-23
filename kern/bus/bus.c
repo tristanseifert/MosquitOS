@@ -84,7 +84,7 @@ int bus_register_driver(driver_t *driver, char* busName) {
 
 		// Insert driver into the array.
 		list_add(drivers->drivers, driver);
-		// kprintf("Initialised driver '%s' for bus '%s'\n", driver->name, busName);
+//		kprintf("Initialised driver '%s' for bus '%s'\n", driver->name, busName);
 
 		return 0;
 	} else {
@@ -112,6 +112,8 @@ bus_t *bus_get_by_name(char *name) {
  */
 driver_t *bus_find_driver(device_t *device, bus_t *bus) {
 	driver_t *driver;
+
+//	kprintf("finding driver on bus 0x%X device 0x%X\n", bus, device);
 
 	// Loop through all drivers for the bus
 	for(int i = 0; i < bus->drivers->num_entries; i++) {
