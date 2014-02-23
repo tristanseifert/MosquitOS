@@ -30,6 +30,9 @@ typedef struct disk_info_struct {
 	// Struct holding pointers to driver's function calls
 	// Should be of type driver_functions_t
 	void* driver_calls;
+
+	// Size of the drive (sectors) or 0 if unknown
+	uint64_t size;
 } disk_t;
 
 typedef struct driver_functions_struct {

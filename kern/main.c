@@ -51,7 +51,7 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 	modules_load();
 
 	// Disk test
-	disk_t *hda0 = disk_allocate();
+/*	disk_t *hda0 = disk_allocate();
 	hda0->bus = 0;
 	hda0->drive_id = 0;
 	ata_driver_init(hda0);
@@ -72,7 +72,7 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 		kprintf("\nParsed ELF to 0x%X\n", elf);
 
 		i386_task_t* task = task_allocate(elf);
-	}
+	}*/
 
 /*	
 	svga_mode_info_t *svga_mode_info = svga_mode_get_info(0x101);

@@ -6,7 +6,7 @@
 #include "bus/bus.h"
 #include "bus/pci.h"
 
-#define PIIX3_BUS_MASTER_IO 0xD000
+#define PIIX3_BUS_MASTER_IO ATA_BUS_MASTER_IO
 
 /*
  * Primary Command Task File Base: BAR0
@@ -28,6 +28,7 @@ enum {
 // Private functions
 static bool drv_piix3_ide_claim(pci_device_t *device);
 static bool drv_piix3_ide_configure(uint16_t vendor, uint16_t device);
+static void drv_piix3_ide_init_drive(disk_t *drive);
 
 // Driver
 static driver_t drv = {
@@ -44,6 +45,9 @@ static pci_function_t *functionPtr;
 static pci_device_t *piix3_device;
 
 static void* piix3_expansion_memory;
+
+// ATA driver associated with this hardware
+static ata_driver_t *ata;
 
 /*
  * Initialises the PIIX 3 IDE controller driver.
@@ -82,15 +86,17 @@ static bool drv_piix3_ide_claim(pci_device_t *device) {
 				ASSERT(!piix3_ide_initialised);
 				piix3_ide_initialised = true;
 
-				// Configure PIIX3
+				// Save location of device
 				piix3_device = device;
 				functionPtr = &device->function[1];
 				pci_bus = device->location.bus;
 				pci_device = device->location.device;
 
+				kprintf("piix3_ide: found on PCI bus at bus %u, device %u, function 1\n", device->location.bus, device->location.device);
+
+				// Set up the chipset
 				drv_piix3_ide_configure(pci_bus, pci_device);
 
-				kprintf("piix3_ide: found on PCI bus at bus %u, device %u, function 1\n", device->location.bus, device->location.device);
 				return true;
 			}
 		}
@@ -143,5 +149,15 @@ static bool drv_piix3_ide_configure(uint16_t bus, uint16_t device) {
 	// Configure slave IORDY sample point 3 clocks, recovery time 3 clocks
 	pci_config_write_b(pci_config_address(bus, device, 1, 0x44), 0b10011001);
 
+	// Set up ATA driver
+	ata = ata_init_pci(functionPtr->bar[0].start, functionPtr->bar[1].start, functionPtr->bar[2].start, functionPtr->bar[3].start, functionPtr->bar[4].start);
+
 	return true;
+}
+
+/*
+ * Initialises a specific drive for use by the ATA driver.
+ */	
+static void drv_piix3_ide_init_drive(disk_t *drive) {
+
 }
