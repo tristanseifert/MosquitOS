@@ -95,7 +95,7 @@ DISK_ERROR ata_init(disk_t* disk) {
 	while((io_inb(ata_bus_to_ioaddr[bus] + 7) & 0x80));
 
 	// If it's an ATAPI drive, LBAhi and LBAmid are zero
-	if(io_inb(ata_bus_to_ioaddr[bus] + 4) || io_inb(ata_bus_to_ioaddr[bus] + 5)) {
+	if(!io_inb(ata_bus_to_ioaddr[bus] + 4) && !io_inb(ata_bus_to_ioaddr[bus] + 5)) {
 		kprintf("Found ATAPI drive at (%u, %u), cannot initialise\n", bus, disk->drive_id);
 		return ATA_ERR_ATAPI_DRIVE;
 	}
@@ -103,7 +103,7 @@ DISK_ERROR ata_init(disk_t* disk) {
 	// Wait for DRQ or ERR to set
 	uint8_t ata_status = io_inb(ata_bus_to_ioaddr[bus] + 7);
 
-	while(true) {
+	for(;;) {
 		ata_status = io_inb(ata_bus_to_ioaddr[bus] + 7);
 
 		// Is DRQ set?
@@ -115,10 +115,10 @@ DISK_ERROR ata_init(disk_t* disk) {
 	}
 
 	// Allocate memory for IDENTIFY response and read
-	info->ata_identify_info = (void *) kmalloc(0x200);
+	info->ata_identify_info = (void *) kmalloc(0x100);
 	ata_do_pio_read(info->ata_identify_info, 0x100, bus);
 
-	kprintf("HDD Model: %.27s\n", info->ata_identify_info+(27*2));
+	// kprintf("HDD Model: %s \n", ata_convert_string(info->ata_identify_info+(27*2), 27));
 
 	return ATA_NO_ERR;
 }
@@ -127,7 +127,7 @@ DISK_ERROR ata_init(disk_t* disk) {
  * Reads num_sectors starting at lba from the disk to destination.
  */
 DISK_ERROR ata_read(disk_t* disk, uint64_t lba, uint32_t num_sectors, void* destination) {
-	kprintf("Reading %u sectors starting at LBA %u", num_sectors, lba);
+	// kprintf("Reading %u sectors starting at LBA %u", num_sectors, lba);
 	ata_info_t* info = disk->driver_specific_data;
 	uint8_t bus = disk->bus;
 
@@ -196,10 +196,10 @@ DISK_ERROR ata_read(disk_t* disk, uint64_t lba, uint32_t num_sectors, void* dest
 		ata_do_pio_read(outPtr, 0x100, bus);
 		outPtr += 0x100;
 
-		kprintf(".");
+		// kprintf(".");
 	}
 
-	kprintf(" Done.\n");
+	// kprintf(" Done.\n");
 
 	return ATA_NO_ERR;
 }

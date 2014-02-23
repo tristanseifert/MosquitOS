@@ -21,7 +21,7 @@ enum {
 	PIIX3_PCTRLB = 1, // 14 primary control task file base
 	PIIX3_SCMDB = 2, // 18 secondary command task file base
 	PIIX3_SCTRLB = 3, // 1c secondary control task file base
-	PIIX3_BMB = 4 // 20 Bus Master IDE base
+	PIIX3_BMB = 4, // 20 Bus Master IDE base
 	PIIX3_EBM = 5 // 24 Expansion Base Memory Address
 };
 
@@ -85,7 +85,10 @@ static bool drv_piix3_ide_claim(pci_device_t *device) {
 				// Configure PIIX3
 				piix3_device = device;
 				functionPtr = &device->function[1];
-				drv_piix3_ide_configure(device->location.bus, device->location.device);
+				pci_bus = device->location.bus;
+				pci_device = device->location.device;
+
+				drv_piix3_ide_configure(pci_bus, pci_device);
 
 				kprintf("piix3_ide: found on PCI bus at bus %u, device %u, function 1\n", device->location.bus, device->location.device);
 				return true;
@@ -102,23 +105,11 @@ static bool drv_piix3_ide_claim(pci_device_t *device) {
  * allows later drive functions to use cached data.
  */
 static bool drv_piix3_ide_configure(uint16_t bus, uint16_t device) {
-	pci_bus = bus;
-	pci_device = device;
-
-/*	// Command task file for primary is at 0x1F0
-	pci_device_update_bar(piix3_device, 1, PIIX3_PCMDB, (ATA_BUS_0_IOADDR | 0x0001));
-	// Control task file for primary is at 0x1F8
-	pci_device_update_bar(piix3_device, 1, PIIX3_PCTRLB, (ATA_BUS_0_CTRLADDR | 0x0001));
-
-	// Command task file for secondary is at 0x170
-	pci_device_update_bar(piix3_device, 1, PIIX3_SCMDB, (ATA_BUS_1_IOADDR | 0x0001));
-	// Control task file for secondary is at 0x178
-	pci_device_update_bar(piix3_device, 1, PIIX3_SCTRLB, (ATA_BUS_1_CTRLADDR | 0x0001));*/
-
 	// Allocate 4K for extended memory
 	uint32_t expansion_memory_phys;
 	piix3_expansion_memory = (void *) kmalloc_ap(4096, &expansion_memory_phys);
-	kprintf("piix3_ide: Expansion memory at 0x%X (0x%X phys)", piix3_expansion_memory, expansion_memory_phys);
+
+//	kprintf("piix3_ide: Expansion memory at 0x%X (0x%X phys)\n", piix3_expansion_memory, expansion_memory_phys);
 
 	// Set expansion memory address
 	pci_device_update_bar(piix3_device, 1, PIIX3_EBM, expansion_memory_phys);
@@ -128,15 +119,6 @@ static bool drv_piix3_ide_configure(uint16_t bus, uint16_t device) {
 
 	// Enable IO space addressing
 	pci_config_write_w(pci_config_address(bus, device, 1, 0x04), 0x0005);
-
-	// Determine size required by BAR0
-	for(int i = 0; i < 6; i++) {
-		pci_bar_t bar = functionPtr->bar[i];
-		kprintf("piix3_ide: BAR%u size 0x%X, address 0x%X, flags 0x%X\n", i, bar.end - bar.start, bar.start, bar.flags);
-	}
-
-	// Get busmaster IO address
-	busmaster_io_addr = functionPtr->bar[4].start;
 
 	/*
 	 * Configure Master and Slave IDE:
@@ -154,11 +136,12 @@ static bool drv_piix3_ide_configure(uint16_t bus, uint16_t device) {
 	 * Enable IORDY sampling for drive 0 (b1)
 	 * Fast Data Bank Drive Select 0 Enable (b0)
 	 */
-	uint32_t cfg = 0b11100001001100111110000100110011;
-	pci_config_write_l(pci_config_address(bus, device, 1, 0x40), cfg);
+	uint16_t cfg = 0b1110000100110011;
+	pci_config_write_w(pci_config_address(bus, device, 1, 0x40), cfg); // primary
+	pci_config_write_w(pci_config_address(bus, device, 1, 0x42), cfg); // secondary
 
 	// Configure slave IORDY sample point 3 clocks, recovery time 3 clocks
-	pci_config_write_l(pci_config_address(bus, device, 1, 0x44), 0b10011001);
+	pci_config_write_b(pci_config_address(bus, device, 1, 0x44), 0b10011001);
 
 	return true;
 }

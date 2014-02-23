@@ -80,7 +80,7 @@ void pci_device_update_bar(pci_device_t *d, int function, int bar, uint32_t valu
 	uint32_t length = d->function[function].bar[bar].end - d->function[function].bar[bar].start;
 	uint32_t addr = pci_config_address(d->location.bus, d->location.device, function, (0x10 + (bar << 2)));
 
-	kprintf("PCI BAR UPDATE: bus %u, device %u, function %u, BAR %X, value 0x%X, address 0x%X\n", d->location.bus, d->location.device, function, (0x10 + (bar << 2)), value, addr);
+	// kprintf("PCI BAR UPDATE: bus %u, device %u, function %u, BAR %X, value 0x%X, address 0x%X\n", d->location.bus, d->location.device, function, (0x10 + (bar << 2)), value, addr);
 
 	// Do write to PCI config space
 	pci_config_write_l(addr, value);

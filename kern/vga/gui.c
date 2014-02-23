@@ -75,7 +75,7 @@ void gui_draw_bmp(void* bitmap, int px, int py) {
 	void *buf = (void *) 0xD0000000;
 
 	uint8_t *read = (uint8_t *) bitmap;
-	uint8_t *write = buf + (px * 3) + (py * 0xC00);
+	uint8_t *write = buf + (px * 4) + (py * 0x1000);
 
 	int width, height;
 	// Read width, height from file
@@ -84,10 +84,10 @@ void gui_draw_bmp(void* bitmap, int px, int py) {
 
 	// Read pointer (bottom to top)
 	read += read[0x0E] + 0x0E;
-	read += (width * height * 3) - (width * 3);
+	read += (width * 3 * height) - (width * 3);
 
 	for(int y = 0; y < height; y++) {
-		uint8_t *ptr = write + (y * 0xC00);
+		uint8_t *ptr = write + (y * 0x1000);
 
 		for(int x = 0; x < width; x++) {
 			ptr[0] = read[0];
@@ -95,7 +95,7 @@ void gui_draw_bmp(void* bitmap, int px, int py) {
 			ptr[2] = read[2];
 
 			read += 3;
-			ptr += 3;
+			ptr += 4;
 		}
 
 		read -= (width * 6);

@@ -124,8 +124,8 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 	kprintf("\n");*/
 
 	// BMP loading test
-	/*void* bmpFile = fat_read_file(superblock, "/gui/test.bmp", NULL, 0);
-	gui_draw_bmp(bmpFile, 320, 0);*/
+	void* bmpFile = fat_read_file(superblock, "/gui/test.bmp", NULL, 0);
+	gui_draw_bmp(bmpFile, 1024-320, 768-256);
 
 	return superblock;
 }
