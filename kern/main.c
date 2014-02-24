@@ -28,16 +28,18 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 	// Perform some preloading stuff
 	kernel_preload();
 
+	// Copyrights
+	kprintf("\x01\x11\x01\x0EMosquitOS\x01\x0F\x01\x10 Kernel v0.1 build %u compiled %s on %s using %s\n", (unsigned long) &KERN_BNUM, KERN_BDATE, KERN_BTIME, KERN_COMPILER);
+	kprintf("Copyrignt 2013-2014: Tristan Seifert. All rights reserved. Kernel and userland are available under the BSD license.\n\n");
+
 	// Get memory info
 	paging_stats_t paging_info = paging_get_stats();
-	kprintf("%iKB low memory, %iKB high memory\n", sys_multiboot_info->mem_lower, sys_multiboot_info->mem_upper);
-	kprintf("%i/%i pages mapped (%i pages free, %i pages wired)\n", paging_info.pages_mapped, paging_info.total_pages, paging_info.pages_free, paging_info.pages_wired);
+	kprintf("%iKB low memory, %iKB high memory available for use\n", sys_multiboot_info->mem_lower, sys_multiboot_info->mem_upper);
+	kprintf("%i/%i pages mapped (%i pages free, %i pages wired): ", paging_info.pages_mapped, paging_info.total_pages, paging_info.pages_free, paging_info.pages_wired);
 	kprintf("%i/%i KB allocated (%i KB free, %i KB wired)\n", paging_info.pages_mapped*4, paging_info.total_pages*4, paging_info.pages_free*4, paging_info.pages_wired*4);
 
 	// kernel stuff
 	system_init();
-
-	kprintf("\x01\x11\x01\x0EMosquitOS\x01\x0F\x01\x10 Kernel v0.1 build %u compiled %s on %s with %s\n", (unsigned long) &KERN_BNUM, KERN_BDATE, KERN_BTIME, KERN_COMPILER);
 
 	// Initialise modules
 	modules_load();

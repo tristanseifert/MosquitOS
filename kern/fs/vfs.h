@@ -2,7 +2,6 @@
 #define VFS_H
 
 #include <types.h>
-#include <io/disk.h>
 #include "ptable.h"
 
 #define VFS_FLAG_READONLY 0x80000000
@@ -11,7 +10,7 @@ typedef struct fs_superblock {
 	const char *vol_label;
 	const char *vol_mount_point;
 
-	disk_t *disk;
+	// disk_t *disk;
 	ptable_entry_t *pt;
 
 	// Functions to interact with the filesytem

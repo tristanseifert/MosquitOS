@@ -211,6 +211,18 @@ static bool drv_piix3_ide_configure(uint16_t bus, uint16_t device) {
 		}
 	}
 
+	// Try to read a sector
+	void *buf = (void *) malloc(1024);
+	uint32_t lba = 0; uint8_t sects = 2;
+	int err = ide_ata_access_pio(ata, ATA_READ, 0, lba, sects, buf);
+
+	if(err) {
+		int temp = ata_print_error(ata, 0, err);
+		kprintf("Error code 0x%X\n", temp);
+	} else {
+		kprintf("Read %u sector(s) from LBA %u to 0x%X\n", sects, lba, buf);
+	}
+
 	return true;
 }
 

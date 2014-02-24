@@ -2,7 +2,6 @@
 #define FS_FAT_H
 
 #include <types.h>
-#include "io/disk.h"
 #include "vfs.h"
 
 #define FAT_BUF_SECTORS 8

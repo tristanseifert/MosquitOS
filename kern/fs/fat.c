@@ -47,13 +47,13 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 	memclr(sector_buffer, FAT_SECTOR_BUFFER_SIZE);
 
 	// Read first sector of FAT volume
-	DISK_ERROR derr;
-	derr = disk_read(ptable->disk, PARTITION_LBA_REL2ABS(0, pt), 1, sector_buffer);
+	int derr;
+	//derr = disk_read(ptable->disk, PARTITION_LBA_REL2ABS(0, pt), 1, sector_buffer);
 
 	// Handle disk read errors
-	if(derr != kDiskErrorNone) {
+//	if(derr != kDiskErrorNone) {
 		return NULL;
-	}
+//	}
 
 	// Allocate memory for FS info struct
 	fat_fs_info_t *fs_info = (fat_fs_info_t *) kmalloc(sizeof(fat_fs_info_t));
@@ -124,8 +124,8 @@ static fs_superblock_t* fat_make_superblock(fs_superblock_t* superblock, ptable_
 	kprintf("\n");*/
 
 	// BMP loading test
-	void* bmpFile = fat_read_file(superblock, "/gui/test.bmp", NULL, 0);
-	gui_draw_bmp(bmpFile, 1024-320, 768-256);
+	//void* bmpFile = fat_read_file(superblock, "/gui/test.bmp", NULL, 0);
+	//gui_draw_bmp(bmpFile, 1024-320, 768-256);
 
 	return superblock;
 }
@@ -161,7 +161,7 @@ void fat_read_cluster(fs_superblock_t* superblock, uint32_t cluster, void* buffe
 
 	uint32_t sector;
 	uint32_t cluster_to_read = cluster & FAT32_MASK;
-	DISK_ERROR derr;
+	int derr = 0;
 
 	uint8_t *write_ptr = buffer;
 	int bytes_written = 0;
@@ -180,13 +180,13 @@ void fat_read_cluster(fs_superblock_t* superblock, uint32_t cluster, void* buffe
 		 * gg Microsoft, gg.
 		 */
 		sector = PARTITION_LBA_REL2ABS(cluster_to_read-2+fs_info->first_data_sector, superblock->pt);
-		derr = disk_read(superblock->disk, sector, 1, sector_buffer);
+		//derr = disk_read(superblock->disk, sector, 1, sector_buffer);
 
 		// Handle disk read errors
-		if(derr != kDiskErrorNone) {
+//		if(derr != kDiskErrorNone) {
 			kprintf("Error reading file: 0x%X\n", derr);
 			break;
-		}
+//		}
 
 		// Copy into buffer
 		if(buffer_size > 512) {
@@ -239,14 +239,14 @@ static uint32_t fat_get_next_cluster(fs_superblock_t* superblock, uint32_t clust
 		// kprintf("FAT sector: 0x%X entry 0x%X (cluster = 0x%X)\n", PARTITION_LBA_REL2ABS(fat_sector, superblock->pt), fat_offset, cluster_value);
 
 		// Read FAT
-		DISK_ERROR derr;
-		derr = disk_read(superblock->disk, PARTITION_LBA_REL2ABS(fat_sector, superblock->pt), 1, buffer);
+		int derr;
+		//derr = disk_read(superblock->disk, PARTITION_LBA_REL2ABS(fat_sector, superblock->pt), 1, buffer);
 
 		// Handle disk read errors
-		if(derr != kDiskErrorNone) {
+//		if(derr != kDiskErrorNone) {
 			kprintf("Error reading FAT: 0x%X\n", derr);
 			return 0xFFFFFFFE;
-		}
+//		}
 
 		uint32_t next_cluster = buffer[fat_offset];
 

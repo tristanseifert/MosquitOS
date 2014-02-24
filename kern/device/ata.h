@@ -2,23 +2,18 @@
 #define ATA_PIO_H
 
 #include <types.h>
-#include "io/disk.h"
 
-// Channels:
 #define ATA_PRIMARY				0x00
 #define ATA_SECONDARY			0x01
- 
-// Directions:
-#define ATA_READ				0x00
-#define ATA_WRITE				0x01
 
-// Device types
 #define ATA_DEVICE_TYPE_ATA		0x00
 #define ATA_DEVICE_TYPE_ATAPI	0x01
- 
+
 #define ATA_MASTER				0x00
 #define ATA_SLAVE				0x01
 
+#define	ATA_READ				0x00
+#define ATA_WRITE				0x01
 
 /*
  * DMA modes
@@ -74,7 +69,7 @@ struct ata_device {
 	uint16_t capabilities; // features
 	uint32_t commandSets; // supported comamnd sets
 
-	uint64_t size; // size in sectors
+	uint32_t size; // size in sectors
 	
 	char model[42]; // model name string
 
@@ -91,7 +86,9 @@ struct ata_device {
 	uint16_t pio_cycle_len; // minimum PIO cycle length without flow control
 	uint16_t pio_cycle_len_iordy; // minimum PIO cycle length with flow control
 
-	ata_info_t *ata_info; // Info read from the device
+	ata_info_t *ata_info; // Info read from the device (IDENTIFY output)
+
+	bool dma_enabled; // set if the ATA driver associated with this drive will handle DMA
 };
 
 // Struct defining an ATA channel
@@ -120,5 +117,8 @@ struct ata_driver {
 
 ata_driver_t* ata_init_pci(uint32_t BAR0, uint32_t BAR1, uint32_t BAR2, uint32_t BAR3, uint32_t BAR4);
 void ata_deinit(ata_driver_t *driver);
+
+int ide_ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lba, uint8_t numsects, void *buf);
+int ata_print_error(ata_driver_t *drv, int drive, int err);
 
 #endif

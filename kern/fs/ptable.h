@@ -7,7 +7,6 @@
 #define PTABLE_H
 
 #include <types.h>
-#include <io/disk.h>
 
 #define PARTITION_LBA_REL2ABS(lba, pt) lba+pt->lba_start
 
@@ -36,9 +35,7 @@ typedef enum {
 
 // Defines a partition table
 typedef struct {
-	disk_t *disk;
 	ptable_type_t type;
-
 	ptable_entry_t *first;
 } ptable_t;
 

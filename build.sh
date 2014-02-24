@@ -41,4 +41,4 @@ dot_clean -m /Volumes/MosquitOS/
 clear
 
 # -monitor telnet::4444,server
-qemu-system-i386 -hda /Users/tristanseifert/MosquitOS/disk_image.img -m 384M -soundhw ac97 -net nic,model=e1000 -net user -cpu pentium3 -monitor stdio -vga vmware -smbios type=1,manufacturer=NoEuh,product=Computermajig -usb -usbdevice mouse -s
+qemu-system-i386 -hda disk_image.img -m 256M -soundhw ac97 -net nic,model=e1000 -net user -cpu pentium3 -monitor stdio -vga vmware -smbios type=1,manufacturer=NoEuh,product=Computermajig -usb -usbdevice mouse -s

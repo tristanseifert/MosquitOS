@@ -4,6 +4,6 @@
 #include <types.h>
 #include "ptable.h"
 
-ptable_t* mbr_load(disk_t *disk);
+//ptable_t* mbr_load(disk_t *disk);
 
 #endif

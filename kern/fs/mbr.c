@@ -1,8 +1,7 @@
 #include <types.h>
 #include "mbr.h"
-#include "io/disk.h"
 
-ptable_t* mbr_load(disk_t *disk) {
+/*ptable_t* mbr_load(disk_t *disk) {
 	// Read MBR
 	uint8_t *outBuff = (uint8_t *) kmalloc(0x200);
 	DISK_ERROR ret = disk_read(disk, 0, 1, outBuff);
@@ -62,4 +61,4 @@ invalid_entry: ;
 	}
 
 	return table;
-}
+}*/
