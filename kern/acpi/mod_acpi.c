@@ -182,6 +182,8 @@ BOOLEAN AcpiOsWritable(void *memory, ACPI_SIZE Length) {
  * Returns the unique ID of the currently running thread/process.
  */
 ACPI_THREAD_ID AcpiOsGetThreadId() {
+	return 0xDEADBEEF;
+
 	uint32_t pid = ((i386_task_t *) sched_curr_task())->pid;
 
 	if(pid == 0) {
@@ -292,6 +294,7 @@ void AcpiOsReleaseLock(ACPI_SPINLOCK Handle, ACPI_CPU_FLAGS Flags) {
 ACPI_STATUS AcpiOsInstallInterruptHandler(UINT32 InterruptLevel, ACPI_OSD_HANDLER Handler, void *Context) {
 	kprintf("ACPI: Register IRQ handler for level %i at 0x%X\n", InterruptLevel, Handler);
 	irq_register(InterruptLevel, (irq_t) Handler, Context);
+
 	return AE_OK;
 }
 
@@ -329,6 +332,8 @@ void AcpiOsVprintf(const char *format, va_list va) {
  * to by Value.
  */
 ACPI_STATUS AcpiOsReadMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64 *Value, UINT32 Width) {
+	kprintf("ACPI read from 0x%X of 0x%X bits\n", Address, Width);
+
 	switch(Width) {
 		case 8: {
 			uint8_t *read = (uint8_t *) Address;
@@ -359,6 +364,8 @@ ACPI_STATUS AcpiOsReadMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64 *Value, UINT3
  * Writes Width bits from Value to the virtual address Address.
  */
 ACPI_STATUS AcpiOsWriteMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64 Value, UINT32 Width) {
+	kprintf("ACPI Write to 0x%X of 0x%X bits\n", Address, Width);
+
 	switch(Width) {
 		case 8: {
 			uint8_t *write = (uint8_t *) Address;
