@@ -3,17 +3,35 @@
 
 #include <types.h>
 
-#define ATA_PRIMARY				0x00
-#define ATA_SECONDARY			0x01
+#define ATA_PRIMARY						0x00
+#define ATA_SECONDARY					0x01
 
-#define ATA_DEVICE_TYPE_ATA		0x00
-#define ATA_DEVICE_TYPE_ATAPI	0x01
+#define ATA_DEVICE_TYPE_ATA				0x00
+#define ATA_DEVICE_TYPE_ATAPI			0x01
 
-#define ATA_MASTER				0x00
-#define ATA_SLAVE				0x01
+#define ATA_MASTER						0x00
+#define ATA_SLAVE						0x01
 
-#define	ATA_READ				0x00
-#define ATA_WRITE				0x01
+#define	ATA_READ						0x00
+#define ATA_WRITE						0x01
+
+#define ATA_ERR_NONE					0x00 // great success, many good, very ATA
+#define ATA_ERR_MISC					0x01 // unexpected stuff
+#define ATA_ERR_DMA_CRC					0x02 // interface CRC error during DMA
+#define	ATA_ERR_MEDIA_ERROR				0x03 // error reading/writing media
+#define	ATA_ERR_MEDIA_CHANGE_REQUEST	0x04 // media change reuqest
+#define	ATA_ERR_MEDIA_CHANGE			0x05 // media was changed since last command
+#define	ATA_ERR_ID_NOT_FOUND			0x06 // address could not be found
+#define	ATA_ERR_NO_ADDR_MARK			0x07 // invalid address or broken media
+#define	ATA_ERR_UNCORRECTABLE_ERROR		0x08 // uncorrectable media error
+#define	ATA_ERR_BAD_SECTOR				0x09 // bad sectors
+#define	ATA_ERR_DEVICE_FAULT			0x0A // device fault
+#define	ATA_ERR_CMD_ABORT				0x0B // command aborted
+#define	ATA_ERR_NO_DATA					0x0C // no data returned by device
+#define	ATA_ERR_WRITE_PROTECT			0x0D // media write-protected
+#define ATA_ERR_TIMEOUT					0x0E // timeout while waiting for device
+#define ATA_ERR_NO_MEDIA				0x0F // no media present in removable media device
+#define ATA_ERR_INVALID					0xFF // invalid inputs to function
 
 /*
  * DMA modes
@@ -89,6 +107,8 @@ struct ata_device {
 	ata_info_t *ata_info; // Info read from the device (IDENTIFY output)
 
 	bool dma_enabled; // set if the ATA driver associated with this drive will handle DMA
+
+	uint8_t atapi_buffer[12]; // Buffer for ATAPI stuff
 };
 
 // Struct defining an ATA channel
@@ -118,7 +138,9 @@ struct ata_driver {
 ata_driver_t* ata_init_pci(uint32_t BAR0, uint32_t BAR1, uint32_t BAR2, uint32_t BAR3, uint32_t BAR4);
 void ata_deinit(ata_driver_t *driver);
 
-int ide_ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lba, uint8_t numsects, void *buf);
-int ata_print_error(ata_driver_t *drv, int drive, int err);
+int ata_read(ata_driver_t *drv, uint8_t drive, uint32_t lba, uint8_t sectors, void *buffer);
+int ata_write(ata_driver_t *drv, uint8_t drive, uint32_t lba, uint8_t sectors, void *buffer);
+
+void ata_irq_callback(ata_driver_t *drv);
 
 #endif

@@ -1,13 +1,13 @@
 #include <types.h>
 #include "sys/system.h"
+#include "sys/irq.h"
 #include "io/io.h"
 #include "ata.h"
 
-// Buffers
-static bool ide_irq_invoked = false;
-static uint8_t atapi_packet[12] = {0xA8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-
+// D2203
 static int ata_drivers_loaded = 0;
+
+#define	ATA_WAIT_TIMEOUT		200
 
 // Command/status port bit masks
 #define ATA_SR_BSY				0x80
@@ -44,7 +44,7 @@ static int ata_drivers_loaded = 0;
 #define ATA_CMD_IDENTIFY_PACKET	0xA1
 #define ATA_CMD_IDENTIFY		0xEC
 
-// Offsets into the ATA IDENTIFY chunk
+// Offsets into the ATA IDENTIFY chunk (in bytes)
 #define ATA_IDENT_DEVICETYPE	0
 #define ATA_IDENT_CYLINDERS		2
 #define ATA_IDENT_HEADS			6
@@ -63,7 +63,7 @@ static int ata_drivers_loaded = 0;
 #define ATA_IDENT_UDMASUPPORT	176
 #define ATA_IDENT_MAX_LBA_EXT	200
 
-// Registers accepted by the ata_write and ata_read functions
+// Registers accepted by the ata_reg_write and ata_reg_read functions
 #define ATA_REG_DATA			0x00
 #define ATA_REG_ERROR			0x01
 #define ATA_REG_FEATURES		0x01
@@ -83,9 +83,10 @@ static int ata_drivers_loaded = 0;
 #define ATA_REG_DEVADDRESS		0x0D
 
 // Private functions
-static uint8_t ata_read(ata_driver_t *drv, uint8_t channel, uint8_t reg);
-static void ata_write(ata_driver_t *drv, unsigned char channel, unsigned char reg, unsigned char data);
+static uint8_t ata_reg_read(ata_driver_t *drv, uint8_t channel, uint8_t reg);
+static void ata_reg_write(ata_driver_t *drv, unsigned char channel, unsigned char reg, unsigned char data);
 static void ata_do_pio_read(ata_driver_t *drv, void* dest, uint32_t num_words, uint8_t channel);
+static int ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lba, uint8_t numsects, void *buf);
 
 /*
  * Initialises the driver, based on the base addresses from the PCI controller
@@ -118,17 +119,21 @@ ata_driver_t* ata_init_pci(uint32_t BAR0, uint32_t BAR1, uint32_t BAR2, uint32_t
 	// Set up IO ports to control the IDE controller with
 	driver->channels[ATA_PRIMARY].base = (BAR0 & 0xFFFFFFFC) + 0x1F0 * (!BAR0);
 	driver->channels[ATA_PRIMARY].ctrl = (BAR1 & 0xFFFFFFFC) + 0x3F6 * (!BAR1);
+	driver->channels[ATA_PRIMARY].bmide = (BAR4 & 0xFFFFFFFC) + 0; // Bus Master IDE
 	driver->channels[ATA_SECONDARY].base = (BAR2 & 0xFFFFFFFC) + 0x170 * (!BAR2);
 	driver->channels[ATA_SECONDARY].ctrl = (BAR3 & 0xFFFFFFFC) + 0x376 * (!BAR3);
-	driver->channels[ATA_PRIMARY].bmide = (BAR4 & 0xFFFFFFFC) + 0; // Bus Master IDE
 	driver->channels[ATA_SECONDARY].bmide = (BAR4 & 0xFFFFFFFC) + 8; // Bus Master IDE
 
 	// Disable IRQs for both channels
-	ata_write(driver, ATA_PRIMARY, ATA_REG_CONTROL, 2);
-	ata_write(driver, ATA_SECONDARY, ATA_REG_CONTROL, 2);
+	ata_reg_write(driver, ATA_PRIMARY, ATA_REG_CONTROL, driver->channels[ATA_PRIMARY].nIEN = 0x02);
+	ata_reg_write(driver, ATA_SECONDARY, ATA_REG_CONTROL, driver->channels[ATA_SECONDARY].nIEN = 0x02);
 
 	// Probe for devices
 	for(channel = 0; channel < 2; channel++) {
+		// Disenable IRQs for the channel
+		driver->channels[channel].nIEN = 2;
+
+		// Check each device on the channel
 		for(device = 0; device < 2; device++) {
 			uint8_t type = ATA_DEVICE_TYPE_ATA, status;
 			bool isATAPI = false;
@@ -138,22 +143,22 @@ ata_driver_t* ata_init_pci(uint32_t BAR0, uint32_t BAR1, uint32_t BAR2, uint32_t
 			driver->devices[count].dma_enabled = false;
  
  			// Select drive
-			ata_write(driver, channel, ATA_REG_HDDEVSEL, 0xA0 | (device << 4));
+			ata_reg_write(driver, channel, ATA_REG_HDDEVSEL, 0xA0 | (device << 4));
  
 			// Send IDENTIFY command
-			ata_write(driver, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
+			ata_reg_write(driver, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY);
 
 			// Wait a while by writing to a bogus IO port
  			io_wait();
  			io_wait();
 
  			// If the status register is 0, there is no device
-			if(ata_read(driver, channel, ATA_REG_STATUS) == 0) continue;
+			if(ata_reg_read(driver, channel, ATA_REG_STATUS) == 0) continue;
  
  			// Wait until we read an error or DREQ
 			for(;;) {
 				// Read status register
-				status = ata_read(driver, channel, ATA_REG_STATUS);
+				status = ata_reg_read(driver, channel, ATA_REG_STATUS);
 
 				// If the error bit is set, we don't have an ATA device
 				if ((status & ATA_SR_ERR)) {
@@ -167,8 +172,8 @@ ata_driver_t* ata_init_pci(uint32_t BAR0, uint32_t BAR1, uint32_t BAR2, uint32_t
  
 			// If the drive is an ATAPI drive, send IDENTIFY PACKET command
 			if(isATAPI) {
-				uint8_t cl = ata_read(driver, channel, ATA_REG_LBA1);
-				uint8_t ch = ata_read(driver, channel, ATA_REG_LBA2);
+				uint8_t cl = ata_reg_read(driver, channel, ATA_REG_LBA1);
+				uint8_t ch = ata_reg_read(driver, channel, ATA_REG_LBA2);
  
 				if (cl == 0x14 && ch ==0xEB)
 					type = ATA_DEVICE_TYPE_ATAPI;
@@ -177,7 +182,10 @@ ata_driver_t* ata_init_pci(uint32_t BAR0, uint32_t BAR1, uint32_t BAR2, uint32_t
 				else
 					continue; // Unknown Type (may not be a device).
  
-				ata_write(driver, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET);
+				ata_reg_write(driver, channel, ATA_REG_COMMAND, ATA_CMD_IDENTIFY_PACKET);
+
+				// Initialise ATAPI buffer for thsi packet
+				driver->devices[count].atapi_buffer[0] = 0xA8;
 			}
  
 			// Read Device identification block (512 bytes)
@@ -299,6 +307,10 @@ ata_driver_t* ata_init_pci(uint32_t BAR0, uint32_t BAR1, uint32_t BAR2, uint32_t
 
 			count++;
 		}
+
+		// Enable IRQs for this channel
+		driver->channels[channel].nIEN = 0x00;
+		ata_reg_write(driver, channel, ATA_REG_CONTROL, driver->channels[channel].nIEN);
 	}
 
 	for (int i = 0; i < 4; i++) {
@@ -336,14 +348,16 @@ void ata_deinit(ata_driver_t *driver) {
 	ata_drivers_loaded--;
 }
 
-// # ! IO Routines
+// ! IO Routines
 /*
  * Read from a register of a channel.
  */
-static uint8_t ata_read(ata_driver_t *drv, uint8_t channel, uint8_t reg) {
+static uint8_t ata_reg_read(ata_driver_t *drv, uint8_t channel, uint8_t reg) {
 	uint8_t result = 0;
+
+	// Set high LBA flag
 	if (reg > 0x07 && reg < 0x0C) {
-		ata_write(drv, channel, ATA_REG_CONTROL, 0x80 | drv->channels[channel].nIEN);
+		ata_reg_write(drv, channel, ATA_REG_CONTROL, 0x80 | drv->channels[channel].nIEN);
 	}
 	
 	// If register is 0-7, read from base address
@@ -365,8 +379,9 @@ static uint8_t ata_read(ata_driver_t *drv, uint8_t channel, uint8_t reg) {
 		result = io_inb(drv->channels[channel].bmide + reg - 0x0E);
 	}
 	
+	// Reset high LBA flag
 	if (reg > 0x07 && reg < 0x0C) {
-		ata_write(drv, channel, ATA_REG_CONTROL, drv->channels[channel].nIEN);
+		ata_reg_write(drv, channel, ATA_REG_CONTROL, drv->channels[channel].nIEN);
 	}
 
 	return result;
@@ -375,9 +390,10 @@ static uint8_t ata_read(ata_driver_t *drv, uint8_t channel, uint8_t reg) {
 /*
  * Write to an ATA register
  */
-static void ata_write(ata_driver_t *drv, unsigned char channel, unsigned char reg, unsigned char data) {
+static void ata_reg_write(ata_driver_t *drv, unsigned char channel, unsigned char reg, unsigned char data) {
+	// High LBA flag
 	if (reg > 0x07 && reg < 0x0C) {
-		ata_write(drv, channel, ATA_REG_CONTROL, 0x80 | drv->channels[channel].nIEN);
+		ata_reg_write(drv, channel, ATA_REG_CONTROL, 0x80 | drv->channels[channel].nIEN);
 	}
 	
 	if (reg < 0x08) {
@@ -396,8 +412,9 @@ static void ata_write(ata_driver_t *drv, unsigned char channel, unsigned char re
 		io_outb(drv->channels[channel].bmide + reg - 0x0E, data);
 	}
 	
+	// Reset high LBA flag
 	if (reg > 0x07 && reg < 0x0C) {
-		ata_write(drv, channel, ATA_REG_CONTROL, drv->channels[channel].nIEN);
+		ata_reg_write(drv, channel, ATA_REG_CONTROL, drv->channels[channel].nIEN);
 	}
 }
 
@@ -405,7 +422,7 @@ static void ata_write(ata_driver_t *drv, unsigned char channel, unsigned char re
  * Performs a PIO read.
  */
 static void ata_do_pio_read(ata_driver_t *drv, void* dest, uint32_t num_words, uint8_t channel) {
-	ata_write(drv, channel, ATA_REG_CONTROL, 0x80 | drv->channels[channel].nIEN);
+	ata_reg_write(drv, channel, ATA_REG_CONTROL, 0x80 | drv->channels[channel].nIEN);
 
 	uint16_t *dest_ptr = (uint16_t *) dest;
 
@@ -416,7 +433,46 @@ static void ata_do_pio_read(ata_driver_t *drv, void* dest, uint32_t num_words, u
 		*dest_ptr++ = temp;
 	}
 
-	ata_write(drv, channel, ATA_REG_CONTROL, drv->channels[channel].nIEN);
+	ata_reg_write(drv, channel, ATA_REG_CONTROL, drv->channels[channel].nIEN);
+}
+
+/*
+ * Polls a certain channel until the command either completes successfully, or
+ * an abnormal condition happens.
+ */
+int ata_poll_ready(ata_driver_t *drv, uint8_t channel, bool advanced_check) {
+	// Wait for drive to assert BSY
+	for(int i = 0; i < 4; i++) {
+		ata_reg_read(drv, channel, ATA_REG_ALTSTATUS);
+	}
+
+	unsigned int waitCycles = 0;
+
+	// Wait for the device to no longer be busy
+	while(ata_reg_read(drv, channel, ATA_REG_STATUS) & ATA_SR_BSY) {
+		waitCycles++;
+
+		// Allow requests to time out
+		if(waitCycles > ATA_WAIT_TIMEOUT) return ATA_ERR_TIMEOUT;
+	}
+
+ 	// If set, we perform more in-depth checking
+	if(advanced_check) {
+		// Read status register
+		uint8_t state = ata_reg_read(drv, channel, ATA_REG_STATUS);
+
+		if(state & ATA_SR_ERR) { // Error executing command
+			return 2;
+		} else if(state & ATA_SR_DF) { // Device fault
+			return 1;
+		} else if(!(state & ATA_SR_DRQ)) { // BSY = 0; DF = 0; ERR = 0; DRQ = 0
+			kprintf("IDE: No data after %u cycles\n", waitCycles);
+			return 3;
+		}
+	}
+
+	// Hooray everything is happy
+	return 0;
 }
 
 // ! Miscellaneous
@@ -436,6 +492,10 @@ static int ata_post_driver_load(void) {
 
 			}
 		}
+
+		// Register IRQs 14 and 15 since parallel ATA
+		irq_register(14, (void (*)(void *)) ata_irq_callback, ata);
+		irq_register(15, (void (*)(void *)) ata_irq_callback, ata);
 	}
 
 	return 0;
@@ -443,93 +503,65 @@ static int ata_post_driver_load(void) {
 module_post_driver_init(ata_post_driver_load);
 
 /*
- * Takes the drive index and error code and prints something readable.
+ * Handles error codes returned by ata_poll_ready.
  */
-int ata_print_error(ata_driver_t *drv, int drive, int err) {
-	if(err == 0) {
-		return err;
-	}
-
-	kprintf("ATA: ");
-	if(err == 1) {
-		kprintf("Device Fault\n"); 
-		err = 19;
+static int ata_convert_error(ata_driver_t *drv, int drive, int err) {
+	if(err == 1) { // device fault
+		err = ATA_ERR_DEVICE_FAULT;
 	} else if(err == 2) {
 		// Read error register
-		uint8_t st = ata_read(drv, drv->devices[drive].channel, ATA_REG_ERROR);
+		uint8_t st = ata_reg_read(drv, drv->devices[drive].channel, ATA_REG_ERROR);
 
-		if(st & ATA_ER_AMNF) {
-			kprintf("No Address Mark Found\n");
-			err = 7;
-		} if(st & ATA_ER_TK0NF) {
-			kprintf("No Media or Media Error\n");
-			err = 3;
-		} if(st & ATA_ER_ABRT) {
-			kprintf("Command Aborted\n");
-			err = 20;
-		} if(st & ATA_ER_MCR) {
-			kprintf("No Media or Media Error\n");
-			err = 3;
-		} if(st & ATA_ER_IDNF) {
-			kprintf("ID mark not Found\n");
-			err = 21;
-		} if(st & ATA_ER_MC) {
-			kprintf("No Media or Media Error\n");
-			err = 3;
-		} if(st & ATA_ER_UNC) {
-			kprintf("Uncorrectable Data Error\n");
-			err = 22;
-		} if(st & ATA_ER_BBK) {
-			kprintf("Bad Sectors\n");
-			err = 13;
+		if(st & ATA_ER_AMNF) { // no address mark
+			err = ATA_ERR_NO_ADDR_MARK;
+		} if(st & ATA_ER_TK0NF) { // no media or media error
+			err = ATA_ERR_MEDIA_ERROR;
+		} if(st & ATA_ER_ABRT) { // command aborted
+			err = ATA_ERR_CMD_ABORT;
+		} if(st & ATA_ER_MCR) { // no media or media error
+			err = ATA_ERR_MEDIA_CHANGE_REQUEST;
+		} if(st & ATA_ER_IDNF) { // ID mark not found
+			err = ATA_ERR_ID_NOT_FOUND;
+		} if(st & ATA_ER_MC) { // no media or media error
+			err = ATA_ERR_MEDIA_CHANGE;
+		} if(st & ATA_ER_UNC) { // uncorrectable data error
+			err = ATA_ERR_UNCORRECTABLE_ERROR;
+		} if(st & ATA_ER_BBK) { // bad sectors
+			err = ATA_ERR_BAD_SECTOR;
 		}
-	} else if(err == 3) {
-		kprintf("No Data Returned on Read\n");
-		err = 23;
-	} else if (err == 4) {
-		kprintf("Write Protected\n");
-		err = 8;
+	} else if(err == 3) { // no data returned by device
+		err = ATA_ERR_NO_DATA;
+	} else if (err == 4) { // write protected
+		err = ATA_ERR_WRITE_PROTECT;
+	} else {
+		return err;
 	}
-
-	kprintf("- [%s %s] %s\n", (const char *[]){"Primary", "Secondary"}[drv->devices[drive].channel], (const char *[]){"Master", "Slave"}[drv->devices[drive].drive], drv->devices[drive].model);
  
 	return err;
 }
 
 /*
- * Polls a certain channel until the command either completes successfully, or
- * an abnormal condition happens.
+ * Reads a certain number of sectors from the specified drive using either DMA
+ * or PIO, into the user-supplied buffer.
  */
-int ata_poll_device(ata_driver_t *drv, uint8_t channel, bool advanced_check) {
-	// Wait for drive to assert BSY
-	for(int i = 0; i < 4; i++) {
-		ata_read(drv, channel, ATA_REG_ALTSTATUS);
+int ata_read(ata_driver_t *drv, uint8_t drive, uint32_t lba, uint8_t sectors, void *buffer) {
+	if(buffer) {
+		return ata_access_pio(drv, ATA_READ, drive, lba, sectors, buffer);
+	} else {
+		return -1;
 	}
+}
 
-	int waitCycles = 0;
-
-	// Wait for the device to no longer be busy
-	while(ata_read(drv, channel, ATA_REG_STATUS) & ATA_SR_BSY) {
-		waitCycles++;
-	}
-
- 	// If set, we perform more in-depth checking
-	if(advanced_check) {
-		// Read status register
-		uint8_t state = ata_read(drv, channel, ATA_REG_STATUS);
-
-		if(state & ATA_SR_ERR) { // Error executing command
-			return 2;
-		} else if(state & ATA_SR_DF) { // Device fault
-			return 1;
-		} else if(!(state & ATA_SR_DRQ)) { // BSY = 0; DF = 0; ERR = 0; DRQ = 0
-			kprintf("IDE: No data after %i cycles\n", waitCycles);
-			return 3;
-		}
-	}
-
-	// Hooray everything is happy
-	return 0;
+/*
+ * Writes a certain number of sectors from the specified buffer to the LBA
+ * specified on the selected drive.
+ */
+int ata_write(ata_driver_t *drv, uint8_t drive, uint32_t lba, uint8_t sectors, void *buffer) {
+	if(buffer) {
+		return ata_access_pio(drv, ATA_WRITE, drive, lba, sectors, buffer);
+	} else {
+		return -1;
+	}	
 }
 
 /*
@@ -537,14 +569,14 @@ int ata_poll_device(ata_driver_t *drv, uint8_t channel, bool advanced_check) {
  *
  * Note that this does NOT work on ATAPI drives.
  */
-int ide_ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lba, uint8_t numsects, void *buf) {
+static int ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lba, uint8_t numsects, void *buf) {
 	uint8_t lba_mode; // 0: CHS, 1:LBA28, 2: LBA48
 	uint8_t cmd;
 
 	uint8_t lba_io[6];
 	uint8_t channel = drv->devices[drive].channel; // channel
 	uint8_t slavebit = drv->devices[drive].drive & 0x01; // master/slave
-	uint16_t bus = drv->channels[channel].base; // Bus Base, like 0x1F0 which is also data port.
+	uint16_t bus_io_reg = drv->channels[channel].base; // Bus base address
 
 	// Size of a single sector in words (assume 512)
 	uint16_t sectorSize = 256;
@@ -552,8 +584,15 @@ int ide_ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lb
 	uint16_t cyl, i;
 	uint8_t head, sect, err;
 
-	// Disable IRQs
-	ata_write(drv, channel, ATA_REG_CONTROL, drv->channels[channel].nIEN = (ide_irq_invoked = 0x0) + 0x02);
+	// Ensure the LBA is within range of this device's size
+	if(lba > drv->devices[drive].size) {
+		return ATA_ERR_INVALID;
+	}
+
+	// Ensure we don't try to read past the end of the drive
+	if(lba + numsects > drv->devices[drive].size) {
+		return ATA_ERR_INVALID;
+	}
 
 	// Select the appropriate addressing mode
 	if(lba >= 0x10000000) { // LBA48
@@ -587,28 +626,31 @@ int ide_ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lb
 		head = (lba + 1 - sect) % (16 * 63) / (63); // Head number is written to HDDEVSEL lower 4-bits.
 	}
 
+	// Disable IRQs
+	// ata_reg_write(drv, channel, ATA_REG_CONTROL, drv->channels[channel].nIEN = (0x0) + 0x02);
+
 	// Wait until the channel is no longer busy
-	while(ata_read(drv, channel, ATA_REG_STATUS) & ATA_SR_BSY);
+	while(ata_reg_read(drv, channel, ATA_REG_STATUS) & ATA_SR_BSY);
 
 	// Select drive and LBA/CHS mode
 	if (lba_mode == 0) { // CHS
-		ata_write(drv, channel, ATA_REG_HDDEVSEL, 0xA0 | (slavebit << 4) | head);
+		ata_reg_write(drv, channel, ATA_REG_HDDEVSEL, 0xA0 | (slavebit << 4) | head);
 	} else {
-		ata_write(drv, channel, ATA_REG_HDDEVSEL, 0xE0 | (slavebit << 4) | head);
+		ata_reg_write(drv, channel, ATA_REG_HDDEVSEL, 0xE0 | (slavebit << 4) | head);
 	}
 
 	// Write parameters
 	if (lba_mode == 2) { // Write LBA48 special regs
-		ata_write(drv, channel, ATA_REG_SECCOUNT1, 0);
-		ata_write(drv, channel, ATA_REG_LBA3, lba_io[3]);
-		ata_write(drv, channel, ATA_REG_LBA4, lba_io[4]);
-		ata_write(drv, channel, ATA_REG_LBA5, lba_io[5]);
+		ata_reg_write(drv, channel, ATA_REG_SECCOUNT1, 0);
+		ata_reg_write(drv, channel, ATA_REG_LBA3, lba_io[3]);
+		ata_reg_write(drv, channel, ATA_REG_LBA4, lba_io[4]);
+		ata_reg_write(drv, channel, ATA_REG_LBA5, lba_io[5]);
 	}
 
-	ata_write(drv, channel, ATA_REG_SECCOUNT0, numsects);
-	ata_write(drv, channel, ATA_REG_LBA0, lba_io[0]);
-	ata_write(drv, channel, ATA_REG_LBA1, lba_io[1]);
-	ata_write(drv, channel, ATA_REG_LBA2, lba_io[2]);
+	ata_reg_write(drv, channel, ATA_REG_SECCOUNT0, numsects);
+	ata_reg_write(drv, channel, ATA_REG_LBA0, lba_io[0]);
+	ata_reg_write(drv, channel, ATA_REG_LBA1, lba_io[1]);
+	ata_reg_write(drv, channel, ATA_REG_LBA2, lba_io[2]);
 
 	// Select correct command
 	if (lba_mode == 0 && rw == ATA_READ) cmd = ATA_CMD_READ_PIO;
@@ -619,7 +661,7 @@ int ide_ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lb
 	if (lba_mode == 2 && rw == ATA_WRITE) cmd = ATA_CMD_WRITE_PIO_EXT;
 
 	// Send command
-	ata_write(drv, channel, ATA_REG_COMMAND, cmd);
+	ata_reg_write(drv, channel, ATA_REG_COMMAND, cmd);
 
 	/*
 	 * To read and receive blocks, we use "rep insw"/"rep outsw" instructions.
@@ -631,15 +673,15 @@ int ide_ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lb
 	if (rw == ATA_READ) { // Read
 		for (uint8_t s = 0; s < numsects; s++) {
 			// Wait for drive to have a sector available
-			if ((err = ata_poll_device(drv, channel, true))) {
+			if ((err = ata_poll_ready(drv, channel, true))) {
 				kprintf("IDE: Device read error (disk %u on channel %u)\n", slavebit, channel);
-				return err;
+				return ata_convert_error(drv, drive, err);
 			}
 
 			// Receive data
 			__asm__ volatile("pushw %es");
 			__asm__ volatile("mov %%ax, %%es" : : "a" (SYS_KERN_DATA_SEG));
-			__asm__ volatile("rep insw" : : "c" (sectorSize), "d" (bus), "D" (buf));
+			__asm__ volatile("rep insw" : : "c" (sectorSize), "d" (bus_io_reg), "D" (buf));
 			__asm__ volatile("popw %es");
 
 			buf += (sectorSize * 2);
@@ -647,12 +689,12 @@ int ide_ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lb
 	} else { // Write
 		for (uint8_t s = 0; s < numsects; s++) {
 			// Wait for the device to be ready to accept another sector
-			ata_poll_device(drv, channel, false);
+			ata_poll_ready(drv, channel, false);
 
 			// Write data
 			__asm__ volatile("pushw %ds");
 			__asm__ volatile("mov %%ax, %%ds" : : "a" (SYS_KERN_DATA_SEG));
-			__asm__ volatile("rep outsw" : : "c" (sectorSize), "d" (bus), "S" (buf));
+			__asm__ volatile("rep outsw" : : "c" (sectorSize), "d" (bus_io_reg), "S" (buf));
 			__asm__ volatile("popw %ds");
 
 			buf += (sectorSize * 2);
@@ -660,11 +702,19 @@ int ide_ata_access_pio(ata_driver_t *drv, uint8_t rw, uint8_t drive, uint32_t lb
 
 		// Flush cache after writing
 		uint8_t cacheCmd[3] = {ATA_CMD_CACHE_FLUSH, ATA_CMD_CACHE_FLUSH, ATA_CMD_CACHE_FLUSH_EXT};
-		ata_write(drv, channel, ATA_REG_COMMAND, cacheCmd[lba_mode]);
+		ata_reg_write(drv, channel, ATA_REG_COMMAND, cacheCmd[lba_mode]);
 
 		// Wait for the device to be ready again
-		ata_poll_device(drv, channel, false);
+		ata_poll_ready(drv, channel, false);
 	}
 
-	return 0;
+	return ATA_ERR_NONE;
+}
+
+// !Interrupt support
+/*
+ * Called from the interrupt handler of an IDE driver to 
+ */
+void ata_irq_callback(ata_driver_t *drv) {
+
 }

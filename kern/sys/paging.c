@@ -429,14 +429,14 @@ void paging_page_fault_handler(err_registers_t regs) {
 	int reserved = regs.err_code & 0x8;	  // Overwritten CPU-reserved bits of page entry?
 	int id = regs.err_code & 0x10;			 // Caused by an instruction fetch?
 
-	kprintf("Page fault! ( ");
+	kprintf("Page fault exception ( ");
 	if (present) {kprintf("present ");}
 	if (rw) {kprintf("read-only ");}
 	if (us) {kprintf("user-mode ");}
 	if (reserved) {kprintf("reserved ");}
 	kprintf(") at 0x%X\n", faulting_address);
 
-	while(1);
+//	while(1);
 
 	PANIC("Page Fault");
 }

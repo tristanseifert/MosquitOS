@@ -14,12 +14,12 @@ BUILD_NUMBER_LDFLAGS += -Xlinker --defsym -Xlinker KERN_BNUM=$$(cat $(BUILD_NUMB
 
 # Freestanding binary, strip extra shits
 CFLAGS= -c -finline-functions -g -Wall -static -mmmx -msse\
-		-O3 -fno-exceptions -ftree-vectorize -nostartfiles -nodefaultlibs -std=c99\
+		-O2 -fno-exceptions -ftree-vectorize -nostartfiles -nodefaultlibs -std=c99\
 		-Wno-unused-variable -mfpmath=387+sse -fno-stack-protector -I. -I./includes/\
 		-Wno-unused-function -mtune=pentium3 -fno-omit-frame-pointer \
-		-Wno-unused-but-set-variable
+		-Wno-unused-but-set-variable -pipe -march=i686
 
-CFLAGSNOOPT = $(filter-out -O3,$(CFLAGS))
+CFLAGSNOOPT = $(filter-out -O2,$(CFLAGS))
 
 ASFLAGS =
 
@@ -94,7 +94,7 @@ vga: vga/*.c
 
 # Modules for interfacing with various busses (PCI, ISA, etc)
 bus: bus/*.c
-	@$(CC) $(CFLAGS) -ffreestanding bus/*.c
+	@$(CC) $(CFLAGS) -I./acpi/acpica/include/ -ffreestanding bus/*.c
 	@$(make_obj_archive)
 
 # Management of kernel modules

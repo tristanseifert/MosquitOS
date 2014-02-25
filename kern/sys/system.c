@@ -322,7 +322,7 @@ void sys_set_idt(void* base, uint16_t size) {
  
 	IDTR.length = size;
 	IDTR.base = (uint32_t) base;
-	__asm__("lidt (%0)": : "p"(&IDTR));
+	__asm__ volatile("lidt (%0)": : "p"(&IDTR));
 }
 
 /*

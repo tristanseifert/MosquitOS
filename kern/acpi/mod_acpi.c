@@ -54,10 +54,11 @@ static int acpi_init(void) {
 		kprintf("Object initialisation failed (%i)\n", status);
 		return status;
 	}
+	
 	return 0;
 }
 
-// module_early_init(acpi_init);
+module_early_init(acpi_init);
 
 /*
  * Called during ACPICA initialisation/shutdown. Do nothing.
@@ -103,14 +104,14 @@ ACPI_STATUS AcpiOsPhysicalTableOverride(ACPI_TABLE_HEADER *ExistingTable, ACPI_P
  * pages mapped, but the offset into the first page, i.e. PhysicalAddress
  * logical ANDed with 0x00000FFF.
  */
-void *AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE Length) {
+void *AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE length) {
 	// Below 0x00100000 is identity mapped
 	if(PhysicalAddress < 0x00100000) {
 		return (void *) PhysicalAddress;
 	}
 
-	uint32_t location = paging_map_section(PhysicalAddress, (uint32_t) Length, kernel_directory, kMemorySectionHardware);
-	//kprintf("ACPI: Mapped 0x%X to virtual 0x%X (len = 0x%X)\n", PhysicalAddress, location, Length);
+	uint32_t location = paging_map_section(PhysicalAddress, (uint32_t) length, kernel_directory, kMemorySectionHardware);
+	kprintf("ACPI: Mapped 0x%X to virtual 0x%X (len = 0x%X)\n", PhysicalAddress, location, length);
 	paging_flush_tlb(location);
 
 	return (void *) location;
@@ -120,11 +121,12 @@ void *AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE Length) {
  * Unmaps a memory segment at virtual address where of length Length.
  */
 void AcpiOsUnmapMemory(void *where, ACPI_SIZE length) {
-	// Below 0x00100000 is identity mapped and the kernel needs it, don't unmap
+	// Below 0x00100000 is identity mapped and the kernel needs it to work, don't unmap
 	if((uint32_t) where < 0x00100000) {
 		return;
 	}
 
+	kprintf("ACPI: Unmapped virtual 0x%X (len = 0x%X)\n", (uint32_t) where, length);
 	paging_unmap_section((uint32_t) where, length, kernel_directory);
 }
 
@@ -149,30 +151,30 @@ ACPI_STATUS AcpiOsGetPhysicalAddress(void *LogicalAddress, ACPI_PHYSICAL_ADDRESS
 /*
  * Allocate size bytes of memory.
  */
-inline void *AcpiOsAllocate(ACPI_SIZE size) {
+void *AcpiOsAllocate(ACPI_SIZE size) {
 	void* ptr = (void *) kmalloc(size);
 	memclr(ptr, size);
-	return ptr;
+	return (void *) ptr;
 }
 
 /*
  * Deallocate memory that was previously allocated through AcpiOsAllocate.
  */
-inline void AcpiOsFree(void *memory) {
+void AcpiOsFree(void *memory) {
 	//kfree(memory);
 }
 
 /*
  * Checks if the memory pointed to by Memory is readable.
  */
-inline BOOLEAN AcpiOsReadable(void *memory, ACPI_SIZE Length) {
+BOOLEAN AcpiOsReadable(void *memory, ACPI_SIZE Length) {
 	return true;
 }
 
 /*
  * Checks if the memory at Memory is writeable.
  */
-inline BOOLEAN AcpiOsWritable(void *memory, ACPI_SIZE Length) {
+BOOLEAN AcpiOsWritable(void *memory, ACPI_SIZE Length) {
 	return true;
 }
 

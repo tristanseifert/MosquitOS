@@ -62,8 +62,6 @@ typedef struct {
 	uint16_t bridge_secondary_bus;
 } pci_bus_t;
 
-bool pci_match(device_t* device, driver_t* driver);
-
 void pci_config_write_l(uint32_t address, uint32_t value);
 void pci_config_write_w(uint32_t address, uint16_t value);
 void pci_config_write_b(uint32_t address, uint8_t value);

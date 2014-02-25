@@ -4,8 +4,23 @@
 #include "pci.h"
 #include "pci_tables.h"
 
+#include <acpi.h>
+
 #define PCI_CONFIG_ADDR 0xCF8
 #define PCI_CONFIG_DATA 0xCFC
+
+// Static functions
+static bool pci_match(device_t* dev, driver_t* driver);
+
+static void pci_set_function_info(uint8_t bus, uint8_t device, uint8_t function, pci_function_t* finfo);
+static void pci_probe_bus(pci_bus_t *bus);
+static void pci_enumerate_busses(void);
+
+static void pci_initialise_irq(uint8_t bus);
+
+static pci_str_vendor_t* pci_info_get_vendor(uint16_t vendor);
+static pci_str_device_t* pci_info_get_device(uint16_t vendor, uint16_t device);
+static void pci_print_tree(void);
 
 // Struct passed to bus driver
 static bus_t pci_bus = {
@@ -246,15 +261,19 @@ static void pci_probe_bus(pci_bus_t *bus) {
 
 			list_add(bus->d.node.children, device);	
 		}
-	}
+	}	
+
+	// Set up IRQs for this bus
+	pci_initialise_irq(bus_number);
 }
 
 /*
  * Searches through every bus on the system and reads info if it's valid.
  */
-void pci_enumerate_busses() {
+static void pci_enumerate_busses(void) {
 	uint32_t temp;
 
+	// Iterate through all busses
 	for(int i = 0; i < 256; i++) {
 		temp = pci_config_read(i, 0, 0, 0x00);
 		uint16_t vendor = temp & 0xFFFF;
@@ -316,6 +335,43 @@ void pci_enumerate_busses() {
 }
 
 /*
+ * Initialises IRQ routing using ACPI
+ */
+static void pci_initialise_irq(uint8_t bus) {
+	// ACPI should allocate the required buffer
+	ACPI_BUFFER buf;
+	buf.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
+
+	// Ask for PCI IRQ routing table
+	AcpiGetIrqRoutingTable(NULL, &buf);
+
+/*typedef struct acpi_pci_routing_table
+{
+    UINT32                          Length;
+    UINT32                          Pin;
+    UINT64                          Address;
+    UINT32                          SourceIndex;
+    char                            Source[4];
+} ACPI_PCI_ROUTING_TABLE;*/
+
+	ACPI_PCI_ROUTING_TABLE *next = (ACPI_PCI_ROUTING_TABLE *) buf.Pointer;
+
+	// Walk the tree of PCI IRQ entries
+	while(next) {
+		// Is there a next item?
+		if(next->Length) {
+			next += next->Length;
+		} else {
+			// If not, set next to NULL to exit the loop
+			next = NULL;
+		}
+	}
+
+	// Free ACPI buffer
+	ACPI_FREE_BUFFER(buf);
+}
+
+/*
  * Tries to find info about the vendor.
  */
 static pci_str_vendor_t* pci_info_get_vendor(uint16_t vendor) {
@@ -344,7 +400,7 @@ static pci_str_device_t* pci_info_get_device(uint16_t vendor, uint16_t device) {
 /*
  * Prints a pretty representation of the system's PCI devices.
  */
-static void pci_print_tree() {
+static void pci_print_tree(void) {
 	kprintf("==================== PCI Bus Device Listing ====================\n");
 
 	// Check all possible busses
@@ -405,7 +461,7 @@ static void pci_print_tree() {
  * instance, the device will actually be of type pci_device_t, which is an
  * extended version of device_t.
  */
-bool pci_match(device_t* dev, driver_t* driver) {
+static bool pci_match(device_t* dev, driver_t* driver) {
 	driver->supportQuery(dev);
 
 	return false;
@@ -448,10 +504,28 @@ module_post_driver_init(pci_load_drivers);
  * Initialise PCI subsystem
  */
 static int pci_init(void) {
+	// Register bus
 	pci_fast_config_avail = false;
-
 	bus_register(&pci_bus, BUS_NAME_PCI);
 
+	// Evaluate _PIC with argument of 1 to use IOAPIC
+	ACPI_OBJECT_LIST params;
+	ACPI_OBJECT obj[1];
+
+	params.Count = 1;
+	params.Pointer = (ACPI_OBJECT *) &obj;
+	
+	obj[0].Integer.Type = ACPI_TYPE_INTEGER;
+	obj[0].Integer.Value = 1;
+
+	// Execute method
+	ACPI_STATUS status = AcpiEvaluateObject(NULL, "/_PIC", &params, NULL);
+
+	if(ACPI_SUCCESS(status)) {
+		kprintf("PCI: Error executing _PIC: %i\n", status);
+	}
+
+	// Enumerate
 	pci_enumerate_busses();
 	pci_print_tree();
 
