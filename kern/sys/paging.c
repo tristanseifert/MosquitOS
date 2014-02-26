@@ -9,7 +9,7 @@ extern multiboot_info_t* sys_multiboot_info;
  
 extern uint32_t __kern_size, __kern_bss_start, __kern_bss_size;
 
-static uint32_t pages_total, pages_wired;
+uint32_t pages_total, pages_wired;
 static uint32_t previous_directory;
 
 // Maps a memory section enum entry to a range
@@ -121,6 +121,8 @@ void alloc_frame(page_t* page, bool is_kernel, bool is_writeable) {
 		page->rw = (is_writeable) ? 1 : 0;
 		page->user = (is_kernel) ? 0 : 1;
 		page->frame = idx;
+
+		// kprintf("Mapped page at phys 0x%X\n", idx * 0x1000);
 	}
 }
 
@@ -391,6 +393,7 @@ paging_stats_t paging_get_stats() {
 page_t* paging_get_page(uint32_t address, bool make, page_directory_t* dir) {
 	// Turn the address into an index.
 	address /= 0x1000;
+
 	// Find the page table containing this address.
 	uint32_t table_idx = address / 1024;
 
@@ -404,7 +407,6 @@ page_t* paging_get_page(uint32_t address, bool make, page_directory_t* dir) {
 		uint32_t phys_ptr = tmp | 0x7;
 		phys_ptr &= 0x0FFFFFFF; // get rid of high nybble
 		dir->tablesPhysical[table_idx] = phys_ptr;
-
 		dir->tables[table_idx]->pages[address % 0x400].present = 0;
 
 		return &dir->tables[table_idx]->pages[address % 0x400];
@@ -424,21 +426,25 @@ void paging_page_fault_handler(err_registers_t regs) {
 
 	// The error code gives us details of what happened.
 	int present	= !(regs.err_code & 0x1); // Page not present
-	int rw = regs.err_code & 0x2;			  // Write operation?
-	int us = regs.err_code & 0x4;			  // Processor was in user-mode?
-	int reserved = regs.err_code & 0x8;	  // Overwritten CPU-reserved bits of page entry?
-	int id = regs.err_code & 0x10;			 // Caused by an instruction fetch?
+	int rw = regs.err_code & 0x2; // Write operation?
+	int us = regs.err_code & 0x4; // Processor was in user-mode?
+	int reserved = regs.err_code & 0x8; // Overwritten CPU-reserved bits of page entry?
+	int id = regs.err_code & 0x10; // Caused by an instruction fetch?
 
 	kprintf("Page fault exception ( ");
-	if (present) {kprintf("present ");}
-	if (rw) {kprintf("read-only ");}
-	if (us) {kprintf("user-mode ");}
-	if (reserved) {kprintf("reserved ");}
-	kprintf(") at 0x%X\n", faulting_address);
+	if (present) kprintf("present ");
+	if (rw) kprintf("read-only ");
+	if (us) kprintf("user-mode ");
+	if (reserved) kprintf("reserved ");
+	if(id) kprintf("instruction fetch");
+	kprintf(") at 0x%X (regs 0x%X)\n", faulting_address, regs.err_code);
 
-//	while(1);
+	// Dump registers
+	error_dump_regs(regs);
 
-	PANIC("Page Fault");
+	while(1);
+
+//	PANIC("Page Fault");
 }
 
 /*

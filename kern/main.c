@@ -44,6 +44,20 @@ void kernel_main(uint32_t magic, multiboot_info_t* multibootInfo) {
 	// Initialise modules
 	modules_load();
 
+	// Memory testing
+	kprintf("Begin memory test\n");
+	for(int i = 0; i < 4096<<2; i++) {
+		int size = i << 4;
+		void *mem = (void *) kmalloc(size);
+		memclr(mem, size);
+		kfree(mem);
+	}
+	kprintf("Memory test success\n");
+
+	paging_stats_t paging_info2 = paging_get_stats();
+	kprintf("%i/%i pages mapped (%i pages free, %i pages wired): ", paging_info2.pages_mapped, paging_info2.total_pages, paging_info2.pages_free, paging_info2.pages_wired);
+	kprintf("%i/%i KB allocated (%i KB free, %i KB wired)\n", paging_info2.pages_mapped*4, paging_info2.total_pages*4, paging_info2.pages_free*4, paging_info2.pages_wired*4);
+
 	// Disk test
 /*	disk_t *hda0 = disk_allocate();
 	hda0->bus = 0;
@@ -123,6 +137,7 @@ void kernel_init(void) {
 static void kernel_preload(void) {
 	// Check if we're in a VBE mode that's 32bpp or 16bpp and set up FB console
 	svga_mode_info_t *vbe_info = (svga_mode_info_t *) sys_multiboot_info->vbe_mode_info;
+
 	if(vbe_info->bpp == 32 || vbe_info->bpp == 16) {
 		console_init_fb();
 	}

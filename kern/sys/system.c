@@ -12,6 +12,7 @@
 #include "sys/multiboot.h"
 #include "runtime/hashmap.h"
 #include "task.h"
+#include "binfmt_elf.h"
 #include "vga/svga.h"
 
 // This CANNOT be static as we need to access it elsewhere
@@ -21,6 +22,11 @@ static hashmap_t* sys_kern_arguments;
 static uint64_t sys_timer_ticks;
 static uint64_t sys_tsc_boot_ticks;
 static cpu_info_t* sys_current_cpu_info;
+
+// Some info from the ELF
+char *kern_elf_strtab;
+elf_symbol_entry_t *kern_elf_symtab;
+unsigned int kern_elf_symtab_entries;
 
 // Allocate memory in the BSS for IDT, GDT, and TSSes
 static idt_entry_t sys_idt[256];
@@ -66,10 +72,10 @@ void sys_timer_tick_handler(void* context);
  * Initialises the system into a known state.
  */ 
 void system_init() {
-	// Set up IDT.
+	// Set up IDT
 	sys_setup_ints();
 
-	// Read x86 TSC
+	// Read TSC
 	sys_tsc_boot_ticks = sys_rdtsc();
 
 	// Set up the TSS and their stacks
@@ -135,6 +141,44 @@ void sys_copy_multiboot() {
 	if (MULTIBOOT_CHECK_FLAG(lowmemStruct->flags, 5)) {
 		multiboot_elf_section_header_table_t *multiboot_elf_sec = &(lowmemStruct->u.elf_sec);
 		memcpy(&himemStruct->u.elf_sec, multiboot_elf_sec, sizeof(multiboot_elf_section_header_table_t));
+
+		// Physical address of the ELF headers
+		elf_section_entry_t *entries = (elf_section_entry_t *) multiboot_elf_sec->addr;
+
+		// Get string table
+		elf_section_entry_t *strtab = &entries[multiboot_elf_sec->shndx];
+		kern_elf_strtab = (char *) strtab->sh_addr;
+
+		// Iterate through all the tables
+		for(int i = 0; i < multiboot_elf_sec->num; i++) {
+			elf_section_entry_t *ent = &entries[i];
+
+			// Ignore NULL entries
+			if(ent->sh_type != SHT_NULL) {
+				char* name = kern_elf_strtab+ent->sh_name;
+
+				// Did we find the symbol table?
+				if(ent->sh_type == SHT_SYMTAB) {
+					kern_elf_symtab = (elf_symbol_entry_t *) kmalloc(ent->sh_size);
+					memcpy(kern_elf_symtab, (void *) ent->sh_addr, ent->sh_size);
+
+					kern_elf_symtab_entries = ent->sh_size / sizeof(elf_symbol_entry_t);
+
+					kprintf("Symbol table copied to 0x%X, link 0x%X\n", kern_elf_symtab, ent->sh_link);
+				} else if(ent->sh_type == SHT_STRTAB) { // If we found the string table, copy to highmem
+					kern_elf_strtab = (char *) kmalloc(ent->sh_size);
+					memcpy(kern_elf_strtab, (void *) ent->sh_addr, ent->sh_size);
+
+					kprintf("String table copied to 0x%X, size 0x%X\n", kern_elf_strtab, ent->sh_size);
+				} else { // other kind of section
+					kprintf("Section %s, addr 0x%x, sz 0x%X, type 0x%X, idx 0x%X\n", name, ent->sh_addr, ent->sh_size, ent->sh_type, i);
+				}
+			}
+		}
+
+		// Stuff
+		elf_symbol_entry_t *symbol = &kern_elf_symtab[535];
+		kprintf("Addr 0x%X: \"%s\" (%u bytes, name 0x%X)\n", symbol->st_address, kern_elf_strtab+symbol->st_name, symbol->st_size, symbol->st_name);
 	}
 
 	// Copy memory map

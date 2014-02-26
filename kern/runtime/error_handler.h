@@ -12,3 +12,7 @@ typedef struct registers {
 } err_registers_t;
 
 void error_handler(err_registers_t regs);
+void error_dump_regs(err_registers_t regs);
+void error_dump_stack_trace(unsigned int maxFrames);
+
+char *error_get_closest_symbol(unsigned int address);

@@ -335,40 +335,10 @@ static void pci_enumerate_busses(void) {
 }
 
 /*
- * Initialises IRQ routing using ACPI
+ * Initialises IRQ routing
  */
 static void pci_initialise_irq(uint8_t bus) {
-	// ACPI should allocate the required buffer
-	ACPI_BUFFER buf;
-	buf.Length = ACPI_ALLOCATE_LOCAL_BUFFER;
 
-	// Ask for PCI IRQ routing table
-	AcpiGetIrqRoutingTable(NULL, &buf);
-
-/*typedef struct acpi_pci_routing_table
-{
-    UINT32                          Length;
-    UINT32                          Pin;
-    UINT64                          Address;
-    UINT32                          SourceIndex;
-    char                            Source[4];
-} ACPI_PCI_ROUTING_TABLE;*/
-
-	ACPI_PCI_ROUTING_TABLE *next = (ACPI_PCI_ROUTING_TABLE *) buf.Pointer;
-
-	// Walk the tree of PCI IRQ entries
-	while(next) {
-		// Is there a next item?
-		if(next->Length) {
-			next += next->Length;
-		} else {
-			// If not, set next to NULL to exit the loop
-			next = NULL;
-		}
-	}
-
-	// Free ACPI buffer
-	ACPI_FREE_BUFFER(buf);
 }
 
 /*
@@ -507,23 +477,6 @@ static int pci_init(void) {
 	// Register bus
 	pci_fast_config_avail = false;
 	bus_register(&pci_bus, BUS_NAME_PCI);
-
-	// Evaluate _PIC with argument of 1 to use IOAPIC
-	ACPI_OBJECT_LIST params;
-	ACPI_OBJECT obj[1];
-
-	params.Count = 1;
-	params.Pointer = (ACPI_OBJECT *) &obj;
-	
-	obj[0].Integer.Type = ACPI_TYPE_INTEGER;
-	obj[0].Integer.Value = 1;
-
-	// Execute method
-	ACPI_STATUS status = AcpiEvaluateObject(NULL, "/_PIC", &params, NULL);
-
-	if(ACPI_SUCCESS(status)) {
-		kprintf("PCI: Error executing _PIC: %i\n", status);
-	}
 
 	// Enumerate
 	pci_enumerate_busses();

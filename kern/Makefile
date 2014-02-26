@@ -41,9 +41,9 @@ kernel: main.c
 	@$(CC) $(CFLAGS) -ffreestanding *.c -o kern_main.$(obj_arc_ext)
 	@$(CC) -Wl,-T,kern.ld -o kernel.elf -ffreestanding -g -O2 -nostdlib $(BUILD_NUMBER_LDFLAGS) tmp/entry.o *.$(obj_arc_ext)
 	
+	@i686-pc-elf-objdump -b elf32-i386 -S -d kernel.elf > symbols.txt
 	@i686-pc-elf-objcopy -I elf32-i386 --only-keep-debug kernel.elf kernel.sym
 	@i686-pc-elf-objcopy -I elf32-i386 --strip-debug kernel.elf
-	@i686-pc-elf-objdump -b elf32-i386 -d kernel.elf > symbols.txt
 
 # Sets up directories and stuff.
 setup:

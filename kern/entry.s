@@ -138,10 +138,10 @@ flush_gdt_2:
 	pop		%eax
 	ret
 
-# Reserve a stack of 16K
+# Reserve a stack of 128K
 .section .bss
 stack_bottom:
-.skip 0x4000
+.skip 0x10000
 stack_top:
 
 # Bootup page tables

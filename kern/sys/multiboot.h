@@ -94,10 +94,10 @@ typedef struct multiboot_aout_symbol_table {
 
 // The section header table for ELF.
 typedef struct multiboot_elf_section_header_table {
-	uint32_t num;
-	uint32_t size;
-	uint32_t addr;
-	uint32_t shndx;
+	uint32_t num; // number of entries
+	uint32_t size; // size of a single entry
+	uint32_t addr; // physical address
+	uint32_t shndx; // index of the string table
 } multiboot_elf_section_header_table_t;
 
 typedef struct multiboot_mmap_entry {

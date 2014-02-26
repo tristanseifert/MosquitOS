@@ -125,12 +125,12 @@ typedef struct{
 } __attribute__((packed)) elf_section_entry_t;
 
 typedef struct elf_symbol_entry {
-	uint32_t st_name;
-	uint32_t st_address;
-	uint32_t st_size;
-	uint8_t st_info;
-	uint8_t st_other;
-	uint32_t st_shndx;
+	uint32_t st_name; // k
+	uint32_t st_address; // k
+	uint32_t st_size; // k
+	unsigned char st_info; // k
+	unsigned char st_other; // k
+	uint16_t st_shndx; // k
 } __attribute__((packed)) elf_symbol_entry_t;
 
 typedef struct{

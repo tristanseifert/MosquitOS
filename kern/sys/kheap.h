@@ -9,7 +9,7 @@
 
 #define HEAP_INDEX_SIZE		0x20000
 #define HEAP_MAGIC			0xDEADCAFE
-#define HEAP_MIN_SIZE		0x70000
+#define HEAP_MIN_SIZE		0xA0000
 
 /*
  * Size information for a hole/block

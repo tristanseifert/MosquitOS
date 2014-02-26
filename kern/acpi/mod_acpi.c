@@ -58,7 +58,7 @@ static int acpi_init(void) {
 	return 0;
 }
 
-module_early_init(acpi_init);
+//module_early_init(acpi_init);
 
 /*
  * Called during ACPICA initialisation/shutdown. Do nothing.
@@ -111,7 +111,7 @@ void *AcpiOsMapMemory(ACPI_PHYSICAL_ADDRESS PhysicalAddress, ACPI_SIZE length) {
 	}
 
 	uint32_t location = paging_map_section(PhysicalAddress, (uint32_t) length, kernel_directory, kMemorySectionHardware);
-	kprintf("ACPI: Mapped 0x%X to virtual 0x%X (len = 0x%X)\n", PhysicalAddress, location, length);
+	// kprintf("ACPI: Mapped 0x%X to virtual 0x%X (len = 0x%X)\n", PhysicalAddress, location, length);
 	paging_flush_tlb(location);
 
 	return (void *) location;
@@ -126,7 +126,7 @@ void AcpiOsUnmapMemory(void *where, ACPI_SIZE length) {
 		return;
 	}
 
-	kprintf("ACPI: Unmapped virtual 0x%X (len = 0x%X)\n", (uint32_t) where, length);
+	// kprintf("ACPI: Unmapped virtual 0x%X (len = 0x%X)\n", (uint32_t) where, length);
 	paging_unmap_section((uint32_t) where, length, kernel_directory);
 }
 
@@ -332,8 +332,6 @@ void AcpiOsVprintf(const char *format, va_list va) {
  * to by Value.
  */
 ACPI_STATUS AcpiOsReadMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64 *Value, UINT32 Width) {
-	kprintf("ACPI read from 0x%X of 0x%X bits\n", Address, Width);
-
 	switch(Width) {
 		case 8: {
 			uint8_t *read = (uint8_t *) Address;
@@ -364,8 +362,6 @@ ACPI_STATUS AcpiOsReadMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64 *Value, UINT3
  * Writes Width bits from Value to the virtual address Address.
  */
 ACPI_STATUS AcpiOsWriteMemory(ACPI_PHYSICAL_ADDRESS Address, UINT64 Value, UINT32 Width) {
-	kprintf("ACPI Write to 0x%X of 0x%X bits\n", Address, Width);
-
 	switch(Width) {
 		case 8: {
 			uint8_t *write = (uint8_t *) Address;
@@ -456,7 +452,7 @@ ACPI_STATUS AcpiOsWritePort(ACPI_IO_ADDRESS Address, UINT32 Value, UINT32 Width)
  * Forms a PCI config space address from the ACPI parameters.
  */
 static inline uint32_t AcpiOSGetPCIAddress(ACPI_PCI_ID *PciId, UINT32 Register) {
-	return (uint32_t) ((PciId->Segment << 16) | (PciId->Device << 11) | (PciId->Function<< 8) | (Register & 0xFC) | 0x80000000);
+	return (uint32_t) ((PciId->Segment << 16) | (PciId->Device << 11) | (PciId->Function<< 8) | (Register & 0xFF) | 0x80000000);
 }
 
 /*
